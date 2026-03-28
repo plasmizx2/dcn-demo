@@ -1,0 +1,190 @@
+"""
+AI-powered worker loop for Step 8.
+
+Usage:
+    python workers/worker.py <worker_node_id>
+
+Run 2-3 of these in separate terminals with different worker UUIDs.
+"""
+
+import sys
+import os
+import time
+import json
+import requests
+
+# Add backend root to path so we can import handlers
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from handlers import document, codebase, website, research, data_processing
+
+BASE_URL = "http://localhost:8000"
+
+# Map task_type -> handler
+HANDLERS = {
+    "document_analysis": document.handle,
+    "codebase_review": codebase.handle,
+    "website_builder": website.handle,
+    "research_pipeline": research.handle,
+    "data_processing": data_processing.handle,
+}
+
+
+def heartbeat(worker_node_id):
+    resp = requests.post(
+        f"{BASE_URL}/workers/heartbeat",
+        json={"worker_node_id": worker_node_id},
+    )
+    if resp.status_code == 200:
+        data = resp.json()
+        print(f"[heartbeat] {data.get('node_name', worker_node_id)} alive")
+    else:
+        print(f"[heartbeat] failed: {resp.text}")
+
+
+def claim_task(worker_node_id):
+    resp = requests.post(
+        f"{BASE_URL}/tasks/claim",
+        json={"worker_node_id": worker_node_id},
+    )
+    if resp.status_code == 200:
+        return resp.json()
+    else:
+        print(f"[claim] error: {resp.text}")
+        return None
+
+
+def fetch_job(job_id):
+    """Fetch the parent job to get task_type and input_payload."""
+    resp = requests.get(f"{BASE_URL}/jobs/{job_id}")
+    if resp.status_code == 200:
+        job = resp.json()
+        # Ensure input_payload is a dict (may come back as JSON string)
+        if isinstance(job.get("input_payload"), str):
+            try:
+                job["input_payload"] = json.loads(job["input_payload"])
+            except (json.JSONDecodeError, TypeError):
+                job["input_payload"] = {}
+        return job
+    else:
+        print(f"[job] error fetching job {job_id}: {resp.text}")
+        return None
+
+
+def complete_task(task_id, result_text, execution_time):
+    resp = requests.post(
+        f"{BASE_URL}/tasks/{task_id}/complete",
+        json={
+            "result_text": result_text,
+            "execution_time_seconds": execution_time,
+        },
+    )
+    if resp.status_code == 200:
+        return resp.json()
+    else:
+        print(f"[complete] error: {resp.text}")
+        return None
+
+
+def fail_task(task_id):
+    """Mark a task as failed via the API."""
+    resp = requests.post(
+        f"{BASE_URL}/tasks/{task_id}/fail",
+    )
+    if resp.status_code == 200:
+        return resp.json()
+    else:
+        print(f"[fail] error: {resp.text}")
+        return None
+
+
+def process_task(task, job):
+    """Run the appropriate handler based on task_type."""
+    task_type = job.get("task_type", "")
+    handler = HANDLERS.get(task_type)
+
+    if not handler:
+        return f"No handler for task type: {task_type}"
+
+    return handler(task, job)
+
+
+def run_worker(worker_node_id):
+    print(f"=== AI Worker started: {worker_node_id} ===")
+    print(f"    Polling {BASE_URL}")
+    print()
+
+    while True:
+        # Send heartbeat
+        heartbeat(worker_node_id)
+
+        # Try to claim a task
+        result = claim_task(worker_node_id)
+
+        if result and result.get("claimed"):
+            task = result["task"]
+            task_id = task["id"]
+            task_name = task.get("task_name", "unknown")
+            job_id = task.get("job_id")
+
+            print(f"[claimed] task {task_id} — {task_name}")
+
+            # Fetch the parent job for task_type and input_payload
+            job = fetch_job(job_id)
+            if not job:
+                print(f"[error] could not fetch job {job_id}, skipping")
+                fail_task(task_id)
+                continue
+
+            task_type = job.get("task_type", "unknown")
+            print(f"[processing] type={task_type}, calling AI...")
+
+            # Process with AI
+            start_time = time.time()
+            try:
+                result_text = process_task(task, job)
+                execution_time = round(time.time() - start_time, 2)
+                print(f"[ai done] got {len(result_text)} chars in {execution_time}s")
+
+                # Submit result
+                complete_result = complete_task(task_id, result_text, execution_time)
+                if complete_result and complete_result.get("completed"):
+                    print(f"[done] task {task_id} submitted")
+                else:
+                    print(f"[error] failed to submit task {task_id}")
+
+            except Exception as e:
+                execution_time = round(time.time() - start_time, 2)
+                print(f"[ai error] {e}")
+
+                # Retry once
+                print(f"[retry] trying again...")
+                try:
+                    result_text = process_task(task, job)
+                    execution_time = round(time.time() - start_time, 2)
+                    print(f"[ai done] retry got {len(result_text)} chars in {execution_time}s")
+
+                    complete_result = complete_task(task_id, result_text, execution_time)
+                    if complete_result and complete_result.get("completed"):
+                        print(f"[done] task {task_id} submitted on retry")
+                    else:
+                        print(f"[error] failed to submit task {task_id}")
+
+                except Exception as e2:
+                    print(f"[failed] retry also failed: {e2}")
+                    fail_task(task_id)
+
+            print()
+        else:
+            msg = result.get("message", "No response") if result else "Request failed"
+            print(f"[idle] {msg} — waiting 5s")
+            time.sleep(5)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python workers/worker.py <worker_node_id>")
+        print("  worker_node_id = UUID from your worker_nodes table")
+        sys.exit(1)
+
+    run_worker(sys.argv[1])
