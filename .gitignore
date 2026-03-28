@@ -3,4 +3,6 @@
 __pycache__/
 *.pyc
 .venv/
+venv/
 node_modules/
+.worker_state.json

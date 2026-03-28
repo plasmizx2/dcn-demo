@@ -86,13 +86,138 @@ async def aggregate_job(conn, job_id: str):
 
 
 def concatenate_results(results, task_type: str) -> str:
-    """Simple structured concatenation — keeps all detail intact."""
+    """Smart concatenation — merges batch results into one clean report."""
+
+    # For distributed worker types, strip repeated headings and merge cleanly
+    DISTRIBUTED_TYPES = {
+        "image_processing", "web_scraping", "audio_transcription", "sentiment_classification",
+    }
+
+    if task_type in DISTRIBUTED_TYPES:
+        return _merge_distributed_results(results, task_type)
+
+    # For AI types, keep section headers
     sections = []
     for r in results:
         sections.append(
             f"=== {r['task_name']} ===\n\n{r['result_text']}"
         )
     return "\n\n---\n\n".join(sections)
+
+
+def _merge_distributed_results(results, task_type: str) -> str:
+    """Merge distributed batch results into a single clean report."""
+    import re
+
+    # Heading patterns each handler uses
+    HEADING_PATTERNS = {
+        "image_processing": r"^## Image Processing Results?\s*\n+",
+        "web_scraping": r"^## Web Scraping Results?\s*\n+",
+        "audio_transcription": r"^## Transcription Results?\s*\n+",
+        "sentiment_classification": r"^## Sentiment Classification Results?\s*\n+",
+    }
+
+    TITLES = {
+        "image_processing": "## Image Processing Results\n\n",
+        "web_scraping": "## Web Scraping Results\n\n",
+        "audio_transcription": "## Transcription Results\n\n",
+        "sentiment_classification": "## Sentiment Classification Results\n\n",
+    }
+
+    heading_re = HEADING_PATTERNS.get(task_type, "")
+    title = TITLES.get(task_type, f"## {task_type.replace('_', ' ').title()} Results\n\n")
+
+    cleaned_sections = []
+    total_items = 0
+
+    for r in results:
+        text = (r["result_text"] or "").strip()
+
+        # Strip the repeated heading
+        if heading_re:
+            text = re.sub(heading_re, "", text, count=1).strip()
+
+        # Strip the "Processed N items..." / "Scraped N URLs" / "Analyzed N items" summary line
+        text = re.sub(r"^(Processed|Scraped|Transcribed|Analyzed)\s+\d+\s+\S+.*\n*", "", text, count=1).strip()
+
+        # Count items from summary lines for a combined total
+        summary_match = re.search(r"(\d+)\s+(images?|URLs?|files?|items?)", r["result_text"] or "")
+        if summary_match:
+            total_items += int(summary_match.group(1))
+
+        if text:
+            cleaned_sections.append(text)
+
+    # For sentiment, merge the summary counts and only keep detailed results
+    if task_type == "sentiment_classification":
+        return _merge_sentiment(results, title, total_items, len(results))
+
+    # Build combined summary line
+    item_word = {
+        "image_processing": "images",
+        "web_scraping": "URLs",
+        "audio_transcription": "audio files",
+    }.get(task_type, "items")
+
+    summary = f"Processed {total_items} {item_word} across {len(results)} workers\n\n" if total_items else ""
+
+    return title + summary + "\n\n---\n\n".join(cleaned_sections)
+
+
+def _merge_sentiment(results, title, total_items, num_workers):
+    """Merge sentiment batches: combine counts into one summary + all details."""
+    import re
+
+    pos = neg = neu = 0
+    all_details = []
+
+    for r in results:
+        text = (r["result_text"] or "").strip()
+
+        # Extract counts from each batch
+        pos_match = re.search(r"\*\*Positive:\*\*\s*(\d+)", text)
+        neg_match = re.search(r"\*\*Negative:\*\*\s*(\d+)", text)
+        neu_match = re.search(r"\*\*Neutral:\*\*\s*(\d+)", text)
+
+        if pos_match:
+            pos += int(pos_match.group(1))
+        if neg_match:
+            neg += int(neg_match.group(1))
+        if neu_match:
+            neu += int(neu_match.group(1))
+
+        # Extract only the detailed results section
+        detail_match = re.search(r"### Detailed Results\s*\n+(.*)", text, re.DOTALL)
+        if detail_match:
+            detail_text = detail_match.group(1).strip()
+        else:
+            # Fallback: strip everything above the numbered results
+            detail_text = re.sub(r"^##.*?\n", "", text, flags=re.MULTILINE)
+            detail_text = re.sub(r"^-\s*\*\*\w+:\*\*.*\n?", "", detail_text, flags=re.MULTILINE)
+            detail_text = re.sub(r"^### Summary\s*\n?", "", detail_text)
+            detail_text = detail_text.strip()
+
+        if detail_text:
+            # Strip LLM preamble lines like "Here are the classifications:"
+            detail_text = re.sub(r"^(Here are the classifications[:\.]?\s*\n*)", "", detail_text, flags=re.IGNORECASE)
+            detail_text = re.sub(r"^(Here is the classification[:\.]?\s*\n*)", "", detail_text, flags=re.IGNORECASE)
+            detail_text = re.sub(r"^(Here are the results[:\.]?\s*\n*)", "", detail_text, flags=re.IGNORECASE)
+            detail_text = detail_text.strip()
+            if detail_text:
+                all_details.append(detail_text)
+
+    total = pos + neg + neu or total_items or 1
+
+    return (
+        f"{title}"
+        f"Analyzed {total_items or total} items across {num_workers} workers\n\n"
+        f"### Summary\n"
+        f"- **Positive:** {pos} ({round(pos/total*100)}%)\n"
+        f"- **Negative:** {neg} ({round(neg/total*100)}%)\n"
+        f"- **Neutral:** {neu} ({round(neu/total*100)}%)\n\n"
+        f"### Detailed Results\n\n"
+        + "\n\n".join(all_details) + "\n"
+    )
 
 
 def synthesize_results(results, job) -> str:

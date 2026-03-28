@@ -42,10 +42,16 @@ def heartbeat(worker_node_id):
         print(f"[heartbeat] failed: {resp.text}")
 
 
+AI_TASK_TYPES = [
+    "codebase_review", "document_analysis", "research_pipeline",
+    "website_builder", "data_processing",
+]
+
+
 def claim_task(worker_node_id):
     resp = requests.post(
         f"{BASE_URL}/tasks/claim",
-        json={"worker_node_id": worker_node_id},
+        json={"worker_node_id": worker_node_id, "task_types": AI_TASK_TYPES},
     )
     if resp.status_code == 200:
         return resp.json()

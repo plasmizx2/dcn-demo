@@ -189,6 +189,13 @@ def run(server_url, worker_id, task_types):
                 fail_task(server_url, task_id)
                 continue
 
+            # Parse task_payload if it's a string
+            if isinstance(task.get("task_payload"), str):
+                try:
+                    task["task_payload"] = json.loads(task["task_payload"])
+                except (json.JSONDecodeError, TypeError):
+                    task["task_payload"] = {}
+
             # Process
             print(f"[processing] Type: {task_type}...")
             start_time = time.time()
@@ -257,7 +264,11 @@ def main():
     state = load_state()
     worker_id = state.get("worker_id")
 
-    if worker_id:
+    saved_name = state.get("worker_name", "")
+    if saved_name and saved_name != worker_name:
+        print(f"[register] Name changed ({saved_name} -> {worker_name}), re-registering...")
+        worker_id = None
+    elif worker_id:
         # Verify still valid
         print(f"[register] Found saved worker ID: {worker_id[:8]}...")
         if heartbeat(server_url, worker_id):

@@ -55,7 +55,8 @@ def handle(task, job):
 
     prompt = (
         "Classify the sentiment of each item below as POSITIVE, NEGATIVE, or NEUTRAL. "
-        "For each item, respond with the number, sentiment, and a brief reason (one line each).\n\n"
+        "For each item, respond with ONLY the number, sentiment, and a brief reason (one line each). "
+        "Do NOT include any preamble or intro text. Start directly with the first item.\n\n"
         f"{batch_text}\n\n"
         "Format each line as: NUMBER. SENTIMENT — reason"
     )

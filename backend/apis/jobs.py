@@ -103,6 +103,18 @@ async def get_job_tasks(job_id: str):
     return [dict(r) for r in rows]
 
 
+@router.delete("/jobs/all")
+async def clear_all_jobs():
+    """Delete all jobs, tasks, events, and results. Demo reset."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM task_results")
+        await conn.execute("DELETE FROM job_events")
+        await conn.execute("DELETE FROM job_tasks")
+        await conn.execute("DELETE FROM jobs")
+    return {"cleared": True}
+
+
 @router.get("/jobs/{job_id}/events")
 async def get_job_events(job_id: str):
     """Return all events for a job, newest first."""
