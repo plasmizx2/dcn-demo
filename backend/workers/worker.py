@@ -16,7 +16,7 @@ import requests
 # Add backend root to path so we can import handlers
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from handlers import document, codebase, website, research, data_processing
+from handlers import document, codebase, website, research, data_processing, ml_experiment
 
 BASE_URL = "http://localhost:8000"
 
@@ -27,6 +27,7 @@ HANDLERS = {
     "website_builder": website.handle,
     "research_pipeline": research.handle,
     "data_processing": data_processing.handle,
+    "ml_experiment": ml_experiment.handle,
 }
 
 
@@ -143,7 +144,14 @@ def run_worker(worker_node_id):
                 continue
 
             task_type = job.get("task_type", "unknown")
-            print(f"[processing] type={task_type}, calling AI...")
+            print(f"[processing] type={task_type}, calling handler...")
+
+            # Ensure task_payload is a dict (may come back as JSON string)
+            if isinstance(task.get("task_payload"), str):
+                try:
+                    task["task_payload"] = json.loads(task["task_payload"])
+                except (json.JSONDecodeError, TypeError):
+                    task["task_payload"] = {}
 
             # Process with AI — retry with backoff on failure
             start_time = time.time()

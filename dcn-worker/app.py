@@ -168,6 +168,9 @@ class WorkerEngine:
                 from handlers import sentiment_classification
                 self._sentiment_handler = sentiment_classification.handle
             return self._sentiment_handler
+        if task_type == "ml_experiment":
+            from handlers import ml_experiment
+            return ml_experiment.handle
         return None
 
     def _loop(self):

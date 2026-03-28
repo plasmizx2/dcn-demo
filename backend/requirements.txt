@@ -4,3 +4,4 @@ asyncpg
 python-dotenv
 requests
 google-genai
+scikit-learn

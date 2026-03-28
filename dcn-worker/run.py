@@ -144,6 +144,9 @@ def get_handler(task_type):
             from handlers import sentiment_classification
             sentiment_handler = sentiment_classification.handle
         return sentiment_handler
+    elif task_type == "ml_experiment":
+        from handlers import ml_experiment
+        return ml_experiment.handle
     return None
 
 

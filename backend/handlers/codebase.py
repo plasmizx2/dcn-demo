@@ -11,9 +11,8 @@ def handle(task: dict, job: dict) -> str:
     task_order = task.get("task_order", 1)
 
     if not github_url:
-        # Fallback: use job title
         return generate_text(
-            f"Provide a general codebase review checklist for: {job.get('title', 'a project')}"
+            f"Provide a SHORT codebase review checklist (10 bullet points max) for: {job.get('title', 'a project')}. Keep it concise."
         )
 
     # Parse owner/repo from GitHub URL
@@ -107,8 +106,13 @@ def handle(task: dict, job: dict) -> str:
         f"You are reviewing a public GitHub repository: {github_url}\n"
         f"Your assignment: {task_desc}\n\n"
         f"Here are the files to review:\n\n{files_text}\n\n"
-        f"Provide a clear code review covering: code quality, potential bugs, "
-        f"improvements, and best practices. Be specific and reference file names."
+        f"Provide a CONCISE code review. For each file:\n"
+        f"- One line summary (what it does)\n"
+        f"- 1-3 bullet points: key issues, bugs, or improvements\n"
+        f"- A severity tag: [OK], [WARN], or [CRITICAL]\n\n"
+        f"Keep it SHORT. No lengthy explanations. No code blocks longer than 3 lines. "
+        f"Think senior engineer PR review, not essay. "
+        f"End with a brief Overall Assessment section (3-5 sentences max)."
     )
 
     return generate_text(prompt)

@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DCN — Job Results</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0a0a0f; color: #e0e0e0; min-height: 100vh;
+  }
+
+  /* Layout */
+  .layout { display: flex; height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 320px; min-width: 320px;
+    border-right: 1px solid #1e1e30;
+    display: flex; flex-direction: column;
+    background: #0e0e18;
+  }
+  .sidebar-header {
+    padding: 20px; border-bottom: 1px solid #1e1e30;
+  }
+  .sidebar-header h1 { font-size: 1.2rem; font-weight: 700; color: #fff; }
+  .sidebar-header h1 span { color: #6c63ff; }
+  .sidebar-header p { font-size: 0.75rem; color: #666; margin-top: 4px; }
+
+  .filter-bar {
+    display: flex; gap: 6px; padding: 12px 20px;
+    border-bottom: 1px solid #1e1e30;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 4px 12px; border-radius: 12px; border: 1px solid #2a2a40;
+    background: transparent; color: #888; font-size: 0.7rem; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .filter-btn:hover { border-color: #6c63ff; color: #fff; }
+  .filter-btn.active { background: #6c63ff; border-color: #6c63ff; color: #fff; }
+
+  .job-list {
+    flex: 1; overflow-y: auto; padding: 8px;
+  }
+  .job-list::-webkit-scrollbar { width: 6px; }
+  .job-list::-webkit-scrollbar-track { background: transparent; }
+  .job-list::-webkit-scrollbar-thumb { background: #2a2a40; border-radius: 3px; }
+
+  .job-item {
+    padding: 12px 14px; border-radius: 8px; cursor: pointer;
+    margin-bottom: 4px; transition: all 0.15s;
+    border: 1px solid transparent;
+  }
+  .job-item:hover { background: #141420; }
+  .job-item.selected { background: #141420; border-color: #6c63ff; }
+  .job-item .job-title {
+    font-size: 0.85rem; font-weight: 600; color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .job-item .job-meta {
+    display: flex; gap: 8px; align-items: center; margin-top: 4px;
+    font-size: 0.7rem; color: #666;
+  }
+  .job-item .type-badge {
+    padding: 2px 8px; border-radius: 10px; font-size: 0.65rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  /* Type colors */
+  .type-codebase_review { background: #1a2a3a; color: #60a5fa; }
+  .type-document_analysis { background: #2a1a3a; color: #c084fc; }
+  .type-research_pipeline { background: #1a3a2a; color: #4ade80; }
+  .type-website_builder { background: #3a2a1a; color: #fb923c; }
+  .type-data_processing { background: #3a1a2a; color: #f472b6; }
+  .type-image_processing { background: #1a3a3a; color: #22d3ee; }
+  .type-web_scraping { background: #2a3a1a; color: #a3e635; }
+  .type-audio_transcription { background: #3a3a1a; color: #facc15; }
+  .type-sentiment_classification { background: #2a1a2a; color: #e879f9; }
+
+  .status-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+  .status-completed { background: #4ade80; }
+  .status-queued { background: #fbbf24; }
+  .status-running { background: #6c63ff; }
+  .status-failed { background: #ef4444; }
+
+  /* Main content */
+  .content {
+    flex: 1; overflow-y: auto; padding: 0;
+  }
+  .content::-webkit-scrollbar { width: 8px; }
+  .content::-webkit-scrollbar-track { background: transparent; }
+  .content::-webkit-scrollbar-thumb { background: #2a2a40; border-radius: 4px; }
+
+  .content-empty {
+    display: flex; align-items: center; justify-content: center;
+    height: 100%; color: #444; font-size: 0.9rem;
+  }
+
+  /* Job detail header */
+  .detail-header {
+    padding: 24px 32px; border-bottom: 1px solid #1e1e30;
+    position: sticky; top: 0; background: #0a0a0f; z-index: 10;
+  }
+  .detail-header h2 {
+    font-size: 1.3rem; font-weight: 700; color: #fff;
+  }
+  .detail-meta {
+    display: flex; gap: 16px; align-items: center; margin-top: 8px;
+    font-size: 0.8rem; color: #666;
+  }
+  .detail-meta .type-badge { font-size: 0.7rem; }
+
+  /* Tab bar */
+  .tab-bar {
+    display: flex; gap: 0; border-bottom: 1px solid #1e1e30;
+    padding: 0 32px; background: #0a0a0f;
+    position: sticky; top: 85px; z-index: 9;
+  }
+  .tab {
+    padding: 10px 20px; font-size: 0.8rem; color: #666; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all 0.2s;
+  }
+  .tab:hover { color: #fff; }
+  .tab.active { color: #6c63ff; border-bottom-color: #6c63ff; }
+
+  /* Output */
+  .output-area { padding: 24px 32px; }
+
+  /* Markdown styles */
+  .markdown-body { line-height: 1.7; font-size: 0.9rem; }
+  .markdown-body h1 { font-size: 1.4rem; font-weight: 700; color: #fff; margin: 24px 0 12px; border-bottom: 1px solid #1e1e30; padding-bottom: 8px; }
+  .markdown-body h2 { font-size: 1.2rem; font-weight: 700; color: #fff; margin: 20px 0 10px; }
+  .markdown-body h3 { font-size: 1rem; font-weight: 600; color: #e0e0e0; margin: 16px 0 8px; }
+  .markdown-body p { margin: 8px 0; color: #ccc; }
+  .markdown-body ul, .markdown-body ol { padding-left: 24px; margin: 8px 0; }
+  .markdown-body li { margin: 4px 0; color: #ccc; }
+  .markdown-body strong { color: #fff; }
+  .markdown-body code {
+    background: #1a1a2e; padding: 2px 6px; border-radius: 4px;
+    font-family: 'Menlo', monospace; font-size: 0.85em; color: #e879f9;
+  }
+  .markdown-body pre {
+    background: #0d0d15; border: 1px solid #1e1e30; border-radius: 8px;
+    padding: 16px; overflow-x: auto; margin: 12px 0;
+  }
+  .markdown-body pre code {
+    background: none; padding: 0; color: #e0e0e0; font-size: 0.82rem;
+  }
+  .markdown-body hr { border: none; border-top: 1px solid #1e1e30; margin: 16px 0; }
+  .markdown-body blockquote {
+    border-left: 3px solid #6c63ff; padding-left: 16px; margin: 12px 0; color: #999;
+  }
+  .markdown-body table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  .markdown-body th, .markdown-body td {
+    border: 1px solid #1e1e30; padding: 8px 12px; text-align: left; font-size: 0.85rem;
+  }
+  .markdown-body th { background: #141420; color: #fff; font-weight: 600; }
+  .markdown-body a { color: #6c63ff; text-decoration: none; }
+  .markdown-body a:hover { text-decoration: underline; }
+
+  /* Raw text */
+  .raw-output {
+    font-family: 'Menlo', monospace; font-size: 0.8rem;
+    white-space: pre-wrap; color: #aaa; line-height: 1.6;
+    background: #0d0d15; border-radius: 8px; padding: 20px;
+    border: 1px solid #1e1e30;
+  }
+
+  /* Task list */
+  .task-list-section { padding: 24px 32px; }
+  .task-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; background: #141420; border: 1px solid #1e1e30;
+    border-radius: 8px; margin-bottom: 6px; font-size: 0.82rem;
+  }
+  .task-item .task-name { flex: 1; color: #fff; font-weight: 500; }
+  .task-item .task-status {
+    padding: 2px 10px; border-radius: 10px; font-size: 0.7rem;
+    font-weight: 600; text-transform: uppercase;
+  }
+  .ts-queued { background: #2a2a1a; color: #fbbf24; }
+  .ts-running { background: #1a1a3a; color: #6c63ff; }
+  .ts-submitted { background: #1a2a1a; color: #4ade80; }
+  .ts-failed { background: #2a1a1a; color: #ef4444; }
+
+  /* Website preview */
+  .preview-container {
+    resize: both; overflow: auto;
+    border: 1px solid #1e1e30; border-radius: 8px;
+    background: #fff; width: 100%; height: calc(100vh - 180px);
+    min-width: 320px; min-height: 300px; position: relative;
+  }
+  .preview-frame {
+    width: 100%; height: 100%; border: none; border-radius: 8px;
+    background: #fff; display: block;
+  }
+  .preview-size-label {
+    position: absolute; bottom: 8px; right: 14px;
+    font-size: 0.65rem; color: #666; background: rgba(0,0,0,0.6);
+    padding: 2px 8px; border-radius: 4px; pointer-events: none; z-index: 2;
+  }
+
+  /* Copy button */
+  .copy-btn {
+    padding: 6px 14px; border-radius: 6px; border: 1px solid #2a2a40;
+    background: transparent; color: #888; font-size: 0.75rem; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .copy-btn:hover { border-color: #6c63ff; color: #fff; }
+
+  .no-output { color: #444; font-style: italic; padding: 40px; text-align: center; }
+
+  /* Search */
+  .search-box {
+    padding: 8px 20px 12px;
+  }
+  .search-box input {
+    width: 100%; padding: 8px 12px; background: #0d0d15; border: 1px solid #2a2a40;
+    border-radius: 8px; color: #e0e0e0; font-size: 0.8rem; font-family: inherit;
+  }
+  .search-box input:focus { outline: none; border-color: #6c63ff; }
+  .search-box input::placeholder { color: #444; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h1><span>DCN</span> Results</h1>
+        <div style="display:flex;gap:6px">
+          <a href="/ops" style="padding:4px 10px;border-radius:5px;border:1px solid #2a2a40;color:#888;font-size:0.65rem;text-decoration:none;transition:all 0.2s;" onmouseover="this.style.borderColor='#6c63ff';this.style.color='#fff'" onmouseout="this.style.borderColor='#2a2a40';this.style.color='#888'">Ops</a>
+          <a href="/" style="padding:4px 10px;border-radius:5px;border:1px solid #2a2a40;color:#888;font-size:0.65rem;text-decoration:none;transition:all 0.2s;" onmouseover="this.style.borderColor='#6c63ff';this.style.color='#fff'" onmouseout="this.style.borderColor='#2a2a40';this.style.color='#888'">Submit</a>
+        </div>
+      </div>
+      <p id="jobCount">Loading...</p>
+    </div>
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Search jobs..." oninput="renderJobList()">
+    </div>
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+      <button class="filter-btn" onclick="setFilter('completed', this)">Completed</button>
+      <button class="filter-btn" onclick="setFilter('queued', this)">Queued</button>
+      <button class="filter-btn" onclick="setFilter('running', this)">Running</button>
+    </div>
+    <div class="job-list" id="jobList"></div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="content" id="content">
+    <div class="content-empty">Select a job to view its output</div>
+  </div>
+</div>
+
+<script>
+  const API = window.location.origin;
+  let allJobs = [];
+  let selectedJobId = null;
+  let currentFilter = 'all';
+  let currentTab = 'rendered';
+
+  async function loadJobs() {
+    try {
+      const resp = await fetch(`${API}/jobs`);
+      allJobs = await resp.json();
+      allJobs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      document.getElementById('jobCount').textContent = `${allJobs.length} jobs`;
+      renderJobList();
+    } catch (e) {
+      document.getElementById('jobCount').textContent = 'Error loading';
+    }
+  }
+
+  function setFilter(filter, btn) {
+    currentFilter = filter;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderJobList();
+  }
+
+  function renderJobList() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const list = document.getElementById('jobList');
+    const filtered = allJobs.filter(j => {
+      if (currentFilter !== 'all' && j.status !== currentFilter) return false;
+      if (search && !j.title.toLowerCase().includes(search) && !j.task_type.toLowerCase().includes(search)) return false;
+      return true;
+    });
+
+    list.innerHTML = filtered.map(j => {
+      const typeLabel = j.task_type.replace(/_/g, ' ');
+      const date = new Date(j.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      return `
+        <div class="job-item ${j.id === selectedJobId ? 'selected' : ''}" onclick="selectJob('${j.id}')">
+          <div class="job-title">${j.title}</div>
+          <div class="job-meta">
+            <span class="status-dot status-${j.status}"></span>
+            <span>${j.status}</span>
+            <span class="type-badge type-${j.task_type}">${typeLabel}</span>
+            <span style="margin-left:auto">${date}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function selectJob(jobId) {
+    selectedJobId = jobId;
+    renderJobList();
+
+    const job = allJobs.find(j => j.id === jobId);
+    if (!job) return;
+
+    // Auto-select best tab for this job type
+    const isWebsite = job.task_type === 'website_builder';
+    if (isWebsite && job.final_output && currentTab === 'rendered') {
+      currentTab = 'preview';
+    } else if (!isWebsite && currentTab === 'preview') {
+      currentTab = 'rendered';
+    }
+
+    // Fetch tasks
+    let tasks = [];
+    try {
+      const resp = await fetch(`${API}/jobs/${jobId}/tasks`);
+      tasks = await resp.json();
+    } catch(e) {}
+
+    const typeLabel = job.task_type.replace(/_/g, ' ');
+    const date = new Date(job.created_at).toLocaleString();
+    const output = job.final_output || '';
+    const hasOutput = output.length > 0;
+    const doneTasks = tasks.filter(t => t.status === 'submitted').length;
+
+    let tabs = `
+      <div class="tab ${currentTab === 'rendered' ? 'active' : ''}" onclick="switchTab('rendered')">Rendered</div>
+      <div class="tab ${currentTab === 'raw' ? 'active' : ''}" onclick="switchTab('raw')">Raw</div>
+      <div class="tab ${currentTab === 'tasks' ? 'active' : ''}" onclick="switchTab('tasks')">Tasks (${doneTasks}/${tasks.length})</div>
+    `;
+    if (isWebsite && hasOutput) {
+      tabs += `<div class="tab ${currentTab === 'preview' ? 'active' : ''}" onclick="switchTab('preview')">Preview</div>`;
+    }
+
+    let content = '';
+    if (currentTab === 'rendered') {
+      if (hasOutput) {
+        // Clean up section headers and code fences for display
+        let cleaned = output;
+        // Turn === section_name === into proper markdown headers
+        cleaned = cleaned.replace(/^=== (.+?) ===/gm, '## $1');
+        // If it looks like raw HTML (website builder viewed in rendered), wrap in code block
+        const looksLikeHtml = cleaned.trim().startsWith('<') || cleaned.includes('<!DOCTYPE');
+        if (looksLikeHtml && isWebsite) {
+          cleaned = '```html\n' + cleaned + '\n```';
+        }
+        const html = marked.parse(cleaned);
+        content = `<div class="output-area"><div class="markdown-body">${html}</div></div>`;
+      } else {
+        content = `<div class="no-output">No output yet — job is ${job.status}</div>`;
+      }
+    } else if (currentTab === 'raw') {
+      content = `<div class="output-area"><div class="raw-output">${escapeHtml(output || 'No output')}</div></div>`;
+    } else if (currentTab === 'tasks') {
+      content = `<div class="task-list-section">${tasks.map(t => `
+        <div class="task-item">
+          <span class="task-name">${t.task_name}</span>
+          <span class="task-status ts-${t.status}">${t.status}</span>
+        </div>
+      `).join('')}</div>`;
+    } else if (currentTab === 'preview') {
+      const cleaned = cleanHtmlOutput(output);
+      content = `<div class="output-area">
+        <div class="preview-container" id="previewContainer">
+          <iframe class="preview-frame" srcdoc="${escapeAttr(cleaned)}" sandbox="allow-scripts"></iframe>
+          <div class="preview-size-label" id="previewSize"></div>
+        </div>
+      </div>`;
+      // Show size label after render
+      setTimeout(() => {
+        const c = document.getElementById('previewContainer');
+        const s = document.getElementById('previewSize');
+        if (c && s) {
+          const update = () => { s.textContent = Math.round(c.offsetWidth) + ' x ' + Math.round(c.offsetHeight); };
+          update();
+          new ResizeObserver(update).observe(c);
+        }
+      }, 50);
+    }
+
+    document.getElementById('content').innerHTML = `
+      <div class="detail-header">
+        <div style="display:flex;justify-content:space-between;align-items:start">
+          <div>
+            <h2>${job.title}</h2>
+            <div class="detail-meta">
+              <span class="status-dot status-${job.status}"></span>
+              <span>${job.status}</span>
+              <span class="type-badge type-${job.task_type}">${typeLabel}</span>
+              <span>${date}</span>
+              ${hasOutput ? `<span>${output.length.toLocaleString()} chars</span>` : ''}
+            </div>
+          </div>
+          ${hasOutput ? `<button class="copy-btn" onclick="copyOutput()">Copy Output</button>` : ''}
+        </div>
+      </div>
+      <div class="tab-bar">${tabs}</div>
+      <div id="tabContent">${content}</div>
+    `;
+  }
+
+  function switchTab(tab) {
+    currentTab = tab;
+    if (selectedJobId) selectJob(selectedJobId);
+  }
+
+  function copyOutput() {
+    const job = allJobs.find(j => j.id === selectedJobId);
+    if (job && job.final_output) {
+      navigator.clipboard.writeText(job.final_output).then(() => {
+        const btn = document.querySelector('.copy-btn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy Output', 1500);
+      });
+    }
+  }
+
+  function cleanHtmlOutput(text) {
+    let html = text;
+    html = html.replace(/^=== .+ ===\s*/gm, '');
+    html = html.replace(/```html?\s*/g, '').replace(/```\s*/g, '');
+    html = html.replace(/^---$/gm, '');
+    return html.trim();
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function escapeAttr(str) {
+    return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Auto-refresh job list every 10s
+  loadJobs();
+  setInterval(loadJobs, 10000);
+
+  // Check URL hash for direct job link
+  if (window.location.hash) {
+    const id = window.location.hash.slice(1);
+    setTimeout(() => {
+      if (allJobs.length) selectJob(id);
+      else setTimeout(() => selectJob(id), 1000);
+    }, 500);
+  }
+</script>
+</body>
+</html>

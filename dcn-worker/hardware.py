@@ -84,7 +84,7 @@ def _compute_tier(info):
 
 def _supported_types(tier):
     """Return list of task types this tier can handle."""
-    types = ["image_processing", "web_scraping"]
+    types = ["image_processing", "web_scraping", "ml_experiment"]
 
     if tier >= 2:
         types.append("audio_transcription")

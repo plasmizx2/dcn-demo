@@ -1,4 +1,4 @@
 {
-  "server_url": "http://localhost:8000",
-  "worker_name": ""
+  "server_url": "https://trula-functionless-bernardine.ngrok-free.dev/",
+  "worker_name": "seans-MacBook-Air.local-worker"
 }
