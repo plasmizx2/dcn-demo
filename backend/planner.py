@@ -30,6 +30,18 @@ def plan_tasks(task_type: str, input_payload: dict) -> list[dict]:
     elif task_type == "data_processing":
         return _plan_data_processing(input_payload)
 
+    elif task_type == "image_processing":
+        return _plan_image_processing(input_payload)
+
+    elif task_type == "web_scraping":
+        return _plan_web_scraping(input_payload)
+
+    elif task_type == "audio_transcription":
+        return _plan_audio_transcription(input_payload)
+
+    elif task_type == "sentiment_classification":
+        return _plan_sentiment_classification(input_payload)
+
     else:
         # Unknown task type — create 3 generic subtasks
         return [
@@ -102,4 +114,86 @@ def _plan_data_processing(input_payload: dict) -> list[dict]:
         {"task_name": "batch_1_processing", "task_description": "Process batch 1 of the data (scope TBD by worker)", "task_payload": {}},
         {"task_name": "batch_2_processing", "task_description": "Process batch 2 of the data (scope TBD by worker)", "task_payload": {}},
         {"task_name": "batch_3_processing", "task_description": "Process batch 3 of the data (scope TBD by worker)", "task_payload": {}},
+    ]
+
+
+# ──────────────────────────────────────────────
+# Distributed worker task types (no AI API needed)
+# ──────────────────────────────────────────────
+
+
+def _plan_image_processing(input_payload: dict) -> list[dict]:
+    """Split image batch across workers."""
+    urls = input_payload.get("image_urls", [])
+    if not urls:
+        return [
+            {"task_name": f"image_batch_{i}", "task_description": f"Process image batch {i}", "task_payload": {}}
+            for i in range(1, 4)
+        ]
+    # Split URLs into 3 batches
+    batch_size = max(1, len(urls) // 3)
+    batches = [urls[i:i + batch_size] for i in range(0, len(urls), batch_size)]
+    return [
+        {"task_name": f"image_batch_{i+1}", "task_description": f"Resize/compress {len(b)} images", "task_payload": {"image_urls": b}}
+        for i, b in enumerate(batches[:3])
+    ]
+
+
+def _plan_web_scraping(input_payload: dict) -> list[dict]:
+    """Split URLs across workers."""
+    urls = input_payload.get("urls", [])
+    if not urls:
+        return [
+            {"task_name": f"scrape_batch_{i}", "task_description": f"Scrape URL batch {i}", "task_payload": {}}
+            for i in range(1, 4)
+        ]
+    batch_size = max(1, len(urls) // 3)
+    batches = [urls[i:i + batch_size] for i in range(0, len(urls), batch_size)]
+    return [
+        {"task_name": f"scrape_batch_{i+1}", "task_description": f"Scrape {len(b)} URLs and extract data", "task_payload": {"urls": b}}
+        for i, b in enumerate(batches[:3])
+    ]
+
+
+def _plan_audio_transcription(input_payload: dict) -> list[dict]:
+    """Split audio files across workers."""
+    files = input_payload.get("audio_urls", [])
+    if not files:
+        return [
+            {"task_name": f"transcribe_batch_{i}", "task_description": f"Transcribe audio batch {i}", "task_payload": {}}
+            for i in range(1, 4)
+        ]
+    batch_size = max(1, len(files) // 3)
+    batches = [files[i:i + batch_size] for i in range(0, len(files), batch_size)]
+    return [
+        {"task_name": f"transcribe_batch_{i+1}", "task_description": f"Transcribe {len(b)} audio files", "task_payload": {"audio_urls": b}}
+        for i, b in enumerate(batches[:3])
+    ]
+
+
+def _plan_sentiment_classification(input_payload: dict) -> list[dict]:
+    """Split text items across workers for sentiment analysis."""
+    items = input_payload.get("texts", [])
+    if not items:
+        text = input_payload.get("text", "")
+        if text:
+            # Split long text into paragraphs/sentences
+            paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
+            if len(paragraphs) < 3:
+                paragraphs = [text]
+            batch_size = max(1, len(paragraphs) // 3)
+            batches = [paragraphs[i:i + batch_size] for i in range(0, len(paragraphs), batch_size)]
+            return [
+                {"task_name": f"sentiment_batch_{i+1}", "task_description": f"Classify sentiment of {len(b)} items", "task_payload": {"texts": b}}
+                for i, b in enumerate(batches[:3])
+            ]
+        return [
+            {"task_name": f"sentiment_batch_{i}", "task_description": f"Classify sentiment batch {i}", "task_payload": {}}
+            for i in range(1, 4)
+        ]
+    batch_size = max(1, len(items) // 3)
+    batches = [items[i:i + batch_size] for i in range(0, len(items), batch_size)]
+    return [
+        {"task_name": f"sentiment_batch_{i+1}", "task_description": f"Classify {len(b)} items", "task_payload": {"texts": b}}
+        for i, b in enumerate(batches[:3])
     ]

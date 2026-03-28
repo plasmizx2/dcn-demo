@@ -15,6 +15,12 @@ class JobCreate(BaseModel):
 
 class TaskClaim(BaseModel):
     worker_node_id: str
+    task_types: Optional[list[str]] = None  # filter to only claim matching types
+
+
+class WorkerRegister(BaseModel):
+    node_name: str
+    capabilities: Optional[dict] = None  # hardware info (ram_gb, cores, has_gpu, tier)
 
 
 class TaskComplete(BaseModel):

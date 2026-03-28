@@ -1,117 +1,127 @@
-# DCN — Distributed Computation Network
+# DCN Demo — Claude Context
 
-## What this project is
+## What This Project Is
 
-A hackathon MVP for a distributed job orchestration system. Users submit jobs, the system splits them into subtasks, AI workers process each task using Gemini, and results are aggregated into a final output.
+**DCN (Distributed Computation Network)** — a distributed task orchestration and AI processing system. Users submit jobs via a web dashboard, those jobs are split into subtasks, distributed to AI-powered worker nodes, and results are aggregated and displayed. Built as a hackathon/MVP demo.
 
-## Tech stack
+---
 
-- **Backend:** FastAPI (Python, async)
-- **Database:** PostgreSQL via Supabase (asyncpg driver)
-- **AI:** Google Gemini 2.5 Flash via `google-genai`
-- **Frontend:** Plain HTML/CSS/JS served through FastAPI
-- **No auth, no WebSockets, no build tools**
+## Stack
 
-## Architecture flow
+| Layer | Tech |
+|-------|------|
+| Backend | Python 3, FastAPI (async), asyncpg, PostgreSQL |
+| Frontend | Vanilla HTML/JS (single-page, no framework) |
+| AI | Google Gemini API (`google-genai`) |
+| Env | `python-dotenv`, `.env` file (gitignored) |
 
-```
-User submits job → POST /jobs
-  → planner.py splits into 3 subtasks (job_tasks table)
-  → workers claim tasks via POST /tasks/claim (atomic, FOR UPDATE SKIP LOCKED)
-  → workers process with Gemini AI (handlers/)
-  → workers submit results via POST /tasks/{id}/complete
-  → last task triggers aggregation (aggregator.py)
-  → final_output saved to jobs table, status → completed
-  → frontend polls and displays result
-```
+---
 
-## Database tables (Supabase PostgreSQL)
-
-- `jobs` — id, title, description, task_type, input_payload, status, final_output, user_id, priority, reward_amount, requires_validation
-- `job_tasks` — id, job_id, task_order, task_name, task_description, task_payload, status, worker_node_id
-- `job_events` — job_id, event_type, message, created_at
-- `task_results` — task_id, worker_node_id, result_text, result_payload, execution_time_seconds, status
-- `worker_nodes` — id, node_name, status, last_heartbeat
-
-## Task types supported
-
-- `codebase_review` — takes `github_url` in input_payload, fetches repo from GitHub API
-- `document_analysis` — takes `text` in input_payload
-- `research_pipeline` — takes `text` in input_payload
-- `website_builder` — takes `text` in input_payload
-- `data_processing` — takes `text` in input_payload
-
-## Aggregation strategy (Step 9)
-
-- **Concatenation** for: codebase_review, website_builder, data_processing (preserves all detail)
-- **Gemini synthesis** for: document_analysis, research_pipeline (merges into coherent report)
-- If Gemini synthesis fails, falls back to concatenation
-- Triggers synchronously when the last task completes
-
-## Error handling
-
-- Worker retries up to 3 times with backoff: 5s → 15s → 30s
-- Rate limit detection (429) doubles the wait time
-- Aggregator falls back to concatenation if Gemini fails
-
-## Key files
+## Project Structure
 
 ```
-backend/
-  main.py              — FastAPI app, serves frontend at /
-  database.py          — asyncpg connection pool
-  schemas.py           — Pydantic models (JobCreate, TaskClaim, TaskComplete, WorkerHeartbeat)
-  planner.py           — splits jobs into subtasks by task_type
-  aggregator.py        — combines task results into final job output
-  apis/
-    jobs.py            — POST /jobs, GET /jobs, GET /jobs/{id}, GET /jobs/{id}/tasks, GET /jobs/{id}/events
-    workers.py         — POST /tasks/claim, POST /tasks/{id}/complete, POST /tasks/{id}/fail, POST /workers/heartbeat
-    monitor.py         — GET /monitor/jobs, /monitor/queue, /monitor/workers
-  handlers/
-    codebase.py        — fetches GitHub repo, sends files to Gemini for review
-    document.py        — document analysis handler
-    research.py        — research pipeline handler
-    website.py         — website builder handler
-    data_processing.py — data processing handler
-  ai/
-    gemini_client.py   — Gemini API wrapper (generate_text function)
-  workers/
-    worker.py          — standalone worker process (run with: python workers/worker.py <worker_node_id>)
-frontend/
-  public_page/
-    index.html         — demo UI (dark theme, job submission, status polling, output display)
+dcn-demo/
+├── backend/
+│   ├── main.py           # FastAPI app, lifespan DB pool, all routes
+│   ├── database.py       # Async connection pool (asyncpg)
+│   ├── schemas.py        # Pydantic request/response models
+│   ├── requirements.txt  # fastapi, uvicorn, asyncpg, python-dotenv, requests, google-genai
+│   ├── handlers/         # Per-task-type AI processing logic
+│   └── workers/
+│       └── worker.py     # Worker loop: claims tasks, runs handlers, posts results
+└── frontend/
+    └── public_page/
+        └── index.html    # Full SPA (dark theme, inline CSS/JS)
 ```
 
-## Environment variables (.env in backend/)
+---
+
+## Environment Variables
 
 ```
-DATABASE_URL=postgresql://...   # Supabase PostgreSQL connection string
-GEMINI_API_KEY=AIzaSy...        # Google Gemini API key
+DATABASE_URL=<postgres connection string>
+GEMINI_API_KEY=<google gemini api key>
 ```
 
-## How to run
+---
 
-1. `cd backend && pip install -r requirements.txt`
-2. Create `.env` with DATABASE_URL and GEMINI_API_KEY
-3. `uvicorn main:app --reload` (or `--host 0.0.0.0` for network access)
-4. Open http://localhost:8000
-5. In a separate terminal: `python workers/worker.py <worker_node_id>`
+## API Endpoints
 
-## Completed steps
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/` | Serve frontend HTML |
+| GET | `/health` | Health check |
+| GET | `/jobs` | List all jobs |
+| GET | `/jobs/{job_id}` | Get single job |
+| POST | `/jobs` | Create job, plan subtasks |
+| GET | `/jobs/{job_id}/tasks` | Get job's tasks |
+| GET | `/jobs/{job_id}/events` | Get event log |
+| POST | `/tasks/claim` | Worker atomically claims next queued task |
+| POST | `/tasks/{task_id}/complete` | Worker submits result, triggers aggregation check |
+| POST | `/tasks/{task_id}/fail` | Worker marks task failed |
+| POST | `/workers/heartbeat` | Worker keepalive |
+| GET | `/monitor/jobs` | Monitor: all jobs |
+| GET | `/monitor/queue` | Monitor: queued/running tasks |
+| GET | `/monitor/workers` | Monitor: all worker nodes |
 
-- Step 5: Database schema (Supabase)
-- Step 6: FastAPI backend with job/task/worker APIs
-- Step 7: Worker system with task claiming
-- Step 8: Gemini AI integration in handlers
-- Step 9: Aggregation + final job output
-- Step 10: Public demo frontend (in progress)
+---
 
-## Rules for working on this project
+## Database Schema
 
-- Do NOT refactor existing working code unless absolutely necessary
-- Do NOT add authentication yet
-- Do NOT add WebSockets — use polling
-- Do NOT add complex frameworks or build tools
-- Do NOT add new database tables unless required
-- Keep everything hackathon-simple
-- The repo is public at https://github.com/plasmizx2/dcn-demo
+- **jobs** — id (UUID), title, description, task_type, input_payload, user_id, priority, reward_amount, requires_validation, status, final_output, created_at
+- **job_tasks** — id, job_id, task_order, task_name, task_description, task_payload, status, worker_node_id, created_at
+- **job_events** — id, job_id, event_type, message, created_at
+- **task_results** — id, task_id, worker_node_id, result_text, result_payload, execution_time_seconds, status, created_at
+- **worker_nodes** — id, node_name, status, last_heartbeat, created_at
+
+---
+
+## Task Types & Handlers
+
+| Task Type | What It Does | Aggregation |
+|-----------|-------------|-------------|
+| `codebase_review` | Fetches GitHub repo files, AI code review | Concatenate |
+| `document_analysis` | AI analysis of provided text | Gemini synthesis |
+| `research_pipeline` | AI research on a topic | Gemini synthesis |
+| `website_builder` | Generates HTML/CSS sections | Concatenate |
+| `data_processing` | Classifies/analyzes data | Concatenate |
+
+---
+
+## Key Architectural Patterns
+
+- **Atomic task claiming**: PostgreSQL `FOR UPDATE SKIP LOCKED` prevents duplicate claims in distributed workers
+- **Event sourcing**: Every action logged (job_created, task_split, task_started, task_submitted, task_failed, job_completed)
+- **Worker retry logic**: Exponential backoff (5s → 15s → 30s), double backoff on 429 rate limits
+- **Two-tier aggregation**: Concatenation for code/data tasks, Gemini synthesis for analysis/research
+- **Async throughout**: FastAPI async endpoints + asyncpg connection pool
+
+---
+
+## Task Status Flow
+
+```
+queued → running → submitted → (aggregation check) → job completed
+                ↘ failed
+```
+
+---
+
+## Frontend Behavior
+
+- Polls `GET /jobs/{id}` + `GET /jobs/{id}/tasks` every 1500ms after job submit
+- Progress bar = completed tasks / total tasks
+- Shows live task list with status badges
+- Displays final_output when job completes
+- 5 task types, dynamic input field (URL for codebase_review, textarea for others)
+
+---
+
+## Known MVP Limitations / TODOs
+
+- Task splitting is **static** (always 3 subtasks) — planner has TODOs for real splitting logic
+- **No authentication** — open endpoints, demo only
+- `requires_validation` field exists but not implemented
+- No worker registration/deregistration UI
+- Single Gemini API client, no global rate limiting layer
+- No Docker/deployment config yet

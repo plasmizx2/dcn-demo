@@ -1,15 +1,31 @@
 import json
 from fastapi import APIRouter, HTTPException
 from database import get_pool
-from schemas import TaskClaim, TaskComplete, WorkerHeartbeat
+from schemas import TaskClaim, TaskComplete, WorkerHeartbeat, WorkerRegister
 from aggregator import aggregate_job
 
 router = APIRouter()
 
 
+@router.post("/workers/register")
+async def register_worker(body: WorkerRegister):
+    """Register a new worker node. Returns the worker UUID."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO worker_nodes (node_name, status)
+            VALUES ($1, 'online')
+            RETURNING id, node_name, status
+            """,
+            body.node_name,
+        )
+    return dict(row)
+
+
 @router.post("/tasks/claim")
 async def claim_task(body: TaskClaim):
-    """Worker claims the next available queued task."""
+    """Worker claims the next available queued task, optionally filtered by task type."""
     pool = await get_pool()
     async with pool.acquire() as conn:
         # Verify worker exists
@@ -20,24 +36,42 @@ async def claim_task(body: TaskClaim):
         if not worker:
             raise HTTPException(status_code=404, detail="Worker not found")
 
-        # Claim the oldest queued task atomically using UPDATE ... RETURNING
-        # This is safe for hackathon MVP — the single UPDATE with WHERE status='queued'
-        # and LIMIT 1 prevents two workers from claiming the same task in Postgres.
-        task = await conn.fetchrow(
-            """
-            UPDATE job_tasks
-            SET status = 'running', worker_node_id = $1
-            WHERE id = (
-                SELECT id FROM job_tasks
-                WHERE status = 'queued'
-                ORDER BY created_at
-                LIMIT 1
-                FOR UPDATE SKIP LOCKED
+        # Build claim query — optionally filter by task types the worker supports
+        if body.task_types:
+            task = await conn.fetchrow(
+                """
+                UPDATE job_tasks
+                SET status = 'running', worker_node_id = $1
+                WHERE id = (
+                    SELECT jt.id FROM job_tasks jt
+                    JOIN jobs j ON j.id = jt.job_id
+                    WHERE jt.status = 'queued'
+                      AND j.task_type = ANY($2)
+                    ORDER BY jt.created_at
+                    LIMIT 1
+                    FOR UPDATE OF jt SKIP LOCKED
+                )
+                RETURNING *
+                """,
+                body.worker_node_id,
+                body.task_types,
             )
-            RETURNING *
-            """,
-            body.worker_node_id,
-        )
+        else:
+            task = await conn.fetchrow(
+                """
+                UPDATE job_tasks
+                SET status = 'running', worker_node_id = $1
+                WHERE id = (
+                    SELECT id FROM job_tasks
+                    WHERE status = 'queued'
+                    ORDER BY created_at
+                    LIMIT 1
+                    FOR UPDATE SKIP LOCKED
+                )
+                RETURNING *
+                """,
+                body.worker_node_id,
+            )
 
         if not task:
             return {"claimed": False, "message": "No queued tasks available"}

@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DCN — Distributed Computation Network</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -178,14 +179,49 @@
       border: 1px solid #1e1e30;
       border-radius: 8px;
       padding: 20px;
-      white-space: pre-wrap;
-      word-wrap: break-word;
       font-size: 0.9rem;
       line-height: 1.6;
       color: #ccc;
       max-height: 600px;
       overflow-y: auto;
     }
+    .output-block h1, .output-block h2, .output-block h3, .output-block h4 {
+      color: #fff; margin: 14px 0 6px 0;
+    }
+    .output-block h1 { font-size: 1.3rem; }
+    .output-block h2 { font-size: 1.1rem; }
+    .output-block h3 { font-size: 1rem; }
+    .output-block p { margin: 8px 0; }
+    .output-block ul, .output-block ol { margin: 8px 0 8px 24px; }
+    .output-block li { margin: 4px 0; }
+    .output-block strong { color: #e0e0e0; }
+    .output-block code {
+      background: #1a1a2e; padding: 1px 5px; border-radius: 3px;
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85rem; color: #a78bfa;
+    }
+    .output-block pre {
+      background: #0a0a14; border: 1px solid #1e1e30; border-radius: 6px;
+      padding: 14px; margin: 10px 0; overflow-x: auto;
+    }
+    .output-block pre code { background: none; padding: 0; color: #ccc; }
+    .output-block blockquote {
+      border-left: 3px solid #6c63ff; padding-left: 14px; margin: 10px 0; color: #999;
+    }
+    .output-block hr { border: none; border-top: 1px solid #1e1e30; margin: 14px 0; }
+
+    .html-preview-public {
+      background: #fff; border: 1px solid #1e1e30; border-radius: 8px;
+      width: 100%; height: 400px; min-height: 200px; resize: vertical; overflow: auto;
+    }
+    .output-tabs {
+      display: flex; gap: 8px; margin-bottom: 12px;
+    }
+    .output-tab {
+      padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
+      text-transform: uppercase; cursor: pointer; border: 1px solid #2a2a40;
+      background: #0d0d15; color: #888;
+    }
+    .output-tab.active { background: #6c63ff; color: #fff; border-color: #6c63ff; }
 
     /* Error */
     .error-msg {
@@ -253,11 +289,19 @@
 
       <label for="taskType">Task Type</label>
       <select id="taskType">
-        <option value="codebase_review">Codebase Review</option>
-        <option value="document_analysis">Document Analysis</option>
-        <option value="research_pipeline">Research Pipeline</option>
-        <option value="website_builder">Website Builder</option>
-        <option value="data_processing">Data Processing</option>
+        <optgroup label="AI-Powered (Cloud)">
+          <option value="codebase_review">Codebase Review</option>
+          <option value="document_analysis">Document Analysis</option>
+          <option value="research_pipeline">Research Pipeline</option>
+          <option value="website_builder">Website Builder</option>
+          <option value="data_processing">Data Processing</option>
+        </optgroup>
+        <optgroup label="Distributed Workers (Local)">
+          <option value="image_processing">Image Processing</option>
+          <option value="web_scraping">Web Scraping</option>
+          <option value="audio_transcription">Audio Transcription</option>
+          <option value="sentiment_classification">Sentiment Classification</option>
+        </optgroup>
       </select>
 
       <div id="inputGroup">
@@ -307,19 +351,28 @@
     taskTypeSelect.addEventListener('change', updateInputField);
     updateInputField();
 
+    const inputConfig = {
+      codebase_review:            { label: 'GitHub Repository URL', tag: 'input', type: 'url', placeholder: 'https://github.com/user/repo' },
+      document_analysis:          { label: 'Document Text', tag: 'textarea', placeholder: 'Paste the document text you want analyzed...' },
+      research_pipeline:          { label: 'Research Topic', tag: 'textarea', placeholder: 'Describe the topic you want researched...' },
+      website_builder:            { label: 'Website Description', tag: 'textarea', placeholder: 'Describe the website you want built (sections, style, purpose)...' },
+      data_processing:            { label: 'Data to Process', tag: 'textarea', placeholder: 'Paste the data you want classified or analyzed...' },
+      image_processing:           { label: 'Image URLs (one per line)', tag: 'textarea', placeholder: 'https://example.com/photo1.jpg\nhttps://example.com/photo2.png' },
+      web_scraping:               { label: 'URLs to Scrape (one per line)', tag: 'textarea', placeholder: 'https://example.com/page1\nhttps://example.com/page2\nhttps://example.com/page3' },
+      audio_transcription:        { label: 'Audio File URLs (one per line)', tag: 'textarea', placeholder: 'https://example.com/meeting.mp3\nhttps://example.com/interview.wav' },
+      sentiment_classification:   { label: 'Text Items to Classify (one per line)', tag: 'textarea', placeholder: 'Great product, love it!\nTerrible customer service\nThe delivery was okay, nothing special' },
+    };
+
     function updateInputField() {
       const type = taskTypeSelect.value;
+      const cfg = inputConfig[type] || inputConfig.document_analysis;
       const group = document.getElementById('inputGroup');
-      if (type === 'codebase_review') {
-        group.innerHTML = `
-          <label for="inputText">GitHub Repository URL</label>
-          <input type="url" id="inputText" placeholder="https://github.com/user/repo">
-        `;
+      if (cfg.tag === 'input') {
+        group.innerHTML = `<label for="inputText">${cfg.label}</label>
+          <input type="${cfg.type || 'text'}" id="inputText" placeholder="${cfg.placeholder}">`;
       } else {
-        group.innerHTML = `
-          <label for="inputText">Input</label>
-          <textarea id="inputText" placeholder="Enter your input here..."></textarea>
-        `;
+        group.innerHTML = `<label for="inputText">${cfg.label}</label>
+          <textarea id="inputText" placeholder="${cfg.placeholder}"></textarea>`;
       }
     }
 
@@ -343,9 +396,22 @@
       btn.textContent = 'Submitting...';
 
       try {
-        const payload = taskType === 'codebase_review'
-          ? { github_url: inputText }
-          : { text: inputText };
+        // Build payload based on task type
+        let payload;
+        const lines = inputText.split('\n').map(l => l.trim()).filter(l => l);
+        if (taskType === 'codebase_review') {
+          payload = { github_url: inputText };
+        } else if (taskType === 'image_processing') {
+          payload = { image_urls: lines };
+        } else if (taskType === 'web_scraping') {
+          payload = { urls: lines };
+        } else if (taskType === 'audio_transcription') {
+          payload = { audio_urls: lines };
+        } else if (taskType === 'sentiment_classification') {
+          payload = { texts: lines };
+        } else {
+          payload = { text: inputText };
+        }
 
         const resp = await fetch(`${API}/jobs`, {
           method: 'POST',
@@ -399,9 +465,13 @@
         badge.textContent = job.status ? job.status.toUpperCase() : 'PENDING';
         badge.className = 'status-badge status-' + (job.status || 'pending');
 
-        // Update task count
+        // Update task count with phase info
         const done = tasks.filter(t => t.status === 'submitted').length;
-        document.getElementById('taskCount').textContent = `${done} / ${tasks.length} tasks done`;
+        const running = tasks.filter(t => t.status === 'running').length;
+        let phaseText = `${done} / ${tasks.length} tasks done`;
+        if (running > 0) phaseText += ` — ${running} processing`;
+        else if (done === 0) phaseText = `${tasks.length} tasks queued — waiting for workers`;
+        document.getElementById('taskCount').textContent = phaseText;
 
         // Update progress bar
         const pct = tasks.length > 0 ? (done / tasks.length) * 100 : 0;
@@ -420,11 +490,71 @@
         if (job.status === 'completed' && job.final_output) {
           clearInterval(pollInterval);
           document.getElementById('outputCard').style.display = 'block';
-          document.getElementById('outputBlock').textContent = job.final_output;
+          renderOutput(job.final_output, job.task_type);
         }
 
       } catch (e) {
         console.error('Poll error:', e);
+      }
+    }
+
+    function cleanOutput(text) {
+      return text
+        .replace(/^=== \S+ ===\s*\n?/gm, '')
+        .replace(/```html?\s*\n?/gi, '')
+        .replace(/\n?```\s*$/gm, '')
+        .replace(/^```\s*\n?/gm, '')
+        .trim();
+    }
+
+    function renderOutput(raw, taskType) {
+      const el = document.getElementById('outputBlock');
+      const cleaned = cleanOutput(raw);
+      const isHtml = taskType === 'website_builder' || /<(?:section|div|html|head|body|style|!DOCTYPE)\b/i.test(cleaned);
+
+      if (isHtml) {
+        el.innerHTML = `
+          <div class="output-tabs">
+            <div class="output-tab active" onclick="togglePublicOutput('preview')">Preview</div>
+            <div class="output-tab" onclick="togglePublicOutput('source')">Source</div>
+          </div>
+          <iframe class="html-preview-public" id="pub-preview" sandbox="allow-same-origin"></iframe>
+          <pre id="pub-source" style="display:none;white-space:pre-wrap;font-size:0.82rem;color:#ccc;margin:0;">${escapeHtml(cleaned)}</pre>
+        `;
+        setTimeout(() => {
+          const iframe = document.getElementById('pub-preview');
+          if (iframe) {
+            const doc = iframe.contentDocument;
+            doc.open();
+            doc.write(cleaned);
+            doc.close();
+          }
+        }, 50);
+      } else {
+        const preview = cleaned.length > 6000 ? cleaned.substring(0, 6000) + '\n\n*... (truncated)*' : cleaned;
+        el.innerHTML = marked.parse(preview);
+      }
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function togglePublicOutput(tab) {
+      const preview = document.getElementById('pub-preview');
+      const source = document.getElementById('pub-source');
+      const tabs = document.querySelectorAll('.output-tab');
+      tabs.forEach(t => t.classList.remove('active'));
+      if (tab === 'preview') {
+        if (preview) preview.style.display = 'block';
+        if (source) source.style.display = 'none';
+        tabs[0]?.classList.add('active');
+      } else {
+        if (preview) preview.style.display = 'none';
+        if (source) source.style.display = 'block';
+        tabs[1]?.classList.add('active');
       }
     }
 

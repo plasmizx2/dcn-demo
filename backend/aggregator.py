@@ -8,7 +8,11 @@ simple concatenation for everything else.
 from ai.gemini_client import generate_text
 
 # Task types that just get concatenated (no Gemini call)
-CONCAT_TYPES = {"codebase_review", "website_builder", "data_processing"}
+CONCAT_TYPES = {
+    "codebase_review", "website_builder", "data_processing",
+    "image_processing", "web_scraping", "audio_transcription",
+    "sentiment_classification",
+}
 
 
 async def aggregate_job(conn, job_id: str):

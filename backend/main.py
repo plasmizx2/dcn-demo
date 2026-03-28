@@ -9,6 +9,7 @@ from apis.monitor import router as monitor_router
 from apis.workers import router as workers_router
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "public_page")
+MONITOR_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "monitor")
 
 
 @asynccontextmanager
@@ -29,6 +30,11 @@ app.include_router(workers_router)
 @app.get("/")
 async def serve_frontend():
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
+
+@app.get("/ops")
+async def serve_monitor():
+    return FileResponse(os.path.join(MONITOR_DIR, "index.html"))
 
 
 @app.get("/health")

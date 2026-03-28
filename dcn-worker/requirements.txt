@@ -1,0 +1,5 @@
+requests
+psutil
+Pillow
+beautifulsoup4
+openai-whisper
