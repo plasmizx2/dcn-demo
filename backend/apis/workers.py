@@ -2,6 +2,7 @@ import json
 from fastapi import APIRouter, HTTPException
 from database import get_pool
 from schemas import TaskClaim, TaskComplete, WorkerHeartbeat
+from aggregator import aggregate_job
 
 router = APIRouter()
 
@@ -116,7 +117,14 @@ async def complete_task(task_id: str, body: TaskComplete = TaskComplete()):
             f"Task {task_id} submitted by worker",
         )
 
-    return {"completed": True, "task": dict(updated)}
+        # Check if all tasks done → run aggregation
+        aggregated = await aggregate_job(conn, task["job_id"])
+
+    return {
+        "completed": True,
+        "task": dict(updated),
+        "job_aggregated": aggregated,
+    }
 
 
 @router.post("/tasks/{task_id}/fail")

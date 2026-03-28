@@ -139,40 +139,46 @@ def run_worker(worker_node_id):
             task_type = job.get("task_type", "unknown")
             print(f"[processing] type={task_type}, calling AI...")
 
-            # Process with AI
+            # Process with AI — retry with backoff on failure
             start_time = time.time()
-            try:
-                result_text = process_task(task, job)
-                execution_time = round(time.time() - start_time, 2)
-                print(f"[ai done] got {len(result_text)} chars in {execution_time}s")
+            retries = [5, 15, 30]  # seconds to wait between attempts
+            succeeded = False
 
-                # Submit result
-                complete_result = complete_task(task_id, result_text, execution_time)
-                if complete_result and complete_result.get("completed"):
-                    print(f"[done] task {task_id} submitted")
-                else:
-                    print(f"[error] failed to submit task {task_id}")
-
-            except Exception as e:
-                execution_time = round(time.time() - start_time, 2)
-                print(f"[ai error] {e}")
-
-                # Retry once
-                print(f"[retry] trying again...")
+            for attempt in range(len(retries) + 1):
                 try:
                     result_text = process_task(task, job)
                     execution_time = round(time.time() - start_time, 2)
-                    print(f"[ai done] retry got {len(result_text)} chars in {execution_time}s")
+                    print(f"[ai done] got {len(result_text)} chars in {execution_time}s")
 
                     complete_result = complete_task(task_id, result_text, execution_time)
                     if complete_result and complete_result.get("completed"):
-                        print(f"[done] task {task_id} submitted on retry")
+                        print(f"[done] task {task_id} submitted")
+                        if complete_result.get("job_aggregated"):
+                            print(f"[aggregated] job {job_id} final output ready!")
                     else:
                         print(f"[error] failed to submit task {task_id}")
 
-                except Exception as e2:
-                    print(f"[failed] retry also failed: {e2}")
-                    fail_task(task_id)
+                    succeeded = True
+                    break
+
+                except Exception as e:
+                    error_str = str(e).lower()
+                    is_rate_limit = "429" in str(e) or "rate" in error_str or "quota" in error_str
+                    execution_time = round(time.time() - start_time, 2)
+
+                    if attempt < len(retries):
+                        wait = retries[attempt]
+                        if is_rate_limit:
+                            wait = wait * 2  # extra backoff for rate limits
+                            print(f"[rate limit] hit rate limit, waiting {wait}s...")
+                        else:
+                            print(f"[ai error] {e} — retrying in {wait}s...")
+                        time.sleep(wait)
+                    else:
+                        print(f"[failed] all retries exhausted: {e}")
+
+            if not succeeded:
+                fail_task(task_id)
 
             print()
         else:
