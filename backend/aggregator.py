@@ -21,12 +21,13 @@ async def aggregate_job(conn, job_id: str):
     If yes, combine results and update the job.
     Returns True if aggregation ran, False if tasks still pending.
     """
-    # Count total vs submitted tasks
+    # Count total vs terminal tasks (submitted or failed)
     counts = await conn.fetchrow(
         """
         SELECT
             COUNT(*) AS total,
-            COUNT(*) FILTER (WHERE status = 'submitted') AS done
+            COUNT(*) FILTER (WHERE status = 'submitted') AS submitted,
+            COUNT(*) FILTER (WHERE status IN ('submitted', 'failed')) AS done
         FROM job_tasks
         WHERE job_id = $1
         """,
@@ -34,7 +35,10 @@ async def aggregate_job(conn, job_id: str):
     )
 
     if counts["done"] < counts["total"]:
-        return False
+        return False  # Some tasks still queued/running
+
+    if counts["submitted"] == 0:
+        return False  # All failed — fail_task handles the job status
 
     # All tasks done — fetch job info
     job = await conn.fetchrow("SELECT * FROM jobs WHERE id = $1", job_id)

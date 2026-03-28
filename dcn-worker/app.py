@@ -77,10 +77,19 @@ class WorkerEngine:
             state["total_earnings"] = 0.0
         self.thread = threading.Thread(target=self._loop, daemon=True)
         self.thread.start()
+        self._hb_thread = threading.Thread(target=self._heartbeat_loop, daemon=True)
+        self._hb_thread.start()
 
     def stop(self):
         with state_lock:
             state["running"] = False
+
+    def _heartbeat_loop(self):
+        """Send heartbeat every 15s independently of task processing."""
+        while state["running"]:
+            if self.worker_id:
+                self._heartbeat()
+            time.sleep(15)
 
     def _register(self, hw_info):
         add_log("Registering with server...")
@@ -172,6 +181,21 @@ class WorkerEngine:
             from handlers import ml_experiment
             return ml_experiment.handle
         return None
+
+    # Earnings per second of execution time, by task type and tier
+    TASK_RATES = {
+        "ml_experiment":          0.0120,
+        "audio_transcription":    0.0090,
+        "image_processing":       0.0060,
+        "web_scraping":           0.0035,
+        "sentiment_classification": 0.0025,
+    }
+    TIER_MULT = {1: 1.0, 2: 1.6, 3: 2.5}
+
+    def _compute_earnings(self, task_type, exec_time, tier):
+        rate = self.TASK_RATES.get(task_type, 0.005)
+        mult = self.TIER_MULT.get(tier, 1.0)
+        return round(exec_time * rate * mult, 4)
 
     def _loop(self):
         hw = hardware.detect()
@@ -267,10 +291,11 @@ class WorkerEngine:
 
                     comp = self._complete(task_id, result_text, exec_time)
                     if comp and comp.get("completed"):
-                        reward = job.get("reward_amount", 0) or 0
+                        earned = self._compute_earnings(task_type, exec_time, hw["tier"])
                         with state_lock:
                             state["tasks_completed"] += 1
-                            state["total_earnings"] += reward / 3
+                            state["total_earnings"] += earned
+                        add_log(f"Earned ${earned:.4f} for {task_type} ({exec_time}s, Tier {hw['tier']})", "success")
                         if comp.get("job_aggregated"):
                             add_log(f"Job {job_id[:8]} fully completed!", "success")
                 except Exception as e:
@@ -305,6 +330,7 @@ HTML_PAGE = """<!DOCTYPE html>
 <title>DCN Worker</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { background: #0a0a0f; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: #0a0a0f; color: #e0e0e0; min-height: 100vh;

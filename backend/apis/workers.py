@@ -82,6 +82,15 @@ async def claim_task(body: TaskClaim):
             body.worker_node_id,
         )
 
+        # Mark job as running when the first task is claimed
+        await conn.execute(
+            """
+            UPDATE jobs SET status = 'running'
+            WHERE id = $1 AND status = 'queued'
+            """,
+            task["job_id"],
+        )
+
         # Log task_started event
         await conn.execute(
             """
@@ -193,6 +202,35 @@ async def fail_task(task_id: str):
             task["job_id"],
             f"Task {task_id} failed during processing",
         )
+
+        # If all tasks are terminal (submitted or failed), mark job as failed
+        counts = await conn.fetchrow(
+            """
+            SELECT
+                COUNT(*) AS total,
+                COUNT(*) FILTER (WHERE status IN ('submitted', 'failed')) AS done
+            FROM job_tasks WHERE job_id = $1
+            """,
+            task["job_id"],
+        )
+        if counts["done"] >= counts["total"]:
+            # Check if any submitted — if so, aggregation will handle it; otherwise job failed
+            submitted = await conn.fetchval(
+                "SELECT COUNT(*) FROM job_tasks WHERE job_id = $1 AND status = 'submitted'",
+                task["job_id"],
+            )
+            if submitted == 0:
+                await conn.execute(
+                    "UPDATE jobs SET status = 'failed' WHERE id = $1",
+                    task["job_id"],
+                )
+                await conn.execute(
+                    """
+                    INSERT INTO job_events (job_id, event_type, message)
+                    VALUES ($1, 'job_failed', 'All tasks failed')
+                    """,
+                    task["job_id"],
+                )
 
     return {"failed": True, "task": dict(updated)}
 
