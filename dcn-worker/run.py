@@ -23,6 +23,22 @@ from handlers import image_processing, web_scraping
 audio_handler = None
 sentiment_handler = None
 
+# Earnings rates: $/second of execution time, by task type
+TASK_RATES = {
+    "ml_experiment":            0.0120,
+    "audio_transcription":      0.0090,
+    "image_processing":         0.0060,
+    "web_scraping":             0.0035,
+    "sentiment_classification": 0.0025,
+}
+TIER_MULT = {1: 1.0, 2: 1.6, 3: 2.5}
+
+
+def compute_earnings(task_type, exec_time, tier):
+    rate = TASK_RATES.get(task_type, 0.005)
+    mult = TIER_MULT.get(tier, 1.0)
+    return round(exec_time * rate * mult, 4)
+
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
 STATE_FILE = os.path.join(os.path.dirname(__file__), ".worker_state.json")
 
@@ -150,7 +166,7 @@ def get_handler(task_type):
     return None
 
 
-def run(server_url, worker_id, task_types):
+def run(server_url, worker_id, task_types, tier=1):
     """Main worker loop."""
     tasks_completed = 0
     total_earnings = 0.0
@@ -211,9 +227,9 @@ def run(server_url, worker_id, task_types):
                 comp = complete_task(server_url, task_id, result_text, execution_time)
                 if comp and comp.get("completed"):
                     tasks_completed += 1
-                    reward = job.get("reward_amount", 0) or 0
-                    total_earnings += reward / 3  # split across tasks
-                    print(f"[submitted] Task {task_id[:8]} complete")
+                    earned = compute_earnings(task_type, execution_time, tier)
+                    total_earnings += earned
+                    print(f"[submitted] Task {task_id[:8]} complete — earned ${earned:.4f}")
                     if comp.get("job_aggregated"):
                         print(f"[aggregated] Job {job_id[:8]} finished!")
                     print(f"[stats] Tasks: {tasks_completed} | Earnings: ${total_earnings:.2f}")
@@ -293,7 +309,7 @@ def main():
 
     # Start the loop
     try:
-        run(server_url, worker_id, task_types)
+        run(server_url, worker_id, task_types, tier=tier)
     except KeyboardInterrupt:
         print("\n[worker] Shutting down. Thanks for contributing!")
         print(f"[worker] ID: {worker_id}")

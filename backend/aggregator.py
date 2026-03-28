@@ -5,6 +5,7 @@ Uses Gemini synthesis for task types that benefit from it,
 simple concatenation for everything else.
 """
 
+import asyncio
 from ai.gemini_client import generate_text
 
 # Task types that just get concatenated (no Gemini call)
@@ -67,7 +68,7 @@ async def aggregate_job(conn, job_id: str):
         final_output = concatenate_results(results, task_type)
     else:
         try:
-            final_output = synthesize_results(results, job)
+            final_output = await asyncio.to_thread(synthesize_results, results, job)
         except Exception as e:
             print(f"[aggregator] Gemini synthesis failed ({e}), falling back to concatenation")
             final_output = concatenate_results(results, task_type)
@@ -76,7 +77,7 @@ async def aggregate_job(conn, job_id: str):
     await conn.execute(
         """
         UPDATE jobs
-        SET final_output = $1, status = 'completed'
+        SET final_output = $1, status = 'completed', updated_at = NOW()
         WHERE id = $2
         """,
         final_output,

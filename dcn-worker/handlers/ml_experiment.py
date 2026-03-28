@@ -2,11 +2,7 @@
 
 import time
 import json
-import sys
-import os
-
-# Add backend to path so we can import datasets
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend"))
+from resource_guard import safe_n_jobs, safe_dataset_size
 
 
 def handle(task: dict, job: dict) -> str:
@@ -44,6 +40,12 @@ def handle(task: dict, job: dict) -> str:
     if not features:
         features = meta["all_features"]
 
+    # Limit dataset size based on available RAM to prevent crashes
+    max_rows = safe_dataset_size(len(rows))
+    if max_rows < len(rows):
+        import random
+        rows = random.sample(rows, max_rows)
+
     X = np.array([[row[f] for f in features] for row in rows])
     y = np.array([row[target] for row in rows])
 
@@ -58,7 +60,7 @@ def handle(task: dict, job: dict) -> str:
             max_depth=p.get("max_depth", 5), random_state=42),
         "random_forest_regressor": lambda p: RandomForestRegressor(
             n_estimators=p.get("n_estimators", 100),
-            max_depth=p.get("max_depth", 10), random_state=42, n_jobs=-1),
+            max_depth=p.get("max_depth", 10), random_state=42, n_jobs=safe_n_jobs()),
         "gradient_boosting_regressor": lambda p: GradientBoostingRegressor(
             n_estimators=p.get("n_estimators", 200),
             max_depth=p.get("max_depth", 5),
@@ -73,7 +75,7 @@ def handle(task: dict, job: dict) -> str:
             max_depth=p.get("max_depth", 5), random_state=42),
         "random_forest_classifier": lambda p: RandomForestClassifier(
             n_estimators=p.get("n_estimators", 100),
-            max_depth=p.get("max_depth", 10), random_state=42, n_jobs=-1),
+            max_depth=p.get("max_depth", 10), random_state=42, n_jobs=safe_n_jobs()),
         "gradient_boosting_classifier": lambda p: GradientBoostingClassifier(
             n_estimators=p.get("n_estimators", 200),
             max_depth=p.get("max_depth", 5),
@@ -96,7 +98,7 @@ def handle(task: dict, job: dict) -> str:
     cv_results = cross_validate(
         model, X_train, y_train,
         cv=cv_folds, scoring=cv_scoring,
-        return_train_score=True, n_jobs=-1,
+        return_train_score=True, n_jobs=safe_n_jobs(),
     )
     cv_time = round(time.time() - cv_start, 3)
 

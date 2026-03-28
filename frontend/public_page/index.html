@@ -614,6 +614,21 @@
           renderOutput(job.final_output, job.task_type);
         }
 
+        // Check if failed
+        if (job.status === 'failed') {
+          clearInterval(pollInterval);
+          const failedCount = tasks.filter(t => t.status === 'failed').length;
+          document.getElementById('outputCard').style.display = 'block';
+          document.getElementById('outputBlock').innerHTML = `
+            <div style="text-align:center; padding:32px 0;">
+              <div style="font-size:2rem; margin-bottom:12px;">⚠️</div>
+              <h3 style="color:#ff6b6b; margin-bottom:8px;">Job Failed</h3>
+              <p style="color:#888;">${failedCount} of ${tasks.length} tasks failed during processing.</p>
+              <p style="color:#666; font-size:0.85rem; margin-top:12px;">This can happen when workers encounter errors or lose connection.</p>
+            </div>
+          `;
+        }
+
       } catch (e) {
         console.error('Poll error:', e);
       }

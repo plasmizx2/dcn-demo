@@ -36,57 +36,58 @@ async def create_job(job: JobCreate):
     """Create a new job and log a job_created event."""
     pool = await get_pool()
     async with pool.acquire() as conn:
-        # Insert the job
-        row = await conn.fetchrow(
-            """
-            INSERT INTO jobs (title, description, task_type, input_payload,
-                              user_id, priority, reward_amount, requires_validation)
-            VALUES ($1, $2, $3, $4::jsonb, $5::uuid, $6, $7, $8)
-            RETURNING *
-            """,
-            job.title,
-            job.description,
-            job.task_type,
-            json.dumps(job.input_payload),
-            job.user_id,
-            job.priority,
-            job.reward_amount,
-            job.requires_validation,
-        )
-
-        # Log a job_created event
-        await conn.execute(
-            """
-            INSERT INTO job_events (job_id, event_type, message)
-            VALUES ($1, 'job_created', 'Job created via API')
-            """,
-            row["id"],
-        )
-
-        # Plan and insert subtasks
-        subtasks = plan_tasks(job.task_type, job.input_payload)
-        for i, task in enumerate(subtasks, start=1):
-            await conn.execute(
+        async with conn.transaction():
+            # Insert the job
+            row = await conn.fetchrow(
                 """
-                INSERT INTO job_tasks (job_id, task_order, task_name, task_description, task_payload, status)
-                VALUES ($1, $2, $3, $4, $5::jsonb, 'queued')
+                INSERT INTO jobs (title, description, task_type, input_payload,
+                                  user_id, priority, reward_amount, requires_validation)
+                VALUES ($1, $2, $3, $4::jsonb, $5::uuid, $6, $7, $8)
+                RETURNING *
                 """,
-                row["id"],
-                i,
-                task["task_name"],
-                task["task_description"],
-                json.dumps(task["task_payload"]),
+                job.title,
+                job.description,
+                job.task_type,
+                json.dumps(job.input_payload),
+                job.user_id,
+                job.priority,
+                job.reward_amount,
+                job.requires_validation,
             )
 
-        # Log task_split event
-        await conn.execute(
-            """
-            INSERT INTO job_events (job_id, event_type, message)
-            VALUES ($1, 'task_split', $2)
-            """,
-            row["id"],
-            f"Job split into {len(subtasks)} tasks",
-        )
+            # Log a job_created event
+            await conn.execute(
+                """
+                INSERT INTO job_events (job_id, event_type, message)
+                VALUES ($1, 'job_created', 'Job created via API')
+                """,
+                row["id"],
+            )
+
+            # Plan and insert subtasks
+            subtasks = plan_tasks(job.task_type, job.input_payload)
+            for i, task in enumerate(subtasks, start=1):
+                await conn.execute(
+                    """
+                    INSERT INTO job_tasks (job_id, task_order, task_name, task_description, task_payload, status)
+                    VALUES ($1, $2, $3, $4, $5::jsonb, 'queued')
+                    """,
+                    row["id"],
+                    i,
+                    task["task_name"],
+                    task["task_description"],
+                    json.dumps(task["task_payload"]),
+                )
+
+            # Log task_split event
+            await conn.execute(
+                """
+                INSERT INTO job_events (job_id, event_type, message)
+                VALUES ($1, 'task_split', $2)
+                """,
+                row["id"],
+                f"Job split into {len(subtasks)} tasks",
+            )
 
     return dict(row)
 

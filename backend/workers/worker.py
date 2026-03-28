@@ -45,7 +45,7 @@ def heartbeat(worker_node_id):
 
 AI_TASK_TYPES = [
     "codebase_review", "document_analysis", "research_pipeline",
-    "website_builder", "data_processing",
+    "website_builder", "data_processing", "ml_experiment",
 ]
 
 

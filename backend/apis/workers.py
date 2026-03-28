@@ -41,13 +41,13 @@ async def claim_task(body: TaskClaim):
             task = await conn.fetchrow(
                 """
                 UPDATE job_tasks
-                SET status = 'running', worker_node_id = $1
+                SET status = 'running', worker_node_id = $1, started_at = NOW()
                 WHERE id = (
                     SELECT jt.id FROM job_tasks jt
                     JOIN jobs j ON j.id = jt.job_id
                     WHERE jt.status = 'queued'
                       AND j.task_type = ANY($2)
-                    ORDER BY jt.created_at
+                    ORDER BY j.priority DESC, jt.created_at
                     LIMIT 1
                     FOR UPDATE OF jt SKIP LOCKED
                 )
@@ -60,13 +60,14 @@ async def claim_task(body: TaskClaim):
             task = await conn.fetchrow(
                 """
                 UPDATE job_tasks
-                SET status = 'running', worker_node_id = $1
+                SET status = 'running', worker_node_id = $1, started_at = NOW()
                 WHERE id = (
-                    SELECT id FROM job_tasks
-                    WHERE status = 'queued'
-                    ORDER BY created_at
+                    SELECT jt.id FROM job_tasks jt
+                    JOIN jobs j ON j.id = jt.job_id
+                    WHERE jt.status = 'queued'
+                    ORDER BY j.priority DESC, jt.created_at
                     LIMIT 1
-                    FOR UPDATE SKIP LOCKED
+                    FOR UPDATE OF jt SKIP LOCKED
                 )
                 RETURNING *
                 """,
@@ -85,7 +86,7 @@ async def claim_task(body: TaskClaim):
         # Mark job as running when the first task is claimed
         await conn.execute(
             """
-            UPDATE jobs SET status = 'running'
+            UPDATE jobs SET status = 'running', updated_at = NOW()
             WHERE id = $1 AND status = 'queued'
             """,
             task["job_id"],
@@ -109,59 +110,60 @@ async def complete_task(task_id: str, body: TaskComplete = TaskComplete()):
     """Worker marks a task as completed and optionally stores a result."""
     pool = await get_pool()
     async with pool.acquire() as conn:
-        # Verify the task exists and is running
-        task = await conn.fetchrow(
-            "SELECT * FROM job_tasks WHERE id = $1",
-            task_id,
-        )
-        if not task:
-            raise HTTPException(status_code=404, detail="Task not found")
-        if task["status"] != "running":
-            raise HTTPException(
-                status_code=400,
-                detail=f"Task is '{task['status']}', not 'running'",
+        async with conn.transaction():
+            # Verify the task exists and is running
+            task = await conn.fetchrow(
+                "SELECT * FROM job_tasks WHERE id = $1",
+                task_id,
+            )
+            if not task:
+                raise HTTPException(status_code=404, detail="Task not found")
+            if task["status"] != "running":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Task is '{task['status']}', not 'running'",
+                )
+
+            # Mark task submitted (worker done, may still need validation)
+            updated = await conn.fetchrow(
+                "UPDATE job_tasks SET status = 'submitted', completed_at = NOW() WHERE id = $1 RETURNING *",
+                task_id,
             )
 
-        # Mark task submitted (worker done, may still need validation)
-        updated = await conn.fetchrow(
-            "UPDATE job_tasks SET status = 'submitted' WHERE id = $1 RETURNING *",
-            task_id,
-        )
-
-        # Insert result into task_results (worker_id left null — it references users)
-        await conn.execute(
-            """
-            INSERT INTO task_results (task_id, worker_node_id,
-                                      result_text, result_payload,
-                                      execution_time_seconds, status)
-            VALUES ($1, $2, $3, $4::jsonb, $5, 'submitted')
-            """,
-            task_id,
-            task["worker_node_id"],
-            body.result_text or f"Processed task {task_id}",
-            json.dumps(body.result_payload) if body.result_payload else "{}",
-            body.execution_time_seconds or 0,
-        )
-
-        # Set worker back to online
-        if task["worker_node_id"]:
+            # Insert result into task_results (worker_id left null — it references users)
             await conn.execute(
-                "UPDATE worker_nodes SET status = 'online' WHERE id = $1",
+                """
+                INSERT INTO task_results (task_id, worker_node_id,
+                                          result_text, result_payload,
+                                          execution_time_seconds, status)
+                VALUES ($1, $2, $3, $4::jsonb, $5, 'submitted')
+                """,
+                task_id,
                 task["worker_node_id"],
+                body.result_text or f"Processed task {task_id}",
+                json.dumps(body.result_payload) if body.result_payload else "{}",
+                body.execution_time_seconds or 0,
             )
 
-        # Log task_submitted event
-        await conn.execute(
-            """
-            INSERT INTO job_events (job_id, event_type, message)
-            VALUES ($1, 'task_submitted', $2)
-            """,
-            task["job_id"],
-            f"Task {task_id} submitted by worker",
-        )
+            # Set worker back to online
+            if task["worker_node_id"]:
+                await conn.execute(
+                    "UPDATE worker_nodes SET status = 'online' WHERE id = $1",
+                    task["worker_node_id"],
+                )
 
-        # Check if all tasks done → run aggregation
-        aggregated = await aggregate_job(conn, task["job_id"])
+            # Log task_submitted event
+            await conn.execute(
+                """
+                INSERT INTO job_events (job_id, event_type, message)
+                VALUES ($1, 'task_submitted', $2)
+                """,
+                task["job_id"],
+                f"Task {task_id} submitted by worker",
+            )
+
+            # Check if all tasks done → run aggregation
+            aggregated = await aggregate_job(conn, task["job_id"])
 
     return {
         "completed": True,
@@ -221,7 +223,7 @@ async def fail_task(task_id: str):
             )
             if submitted == 0:
                 await conn.execute(
-                    "UPDATE jobs SET status = 'failed' WHERE id = $1",
+                    "UPDATE jobs SET status = 'failed', updated_at = NOW() WHERE id = $1",
                     task["job_id"],
                 )
                 await conn.execute(

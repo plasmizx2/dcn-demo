@@ -2,6 +2,7 @@
 
 import time
 import json
+from resource_guard import safe_n_jobs, safe_dataset_size
 
 
 def handle(task: dict, job: dict) -> str:
@@ -49,11 +50,16 @@ def handle(task: dict, job: dict) -> str:
     cv_folds = payload.get("cv_folds", 5)
     params = payload.get("params", {})
 
-    # Load dataset (75K rows)
+    # Load dataset — then downsample if machine is low on RAM
     rows, meta = get_dataset(dataset_name)
 
     if not features:
         features = meta["all_features"]
+
+    max_rows = safe_dataset_size(len(rows))
+    if max_rows < len(rows):
+        import random
+        rows = random.sample(rows, max_rows)
 
     # Build X and y as numpy arrays for speed
     X = np.array([[row[f] for f in features] for row in rows])
@@ -78,7 +84,7 @@ def handle(task: dict, job: dict) -> str:
             n_estimators=p.get("n_estimators", 100),
             max_depth=p.get("max_depth", 10),
             random_state=42,
-            n_jobs=-1,  # use all CPU cores
+            n_jobs=safe_n_jobs(),
         ),
         "gradient_boosting_regressor": lambda p: GradientBoostingRegressor(
             n_estimators=p.get("n_estimators", 200),
@@ -103,7 +109,7 @@ def handle(task: dict, job: dict) -> str:
             n_estimators=p.get("n_estimators", 100),
             max_depth=p.get("max_depth", 10),
             random_state=42,
-            n_jobs=-1,
+            n_jobs=safe_n_jobs(),
         ),
         "gradient_boosting_classifier": lambda p: GradientBoostingClassifier(
             n_estimators=p.get("n_estimators", 200),
@@ -132,7 +138,7 @@ def handle(task: dict, job: dict) -> str:
         cv=cv_folds,
         scoring=cv_scoring,
         return_train_score=True,
-        n_jobs=-1,
+        n_jobs=safe_n_jobs(),
     )
     cv_time = round(time.time() - cv_start, 3)
 
