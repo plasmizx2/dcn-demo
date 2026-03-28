@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DCN — Distributed Computation Network</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+    .header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.5px;
+    }
+    .header h1 span {
+      color: #6c63ff;
+    }
+    .header p {
+      color: #888;
+      margin-top: 8px;
+      font-size: 0.95rem;
+    }
+
+    /* Card */
+    .card {
+      background: #141420;
+      border: 1px solid #1e1e30;
+      border-radius: 12px;
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+    .card h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 20px;
+    }
+
+    /* Form */
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: #999;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 14px;
+      background: #0d0d15;
+      border: 1px solid #2a2a40;
+      border-radius: 8px;
+      color: #e0e0e0;
+      font-size: 0.95rem;
+      font-family: inherit;
+      margin-bottom: 16px;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: #6c63ff;
+    }
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+    select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 12px 32px;
+      background: #6c63ff;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+      width: 100%;
+    }
+    .btn:hover { background: #5a52e0; }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Status */
+    .status-section, .output-section {
+      display: none;
+    }
+
+    .job-id-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #1e1e30;
+    }
+    .job-id-row code {
+      font-size: 0.8rem;
+      color: #888;
+      background: #0d0d15;
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .status-pending { background: #2a2a40; color: #888; }
+    .status-running { background: #1a2940; color: #4a9eff; }
+    .status-completed { background: #1a3a2a; color: #4ade80; }
+
+    /* Task list */
+    .task-list {
+      list-style: none;
+    }
+    .task-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #1a1a28;
+    }
+    .task-item:last-child { border-bottom: none; }
+    .task-name {
+      font-size: 0.9rem;
+      color: #ccc;
+    }
+    .task-status {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 12px;
+      text-transform: uppercase;
+    }
+    .ts-queued { background: #2a2a40; color: #888; }
+    .ts-running { background: #1a2940; color: #4a9eff; }
+    .ts-submitted { background: #1a3a2a; color: #4ade80; }
+    .ts-failed { background: #3a1a1a; color: #ff6b6b; }
+
+    /* Output */
+    .output-block {
+      background: #0d0d15;
+      border: 1px solid #1e1e30;
+      border-radius: 8px;
+      padding: 20px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #ccc;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+
+    /* Error */
+    .error-msg {
+      background: #3a1a1a;
+      border: 1px solid #5a2020;
+      color: #ff6b6b;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    /* Progress bar */
+    .progress-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: #1e1e30;
+      border-radius: 3px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: #6c63ff;
+      border-radius: 3px;
+      transition: width 0.5s ease;
+      width: 0%;
+    }
+
+    /* New job button */
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid #2a2a40;
+      color: #888;
+      padding: 8px 20px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover {
+      border-color: #6c63ff;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1><span>DCN</span> Orchestration Demo</h1>
+      <p>Distributed task processing powered by AI workers</p>
+    </div>
+
+    <!-- Error -->
+    <div class="error-msg" id="errorMsg"></div>
+
+    <!-- Input Form -->
+    <div class="card" id="formCard">
+      <h2>Submit a Job</h2>
+
+      <label for="title">Job Title</label>
+      <input type="text" id="title" placeholder="e.g. Review my project">
+
+      <label for="taskType">Task Type</label>
+      <select id="taskType">
+        <option value="codebase_review">Codebase Review</option>
+        <option value="document_analysis">Document Analysis</option>
+        <option value="research_pipeline">Research Pipeline</option>
+        <option value="website_builder">Website Builder</option>
+        <option value="data_processing">Data Processing</option>
+      </select>
+
+      <div id="inputGroup">
+        <label for="inputText" id="inputLabel">Input</label>
+        <textarea id="inputText" placeholder="Enter your input here..."></textarea>
+      </div>
+
+      <button class="btn" id="submitBtn" onclick="submitJob()">Submit Job</button>
+    </div>
+
+    <!-- Status -->
+    <div class="card status-section" id="statusCard">
+      <div class="job-id-row">
+        <h2 style="margin-bottom:0">Job Status</h2>
+        <code id="jobIdDisplay"></code>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <span class="status-badge status-pending" id="jobStatus">PENDING</span>
+        <span style="font-size:0.85rem; color:#888;" id="taskCount"></span>
+      </div>
+
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressBar"></div>
+      </div>
+
+      <ul class="task-list" id="taskList"></ul>
+    </div>
+
+    <!-- Output -->
+    <div class="card output-section" id="outputCard">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2 style="margin-bottom:0">Final Output</h2>
+        <button class="btn-secondary" onclick="resetForm()">New Job</button>
+      </div>
+      <div class="output-block" id="outputBlock"></div>
+    </div>
+  </div>
+
+  <script>
+    const API = window.location.origin;
+    let currentJobId = null;
+    let pollInterval = null;
+
+    // Swap input field based on task type
+    const taskTypeSelect = document.getElementById('taskType');
+    taskTypeSelect.addEventListener('change', updateInputField);
+    updateInputField();
+
+    function updateInputField() {
+      const type = taskTypeSelect.value;
+      const group = document.getElementById('inputGroup');
+      if (type === 'codebase_review') {
+        group.innerHTML = `
+          <label for="inputText">GitHub Repository URL</label>
+          <input type="url" id="inputText" placeholder="https://github.com/user/repo">
+        `;
+      } else {
+        group.innerHTML = `
+          <label for="inputText">Input</label>
+          <textarea id="inputText" placeholder="Enter your input here..."></textarea>
+        `;
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('errorMsg');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+
+    async function submitJob() {
+      const title = document.getElementById('title').value.trim();
+      const taskType = document.getElementById('taskType').value;
+      const inputText = document.getElementById('inputText').value.trim();
+
+      if (!title) { showError('Please enter a job title.'); return; }
+      if (!inputText) { showError('Please enter some input.'); return; }
+
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Submitting...';
+
+      try {
+        const payload = taskType === 'codebase_review'
+          ? { github_url: inputText }
+          : { text: inputText };
+
+        const resp = await fetch(`${API}/jobs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: title,
+            task_type: taskType,
+            input_payload: payload,
+          }),
+        });
+
+        if (!resp.ok) {
+          const err = await resp.text();
+          throw new Error(err);
+        }
+
+        const job = await resp.json();
+        currentJobId = job.id;
+
+        // Show status card, hide form
+        document.getElementById('formCard').style.display = 'none';
+        document.getElementById('statusCard').style.display = 'block';
+        document.getElementById('jobIdDisplay').textContent = currentJobId;
+
+        // Start polling
+        pollInterval = setInterval(pollJob, 1500);
+        pollJob();
+
+      } catch (e) {
+        showError('Failed to submit job: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Submit Job';
+      }
+    }
+
+    async function pollJob() {
+      if (!currentJobId) return;
+
+      try {
+        const [jobResp, tasksResp] = await Promise.all([
+          fetch(`${API}/jobs/${currentJobId}`),
+          fetch(`${API}/jobs/${currentJobId}/tasks`),
+        ]);
+
+        const job = await jobResp.json();
+        const tasks = await tasksResp.json();
+
+        // Update status badge
+        const badge = document.getElementById('jobStatus');
+        badge.textContent = job.status ? job.status.toUpperCase() : 'PENDING';
+        badge.className = 'status-badge status-' + (job.status || 'pending');
+
+        // Update task count
+        const done = tasks.filter(t => t.status === 'submitted').length;
+        document.getElementById('taskCount').textContent = `${done} / ${tasks.length} tasks done`;
+
+        // Update progress bar
+        const pct = tasks.length > 0 ? (done / tasks.length) * 100 : 0;
+        document.getElementById('progressBar').style.width = pct + '%';
+
+        // Update task list
+        const list = document.getElementById('taskList');
+        list.innerHTML = tasks.map(t => `
+          <li class="task-item">
+            <span class="task-name">${t.task_name}</span>
+            <span class="task-status ts-${t.status}">${t.status}</span>
+          </li>
+        `).join('');
+
+        // Check if completed
+        if (job.status === 'completed' && job.final_output) {
+          clearInterval(pollInterval);
+          document.getElementById('outputCard').style.display = 'block';
+          document.getElementById('outputBlock').textContent = job.final_output;
+        }
+
+      } catch (e) {
+        console.error('Poll error:', e);
+      }
+    }
+
+    function resetForm() {
+      currentJobId = null;
+      if (pollInterval) clearInterval(pollInterval);
+
+      document.getElementById('formCard').style.display = 'block';
+      document.getElementById('statusCard').style.display = 'none';
+      document.getElementById('outputCard').style.display = 'none';
+      document.getElementById('title').value = '';
+      document.getElementById('inputText').value = '';
+      document.getElementById('taskList').innerHTML = '';
+      document.getElementById('progressBar').style.width = '0%';
+    }
+  </script>
+</body>
+</html>
