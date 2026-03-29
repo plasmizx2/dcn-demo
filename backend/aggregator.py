@@ -17,7 +17,7 @@ from config import CONCAT_TASK_TYPES
 CONCAT_TYPES = CONCAT_TASK_TYPES
 
 
-async def aggregate_job(conn, job_id: str):
+async def aggregate_job(conn, job_id: str) -> bool:
     """
     Check if all tasks for a job are submitted.
     If yes, combine results and update the job.
@@ -101,7 +101,7 @@ async def aggregate_job(conn, job_id: str):
     return True
 
 
-def concatenate_results(results, task_type: str) -> str:
+def concatenate_results(results: list, task_type: str) -> str:
     """Smart concatenation — merges batch results into one clean report."""
 
     # For distributed worker types, strip repeated headings and merge cleanly
@@ -121,7 +121,7 @@ def concatenate_results(results, task_type: str) -> str:
     return "\n\n---\n\n".join(sections)
 
 
-def _merge_distributed_results(results, task_type: str) -> str:
+def _merge_distributed_results(results: list, task_type: str) -> str:
     """Merge distributed batch results into a single clean report."""
     import re
 
@@ -180,7 +180,7 @@ def _merge_distributed_results(results, task_type: str) -> str:
     return title + summary + "\n\n---\n\n".join(cleaned_sections)
 
 
-def _merge_sentiment(results, title, total_items, num_workers):
+def _merge_sentiment(results: list, title: str, total_items: int, num_workers: int) -> str:
     """Merge sentiment batches: combine counts into one summary + all details."""
     import re
 
@@ -236,7 +236,7 @@ def _merge_sentiment(results, title, total_items, num_workers):
     )
 
 
-def synthesize_results(results, job) -> str:
+def synthesize_results(results: list, job: dict) -> str:
     """Use Gemini to combine subtask results into a coherent final report."""
     combined = "\n\n---\n\n".join(
         f"[{r['task_name']}]\n{r['result_text']}" for r in results
@@ -254,7 +254,7 @@ def synthesize_results(results, job) -> str:
     return generate_text(prompt)
 
 
-def _aggregate_ml_experiment(results, job) -> str:
+def _aggregate_ml_experiment(results: list, job: dict) -> str:
     """
     Custom aggregation for ml_experiment: parse JSON metrics from each
     experiment result, rank them, and produce a structured comparison report.

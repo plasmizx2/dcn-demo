@@ -131,7 +131,7 @@ async def get_job_tasks(job_id: str) -> list[dict]:
 @router.delete("/jobs/all")
 async def clear_all_jobs(request: Request) -> dict:
     """Delete all jobs, tasks, events, and results. Admin-only demo reset."""
-    user = get_session(request)
+    user = await get_session(request)
     if not user or user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     pool = await get_pool()
