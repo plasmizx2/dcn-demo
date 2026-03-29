@@ -73,14 +73,18 @@ async def aggregate_job(conn, job_id: str):
             print(f"[aggregator] Gemini synthesis failed ({e}), falling back to concatenation")
             final_output = concatenate_results(results, task_type)
 
+    # Set job status based on whether all tasks succeeded
+    job_status = 'completed' if counts['submitted'] == counts['total'] else 'failed'
+
     # Update job with final output and status
     await conn.execute(
         """
         UPDATE jobs
-        SET final_output = $1, status = 'completed', updated_at = NOW()
-        WHERE id = $2
+        SET final_output = $1, status = $2, updated_at = NOW()
+        WHERE id = $3
         """,
         final_output,
+        job_status,
         job_id,
     )
 

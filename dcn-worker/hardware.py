@@ -58,6 +58,38 @@ def _gpu_type():
     if shutil.which("rocm-smi"):
         return "amd_rocm"
 
+    # Check Windows WMI for any dedicated GPU
+    if platform.system() == "Windows":
+        try:
+            result = subprocess.run(
+                ["powershell.exe", "-Command",
+                 "Get-CimInstance -ClassName Win32_VideoController | Select-Object -ExpandProperty Name"],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode == 0:
+                for line in result.stdout.strip().split("\n"):
+                    line = line.strip().lower()
+                    if any(kw in line for kw in ["radeon", "geforce", "nvidia", "amd", "rtx", "gtx", "rx "]):
+                        return f"gpu:{result.stdout.strip().split(chr(10))[0].strip()}"
+        except Exception:
+            pass
+
+    # Check Linux lspci for any GPU
+    if platform.system() == "Linux" and shutil.which("lspci"):
+        try:
+            result = subprocess.run(
+                ["lspci"], capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                for line in result.stdout.split("\n"):
+                    if "VGA" in line or "3D controller" in line:
+                        low = line.lower()
+                        if any(kw in low for kw in ["radeon", "geforce", "nvidia", "amd", "rtx", "gtx", "rx "]):
+                            name = line.split(":")[-1].strip()
+                            return f"gpu:{name}"
+        except Exception:
+            pass
+
     return None
 
 

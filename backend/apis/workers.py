@@ -233,6 +233,8 @@ async def fail_task(task_id: str):
                     """,
                     task["job_id"],
                 )
+            else:
+                await aggregate_job(conn, task["job_id"])
 
     return {"failed": True, "task": dict(updated)}
 
