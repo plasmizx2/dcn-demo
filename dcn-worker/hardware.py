@@ -103,10 +103,17 @@ def _free_disk_gb():
 
 def _compute_tier(info):
     """
-    Tier 1: Any machine (image processing, web scraping, pdf extraction)
-    Tier 2: 8GB+ RAM, 4+ cores (adds Whisper audio transcription)
-    Tier 3: GPU or 16GB+ RAM (adds Ollama LLM tasks)
+    Tier 1: Any machine (image processing, web scraping, audio transcription)
+    Tier 2: 8GB+ RAM, 4+ cores (adds ml_experiment)
+    Tier 3: GPU or 16GB+ RAM, 8+ cores (adds sentiment_classification, LLM tasks)
+    Tier 4: NVIDIA CUDA GPU + 128GB+ RAM + 32+ cores — DGX / datacenter class only
+             (adds large_scale_ml: massive distributed training, 500K+ row jobs)
     """
+    # Tier 4: real NVIDIA GPU (not Apple Silicon) + 128 GB RAM + 32 cores
+    gpu = info.get("gpu_type") or ""
+    is_nvidia_cuda = gpu.startswith("nvidia:")
+    if is_nvidia_cuda and info["ram_gb"] >= 128 and info["cores"] >= 32:
+        return 4
     if info["has_gpu"] or info["ram_gb"] >= 16:
         return 3
     if info["ram_gb"] >= 8 and info["cores"] >= 4:
@@ -124,19 +131,28 @@ def _supported_types(tier):
     if tier >= 3:
         types.append("sentiment_classification")
 
+    if tier >= 4:
+        types.append("large_scale_ml")
+
     return types
 
 
 def print_report(info):
     """Pretty-print hardware detection results."""
-    print("=" * 50)
+    tier_labels = {
+        1: "Tier 1 — Basic (any machine)",
+        2: "Tier 2 — Standard (8GB+ RAM, 4+ cores)",
+        3: "Tier 3 — Enhanced (GPU or 16GB+ RAM)",
+        4: "Tier 4 — Datacenter (NVIDIA GPU + 128GB+ RAM + 32+ cores)",
+    }
+    print("=" * 60)
     print("  DCN Worker — Hardware Detection")
-    print("=" * 50)
+    print("=" * 60)
     print(f"  OS:          {info['os']} ({info['arch']})")
     print(f"  CPU Cores:   {info['cores']}")
     print(f"  RAM:         {info['ram_gb']} GB")
     print(f"  GPU:         {info['gpu_type'] or 'None detected'}")
     print(f"  Free Disk:   {info['free_disk_gb']} GB")
-    print(f"  Tier:        {info['tier']}")
+    print(f"  Tier:        {info['tier']} — {tier_labels.get(info['tier'], 'Unknown')}")
     print(f"  Task Types:  {', '.join(info['supported_task_types'])}")
-    print("=" * 50)
+    print("=" * 60)

@@ -91,11 +91,11 @@ def heartbeat(server_url, worker_id):
     return False
 
 
-def claim_task(server_url, worker_id, task_types):
+def claim_task(server_url, worker_id, task_types, tier=1):
     try:
         resp = requests.post(
             f"{server_url}/tasks/claim",
-            json={"worker_node_id": worker_id, "task_types": task_types},
+            json={"worker_node_id": worker_id, "task_types": task_types, "worker_tier": tier},
             timeout=10,
         )
         if resp.status_code == 200:
@@ -183,7 +183,7 @@ def run(server_url, worker_id, task_types, tier=1):
             continue
 
         # Try to claim a task
-        result = claim_task(server_url, worker_id, task_types)
+        result = claim_task(server_url, worker_id, task_types, tier)
 
         if result and result.get("claimed"):
             task = result["task"]

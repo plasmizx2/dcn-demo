@@ -36,7 +36,7 @@ async def claim_task(body: TaskClaim):
         if not worker:
             raise HTTPException(status_code=404, detail="Worker not found")
 
-        # Build claim query — optionally filter by task types the worker supports
+        # Build claim query — optionally filter by task types the worker supports, enforce min_tier, and prioritize high difficulty tasks
         if body.task_types:
             task = await conn.fetchrow(
                 """
@@ -47,7 +47,8 @@ async def claim_task(body: TaskClaim):
                     JOIN jobs j ON j.id = jt.job_id
                     WHERE jt.status = 'queued'
                       AND j.task_type = ANY($2)
-                    ORDER BY j.priority DESC, jt.created_at
+                      AND COALESCE((jt.task_payload->>'min_tier')::int, 1) <= $3
+                    ORDER BY j.priority DESC, COALESCE((jt.task_payload->>'min_tier')::int, 1) DESC, jt.created_at
                     LIMIT 1
                     FOR UPDATE OF jt SKIP LOCKED
                 )
@@ -55,6 +56,7 @@ async def claim_task(body: TaskClaim):
                 """,
                 body.worker_node_id,
                 body.task_types,
+                body.worker_tier,
             )
         else:
             task = await conn.fetchrow(
@@ -65,13 +67,15 @@ async def claim_task(body: TaskClaim):
                     SELECT jt.id FROM job_tasks jt
                     JOIN jobs j ON j.id = jt.job_id
                     WHERE jt.status = 'queued'
-                    ORDER BY j.priority DESC, jt.created_at
+                      AND COALESCE((jt.task_payload->>'min_tier')::int, 1) <= $2
+                    ORDER BY j.priority DESC, COALESCE((jt.task_payload->>'min_tier')::int, 1) DESC, jt.created_at
                     LIMIT 1
                     FOR UPDATE OF jt SKIP LOCKED
                 )
                 RETURNING *
                 """,
                 body.worker_node_id,
+                body.worker_tier,
             )
 
         if not task:

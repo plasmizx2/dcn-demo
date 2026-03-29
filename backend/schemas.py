@@ -16,6 +16,7 @@ class JobCreate(BaseModel):
 class TaskClaim(BaseModel):
     worker_node_id: str
     task_types: Optional[list[str]] = None  # filter to only claim matching types
+    worker_tier: int = 1
 
 
 class WorkerRegister(BaseModel):
