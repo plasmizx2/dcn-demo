@@ -78,4 +78,4 @@ ADMIN_PAGES = {"/ops", "/results"}
 # API routes that require admin role
 ADMIN_API_PREFIXES = ["/monitor/"]
 # Prefixes that don't need auth (worker endpoints, public pages, jobs API)
-PUBLIC_PREFIXES = ["/login", "/health", "/landing", "/workers/", "/tasks/", "/jobs", "/auth/"]
+PUBLIC_PREFIXES = ["/login", "/health", "/submit", "/workers/", "/tasks/", "/jobs", "/auth/"]

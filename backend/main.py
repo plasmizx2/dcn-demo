@@ -165,6 +165,11 @@ async def do_logout(request: Request):
 
 # ── Page routes ─────────────────────────────────────────────────
 @app.get("/")
+async def serve_landing():
+    return FileResponse(os.path.join(LANDING_DIR, "index.html"))
+
+
+@app.get("/submit")
 async def serve_frontend():
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
 
@@ -179,9 +184,6 @@ async def serve_results():
     return FileResponse(os.path.join(RESULTS_DIR, "index.html"))
 
 
-@app.get("/landing")
-async def serve_landing():
-    return FileResponse(os.path.join(LANDING_DIR, "index.html"))
 
 
 @app.get("/health")
