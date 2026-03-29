@@ -87,3 +87,8 @@ INFO:     Finished server process [72545]
 INFO:     Started server process [72557]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [72557]
+INFO:     Stopping reloader process [69150]
