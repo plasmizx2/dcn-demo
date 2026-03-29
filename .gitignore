@@ -6,3 +6,4 @@ __pycache__/
 venv/
 node_modules/
 .worker_state.json
+dcn-worker/config.json

@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from handlers import document, codebase, website, research, data_processing, ml_experiment
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "https://trula-functionless-bernardine.ngrok-free.dev"
 
 
 def detect_worker_tier():
@@ -53,17 +53,38 @@ def detect_worker_tier():
     if ram_gb is None:
         ram_gb = 4
 
+    # Check for GPU
+    has_gpu = False
+    import shutil, subprocess, platform
+    if shutil.which("nvidia-smi"):
+        has_gpu = True
+    elif platform.system() == "Windows":
+        try:
+            result = subprocess.run(
+                ["powershell.exe", "-Command",
+                 "Get-CimInstance -ClassName Win32_VideoController | Select-Object -ExpandProperty Name"],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode == 0:
+                for line in result.stdout.strip().split("\n"):
+                    if any(kw in line.strip().lower() for kw in ["radeon", "geforce", "nvidia", "amd", "rtx", "gtx", "rx "]):
+                        has_gpu = True
+                        break
+        except Exception:
+            pass
+
     # Determine tier
     if cores >= 8 and ram_gb >= 16:
         tier = 4
-    elif cores >= 6 and ram_gb >= 8:
+    elif has_gpu or (cores >= 6 and ram_gb >= 8):
         tier = 3
     elif cores >= 4 and ram_gb >= 4:
         tier = 2
     else:
         tier = 1
 
-    print(f"[hw detect] cores={cores}, ram={ram_gb:.1f}GB -> tier {tier}")
+    gpu_str = "detected" if has_gpu else "none"
+    print(f"[hw detect] cores={cores}, ram={ram_gb:.1f}GB, gpu={gpu_str} -> tier {tier}")
     return tier
 
 
