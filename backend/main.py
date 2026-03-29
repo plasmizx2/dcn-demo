@@ -156,7 +156,7 @@ async def auth_me(request: Request):
     return {"username": user["username"], "role": user["role"], "name": user.get("name", user["username"])}
 
 
-@app.post("/auth/logout")
+@app.api_route("/auth/logout", methods=["GET", "POST"])
 async def do_logout(request: Request):
     token = request.cookies.get(SESSION_COOKIE)
     if token:
