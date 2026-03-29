@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.post("/workers/register")
-async def register_worker(body: WorkerRegister):
+async def register_worker(body: WorkerRegister) -> dict:
     """Register a new worker node. Returns the worker UUID."""
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -24,7 +24,7 @@ async def register_worker(body: WorkerRegister):
 
 
 @router.post("/tasks/claim")
-async def claim_task(body: TaskClaim):
+async def claim_task(body: TaskClaim) -> dict:
     """Worker claims the next available queued task, optionally filtered by task type."""
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -119,7 +119,7 @@ async def claim_task(body: TaskClaim):
 
 
 @router.post("/tasks/{task_id}/complete")
-async def complete_task(task_id: str, body: TaskComplete = TaskComplete()):
+async def complete_task(task_id: str, body: TaskComplete = TaskComplete()) -> dict:
     """Worker marks a task as completed and optionally stores a result."""
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -186,7 +186,7 @@ async def complete_task(task_id: str, body: TaskComplete = TaskComplete()):
 
 
 @router.post("/tasks/{task_id}/fail")
-async def fail_task(task_id: str):
+async def fail_task(task_id: str) -> dict:
     """Mark a task as failed when processing errors out."""
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -253,7 +253,7 @@ async def fail_task(task_id: str):
 
 
 @router.post("/workers/heartbeat")
-async def worker_heartbeat(body: WorkerHeartbeat):
+async def worker_heartbeat(body: WorkerHeartbeat) -> dict:
     """Worker sends a heartbeat to stay active."""
     pool = await get_pool()
     async with pool.acquire() as conn:

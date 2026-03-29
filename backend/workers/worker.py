@@ -11,7 +11,15 @@ import sys
 import os
 import time
 import json
+import logging
 import requests
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger("dcn.worker")
 
 # Add backend root to path so we can import handlers
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -84,7 +92,7 @@ def detect_worker_tier():
         tier = 1
 
     gpu_str = "detected" if has_gpu else "none"
-    print(f"[hw detect] cores={cores}, ram={ram_gb:.1f}GB, gpu={gpu_str} -> tier {tier}")
+    logger.info("Hardware: cores=%d, ram=%.1fGB, gpu=%s → tier %d", cores, ram_gb, gpu_str, tier)
     return tier
 
 
@@ -108,9 +116,9 @@ def heartbeat(worker_node_id):
     )
     if resp.status_code == 200:
         data = resp.json()
-        print(f"[heartbeat] {data.get('node_name', worker_node_id)} alive")
+        logger.info("Heartbeat: %s alive", data.get('node_name', worker_node_id))
     else:
-        print(f"[heartbeat] failed: {resp.text}")
+        logger.warning("Heartbeat failed: %s", resp.text)
 
 
 AI_TASK_TYPES = [
@@ -127,7 +135,7 @@ def claim_task(worker_node_id):
     if resp.status_code == 200:
         return resp.json()
     else:
-        print(f"[claim] error: {resp.text}")
+        logger.error("Claim error: %s", resp.text)
         return None
 
 
@@ -144,7 +152,7 @@ def fetch_job(job_id):
                 job["input_payload"] = {}
         return job
     else:
-        print(f"[job] error fetching job {job_id}: {resp.text}")
+        logger.error("Failed to fetch job %s: %s", job_id, resp.text)
         return None
 
 
@@ -159,7 +167,7 @@ def complete_task(task_id, result_text, execution_time):
     if resp.status_code == 200:
         return resp.json()
     else:
-        print(f"[complete] error: {resp.text}")
+        logger.error("Failed to submit task %s: %s", task_id, resp.text)
         return None
 
 
@@ -171,7 +179,7 @@ def fail_task(task_id):
     if resp.status_code == 200:
         return resp.json()
     else:
-        print(f"[fail] error: {resp.text}")
+        logger.error("Failed to mark task %s as failed: %s", task_id, resp.text)
         return None
 
 
@@ -187,10 +195,9 @@ def process_task(task, job):
 
 
 def run_worker(worker_node_id):
-    print(f"=== AI Worker started: {worker_node_id} ===")
-    print(f"    Polling {BASE_URL}")
-    print(f"    Tier: {WORKER_TIER} (cores={os.cpu_count()}, ram detected)")
-    print()
+    logger.info("=== AI Worker started: %s ===", worker_node_id)
+    logger.info("    Polling %s", BASE_URL)
+    logger.info("    Tier: %d (cores=%s)", WORKER_TIER, os.cpu_count())
 
     while True:
         # Send heartbeat
@@ -205,17 +212,17 @@ def run_worker(worker_node_id):
             task_name = task.get("task_name", "unknown")
             job_id = task.get("job_id")
 
-            print(f"[claimed] task {task_id} — {task_name}")
+            logger.info("Claimed task %s — %s", task_id, task_name)
 
             # Fetch the parent job for task_type and input_payload
             job = fetch_job(job_id)
             if not job:
-                print(f"[error] could not fetch job {job_id}, skipping")
+                logger.error("Could not fetch job %s, skipping", job_id)
                 fail_task(task_id)
                 continue
 
             task_type = job.get("task_type", "unknown")
-            print(f"[processing] type={task_type}, calling handler...")
+            logger.info("Processing type=%s, calling handler...", task_type)
 
             # Ensure task_payload is a dict (may come back as JSON string)
             if isinstance(task.get("task_payload"), str):
@@ -233,15 +240,15 @@ def run_worker(worker_node_id):
                 try:
                     result_text = process_task(task, job)
                     execution_time = round(time.time() - start_time, 2)
-                    print(f"[ai done] got {len(result_text)} chars in {execution_time}s")
+                    logger.info("Handler done: %d chars in %ss", len(result_text), execution_time)
 
                     complete_result = complete_task(task_id, result_text, execution_time)
                     if complete_result and complete_result.get("completed"):
-                        print(f"[done] task {task_id} submitted")
+                        logger.info("Task %s submitted", task_id)
                         if complete_result.get("job_aggregated"):
-                            print(f"[aggregated] job {job_id} final output ready!")
+                            logger.info("Job %s aggregated — final output ready!", job_id)
                     else:
-                        print(f"[error] failed to submit task {task_id}")
+                        logger.error("Failed to submit task %s", task_id)
 
                     succeeded = True
                     break
@@ -254,28 +261,28 @@ def run_worker(worker_node_id):
                     if attempt < len(retries):
                         wait = retries[attempt]
                         if is_rate_limit:
-                            wait = wait * 2  # extra backoff for rate limits
-                            print(f"[rate limit] hit rate limit, waiting {wait}s...")
+                            wait = wait * 2
+                            logger.warning("Rate limit hit, waiting %ds...", wait)
                         else:
-                            print(f"[ai error] {e} — retrying in {wait}s...")
+                            logger.warning("Handler error: %s — retrying in %ds", e, wait)
                         time.sleep(wait)
                     else:
-                        print(f"[failed] all retries exhausted: {e}")
+                        logger.error("All retries exhausted: %s", e)
 
             if not succeeded:
                 fail_task(task_id)
 
-            print()
+            logger.debug("")
         else:
             msg = result.get("message", "No response") if result else "Request failed"
-            print(f"[idle] {msg} — waiting 5s")
+            logger.debug("Idle: %s — waiting 5s", msg)
             time.sleep(5)
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python workers/worker.py <worker_node_id>")
-        print("  worker_node_id = UUID from your worker_nodes table")
+        logger.error("Usage: python workers/worker.py <worker_node_id>")
+        logger.error("  worker_node_id = UUID from your worker_nodes table")
         sys.exit(1)
 
     run_worker(sys.argv[1])

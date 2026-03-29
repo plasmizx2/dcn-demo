@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.get("/jobs")
-async def list_jobs():
+async def list_jobs() -> list[dict]:
     """Return all jobs, newest first."""
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -19,7 +19,7 @@ async def list_jobs():
 
 
 @router.get("/jobs/{job_id}")
-async def get_job(job_id: str):
+async def get_job(job_id: str) -> dict:
     """Return a single job by ID."""
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -32,7 +32,7 @@ async def get_job(job_id: str):
 
 
 @router.post("/jobs")
-async def create_job(job: JobCreate):
+async def create_job(job: JobCreate) -> dict:
     """Create a new job, plan subtasks, and log events (transactional)."""
     if not job.title or not job.title.strip():
         raise HTTPException(status_code=400, detail="Job title is required")
@@ -100,7 +100,7 @@ async def create_job(job: JobCreate):
 
 
 @router.get("/jobs/{job_id}/tasks")
-async def get_job_tasks(job_id: str):
+async def get_job_tasks(job_id: str) -> list[dict]:
     """Return all tasks for a job, ordered by task_order."""
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -112,7 +112,7 @@ async def get_job_tasks(job_id: str):
 
 
 @router.delete("/jobs/all")
-async def clear_all_jobs():
+async def clear_all_jobs() -> dict:
     """Delete all jobs, tasks, events, and results. Demo reset."""
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -124,7 +124,7 @@ async def clear_all_jobs():
 
 
 @router.get("/jobs/{job_id}/timing")
-async def get_job_timing(job_id: str):
+async def get_job_timing(job_id: str) -> dict:
     """Return parallel vs sequential timing stats for a completed job."""
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -206,7 +206,7 @@ async def get_job_timing(job_id: str):
 
 
 @router.get("/jobs/{job_id}/events")
-async def get_job_events(job_id: str):
+async def get_job_events(job_id: str) -> list[dict]:
     """Return all events for a job, newest first."""
     pool = await get_pool()
     async with pool.acquire() as conn:

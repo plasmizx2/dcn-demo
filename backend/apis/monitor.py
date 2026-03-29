@@ -5,7 +5,7 @@ router = APIRouter(prefix="/monitor")
 
 
 @router.get("/jobs")
-async def monitor_jobs():
+async def monitor_jobs() -> list[dict]:
     """Return all jobs with their status for the monitor dashboard."""
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -16,7 +16,7 @@ async def monitor_jobs():
 
 
 @router.get("/queue")
-async def monitor_queue():
+async def monitor_queue() -> list[dict]:
     """Return tasks that are queued or in-progress."""
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -33,7 +33,7 @@ async def monitor_queue():
 
 
 @router.get("/stats")
-async def monitor_stats():
+async def monitor_stats() -> dict:
     """Return aggregate counts for the dashboard stats bar."""
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -77,7 +77,7 @@ async def monitor_stats():
 
 
 @router.get("/workers")
-async def monitor_workers():
+async def monitor_workers() -> list[dict]:
     """Return all worker nodes, marking stale ones as offline."""
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -97,7 +97,7 @@ async def monitor_workers():
 
 
 @router.get("/worker-history/{worker_id}")
-async def worker_history(worker_id: str):
+async def worker_history(worker_id: str) -> list[dict]:
     """Return task history for a specific worker node."""
     pool = await get_pool()
     async with pool.acquire() as conn:

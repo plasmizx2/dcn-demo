@@ -1,3 +1,4 @@
+import logging
 import os
 import asyncio
 from fastapi import FastAPI, Request
@@ -13,6 +14,8 @@ from auth import (
     verify_user, create_session, get_session, destroy_session,
     SESSION_COOKIE, ADMIN_PAGES, ADMIN_API_PREFIXES, PUBLIC_PREFIXES,
 )
+
+logger = logging.getLogger("dcn")
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "public_page")
 MONITOR_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "monitor")
@@ -52,7 +55,7 @@ async def _maintenance_loop():
                         row["job_id"],
                         f"Task {row['id']} requeued after 8min timeout",
                     )
-                    print(f"[maintenance] Reaped stale task {str(row['id'])[:8]}")
+                    logger.info("Reaped stale task %s", str(row['id'])[:8])
 
                 # Prune dead workers (no heartbeat for >1 hour)
                 pruned = await conn.fetch(
@@ -64,10 +67,10 @@ async def _maintenance_loop():
                     """,
                 )
                 for row in pruned:
-                    print(f"[maintenance] Pruned dead worker: {row['node_name']} ({str(row['id'])[:8]})")
+                    logger.info("Pruned dead worker: %s (%s)", row['node_name'], str(row['id'])[:8])
 
         except Exception as e:
-            print(f"[maintenance] Error: {e}")
+            logger.error("Maintenance loop error: %s", e, exc_info=True)
 
 
 @asynccontextmanager

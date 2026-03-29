@@ -6,7 +6,10 @@ simple concatenation for everything else.
 """
 
 import asyncio
+import logging
 from ai.gemini_client import generate_text
+
+logger = logging.getLogger("dcn.aggregator")
 
 # Task types that just get concatenated (no Gemini call)
 CONCAT_TYPES = {
@@ -62,7 +65,7 @@ async def aggregate_job(conn, job_id: str):
         try:
             final_output = _aggregate_ml_experiment(results, job)
         except Exception as e:
-            print(f"[aggregator] ML experiment aggregation failed ({e}), falling back")
+            logger.warning("ML experiment aggregation failed: %s — falling back", e)
             final_output = concatenate_results(results, task_type)
     elif task_type in CONCAT_TYPES:
         final_output = concatenate_results(results, task_type)
@@ -70,7 +73,7 @@ async def aggregate_job(conn, job_id: str):
         try:
             final_output = await asyncio.to_thread(synthesize_results, results, job)
         except Exception as e:
-            print(f"[aggregator] Gemini synthesis failed ({e}), falling back to concatenation")
+            logger.warning("Gemini synthesis failed: %s — falling back to concatenation", e)
             final_output = concatenate_results(results, task_type)
 
     # Set job status based on whether all tasks succeeded
