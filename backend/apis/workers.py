@@ -137,10 +137,19 @@ async def complete_task(task_id: str, body: TaskComplete = TaskComplete()) -> di
                     detail=f"Task is '{task['status']}', not 'running'",
                 )
 
-            # Mark task submitted (worker done, may still need validation)
+            # Check if the parent job requires validation
+            job = await conn.fetchrow(
+                "SELECT requires_validation FROM jobs WHERE id = $1",
+                task["job_id"],
+            )
+            needs_validation = job["requires_validation"] if job else False
+            new_status = "pending_validation" if needs_validation else "submitted"
+
+            # Mark task as submitted or pending_validation
             updated = await conn.fetchrow(
-                "UPDATE job_tasks SET status = 'submitted', completed_at = NOW() WHERE id = $1 RETURNING *",
+                "UPDATE job_tasks SET status = $2, completed_at = NOW() WHERE id = $1 RETURNING *",
                 task_id,
+                new_status,
             )
 
             # Insert result into task_results (worker_id left null — it references users)
@@ -149,13 +158,14 @@ async def complete_task(task_id: str, body: TaskComplete = TaskComplete()) -> di
                 INSERT INTO task_results (task_id, worker_node_id,
                                           result_text, result_payload,
                                           execution_time_seconds, status)
-                VALUES ($1, $2, $3, $4::jsonb, $5, 'submitted')
+                VALUES ($1, $2, $3, $4::jsonb, $5, $6)
                 """,
                 task_id,
                 task["worker_node_id"],
                 body.result_text or f"Processed task {task_id}",
                 json.dumps(body.result_payload) if body.result_payload else "{}",
                 body.execution_time_seconds or 0,
+                new_status,
             )
 
             # Set worker back to online
@@ -165,21 +175,77 @@ async def complete_task(task_id: str, body: TaskComplete = TaskComplete()) -> di
                     task["worker_node_id"],
                 )
 
-            # Log task_submitted event
+            # Log event
+            event_msg = f"Task {task_id} {'pending validation' if needs_validation else 'submitted'} by worker"
             await conn.execute(
                 """
                 INSERT INTO job_events (job_id, event_type, message)
-                VALUES ($1, 'task_submitted', $2)
+                VALUES ($1, $2, $3)
                 """,
                 task["job_id"],
-                f"Task {task_id} submitted by worker",
+                "task_pending_validation" if needs_validation else "task_submitted",
+                event_msg,
             )
 
-            # Check if all tasks done → run aggregation
-            aggregated = await aggregate_job(conn, task["job_id"])
+            # Only run aggregation if no validation needed
+            aggregated = False
+            if not needs_validation:
+                aggregated = await aggregate_job(conn, task["job_id"])
 
     return {
         "completed": True,
+        "task": dict(updated),
+        "job_aggregated": aggregated,
+    }
+
+
+@router.post("/tasks/{task_id}/validate")
+async def validate_task(task_id: str) -> dict:
+    """Admin validates a pending task, moving it to 'submitted' status.
+
+    Once all tasks for a job are validated (submitted), aggregation runs.
+    """
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            task = await conn.fetchrow(
+                "SELECT * FROM job_tasks WHERE id = $1", task_id
+            )
+            if not task:
+                raise HTTPException(status_code=404, detail="Task not found")
+            if task["status"] != "pending_validation":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Task is '{task['status']}', not 'pending_validation'",
+                )
+
+            # Approve: move to submitted
+            updated = await conn.fetchrow(
+                "UPDATE job_tasks SET status = 'submitted' WHERE id = $1 RETURNING *",
+                task_id,
+            )
+
+            # Also update task_results status
+            await conn.execute(
+                "UPDATE task_results SET status = 'submitted' WHERE task_id = $1",
+                task_id,
+            )
+
+            # Log validation event
+            await conn.execute(
+                """
+                INSERT INTO job_events (job_id, event_type, message)
+                VALUES ($1, 'task_validated', $2)
+                """,
+                task["job_id"],
+                f"Task {task_id} validated by admin",
+            )
+
+            # Check if all tasks are now submitted → aggregate
+            aggregated = await aggregate_job(conn, task["job_id"])
+
+    return {
+        "validated": True,
         "task": dict(updated),
         "job_aggregated": aggregated,
     }
