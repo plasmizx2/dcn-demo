@@ -52,7 +52,7 @@ AI_TASK_TYPES = [
 def claim_task(worker_node_id):
     resp = requests.post(
         f"{BASE_URL}/tasks/claim",
-        json={"worker_node_id": worker_node_id, "task_types": AI_TASK_TYPES},
+        json={"worker_node_id": worker_node_id, "task_types": AI_TASK_TYPES, "worker_tier": 4},
     )
     if resp.status_code == 200:
         return resp.json()
