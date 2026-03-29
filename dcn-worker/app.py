@@ -2,6 +2,7 @@
 """
 DCN Worker — Desktop GUI App (Web-based)
 Double-click to run. Opens in your browser.
+https://trula-functionless-bernardine.ngrok-free.dev/
 """
 
 import os
