@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from database import get_pool
+from config import HEARTBEAT_OFFLINE_SECONDS
 
 router = APIRouter(prefix="/monitor")
 
@@ -55,13 +56,13 @@ async def monitor_stats() -> dict:
             SELECT
                 CASE
                     WHEN last_heartbeat IS NULL THEN 'offline'
-                    WHEN last_heartbeat < NOW() - INTERVAL '30 seconds' THEN 'offline'
+                    WHEN last_heartbeat < NOW() - INTERVAL '{} seconds' THEN 'offline'
                     ELSE status
                 END AS effective_status,
                 COUNT(*) as count
             FROM worker_nodes
             GROUP BY effective_status
-            """
+            """.format(HEARTBEAT_OFFLINE_SECONDS)
         )
         worker_counts = {r["effective_status"]: r["count"] for r in worker_rows}
 
@@ -86,12 +87,12 @@ async def monitor_workers() -> list[dict]:
             SELECT *,
                 CASE
                     WHEN last_heartbeat IS NULL THEN 'offline'
-                    WHEN last_heartbeat < NOW() - INTERVAL '30 seconds' THEN 'offline'
+                    WHEN last_heartbeat < NOW() - INTERVAL '{} seconds' THEN 'offline'
                     ELSE status
                 END AS status
             FROM worker_nodes
             ORDER BY last_heartbeat DESC NULLS LAST
-            """
+            """.format(HEARTBEAT_OFFLINE_SECONDS)
         )
     return [dict(r) for r in rows]
 

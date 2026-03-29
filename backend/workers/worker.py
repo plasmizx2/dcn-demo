@@ -25,6 +25,7 @@ logger = logging.getLogger("dcn.worker")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from handlers import document, codebase, website, research, data_processing, ml_experiment
+from config import RETRY_BACKOFF_SECONDS, RATE_LIMIT_BACKOFF_MULTIPLIER, WORKER_POLL_INTERVAL_SECONDS
 
 BASE_URL = "https://dcn-demo.onrender.com"
 
@@ -233,7 +234,7 @@ def run_worker(worker_node_id):
 
             # Process with AI — retry with backoff on failure
             start_time = time.time()
-            retries = [5, 15, 30]  # seconds to wait between attempts
+            retries = RETRY_BACKOFF_SECONDS
             succeeded = False
 
             for attempt in range(len(retries) + 1):
@@ -261,7 +262,7 @@ def run_worker(worker_node_id):
                     if attempt < len(retries):
                         wait = retries[attempt]
                         if is_rate_limit:
-                            wait = wait * 2
+                            wait = wait * RATE_LIMIT_BACKOFF_MULTIPLIER
                             logger.warning("Rate limit hit, waiting %ds...", wait)
                         else:
                             logger.warning("Handler error: %s — retrying in %ds", e, wait)
@@ -275,8 +276,8 @@ def run_worker(worker_node_id):
             logger.debug("")
         else:
             msg = result.get("message", "No response") if result else "Request failed"
-            logger.debug("Idle: %s — waiting 5s", msg)
-            time.sleep(5)
+            logger.debug("Idle: %s — waiting %ds", msg, WORKER_POLL_INTERVAL_SECONDS)
+            time.sleep(WORKER_POLL_INTERVAL_SECONDS)
 
 
 if __name__ == "__main__":

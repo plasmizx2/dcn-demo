@@ -14,6 +14,10 @@ from auth import (
     verify_user, create_session, get_session, destroy_session,
     SESSION_COOKIE, ADMIN_PAGES, ADMIN_API_PREFIXES, PUBLIC_PREFIXES,
 )
+from config import (
+    MAINTENANCE_INTERVAL_SECONDS, STALE_TASK_TIMEOUT_MINUTES,
+    WORKER_PRUNE_TIMEOUT_MINUTES, SESSION_MAX_AGE_SECONDS,
+)
 
 logger = logging.getLogger("dcn")
 
@@ -30,7 +34,7 @@ WORKER_LOGS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "wor
 async def _maintenance_loop():
     """Background task: reap stale tasks (>8min running) and prune dead workers (>1hr no heartbeat)."""
     while True:
-        await asyncio.sleep(60)
+        await asyncio.sleep(MAINTENANCE_INTERVAL_SECONDS)
         try:
             pool = await get_pool()
             async with pool.acquire() as conn:
@@ -42,9 +46,9 @@ async def _maintenance_loop():
                     SET status = 'queued', worker_node_id = NULL, started_at = NULL
                     WHERE status = 'running'
                       AND started_at IS NOT NULL
-                      AND started_at < NOW() - INTERVAL '8 minutes'
+                      AND started_at < NOW() - INTERVAL '{} minutes'
                     RETURNING id, job_id
-                    """,
+                    """.format(STALE_TASK_TIMEOUT_MINUTES),
                 )
                 for row in reaped:
                     await conn.execute(
@@ -53,7 +57,7 @@ async def _maintenance_loop():
                         VALUES ($1, 'task_requeued', $2)
                         """,
                         row["job_id"],
-                        f"Task {row['id']} requeued after 8min timeout",
+                    f"Task {row['id']} requeued after {STALE_TASK_TIMEOUT_MINUTES}min timeout",
                     )
                     logger.info("Reaped stale task %s", str(row['id'])[:8])
 
@@ -61,10 +65,10 @@ async def _maintenance_loop():
                 pruned = await conn.fetch(
                     """
                     DELETE FROM worker_nodes
-                    WHERE last_heartbeat < NOW() - INTERVAL '1 hour'
-                       OR (last_heartbeat IS NULL AND created_at < NOW() - INTERVAL '1 hour')
+                    WHERE last_heartbeat < NOW() - INTERVAL '{} minutes'
+                       OR (last_heartbeat IS NULL AND created_at < NOW() - INTERVAL '{} minutes')
                     RETURNING id, node_name
-                    """,
+                    """.format(WORKER_PRUNE_TIMEOUT_MINUTES, WORKER_PRUNE_TIMEOUT_MINUTES),
                 )
                 for row in pruned:
                     logger.info("Pruned dead worker: %s (%s)", row['node_name'], str(row['id'])[:8])
@@ -147,7 +151,7 @@ async def do_login(request: Request):
     token = create_session(user)
     redirect = "/ops" if user["role"] == "admin" else "/submit"
     response = JSONResponse({"ok": True, "role": user["role"], "name": user.get("name", user["username"]), "redirect": redirect})
-    response.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="lax", max_age=86400)
+    response.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="lax", max_age=SESSION_MAX_AGE_SECONDS)
     return response
 
 

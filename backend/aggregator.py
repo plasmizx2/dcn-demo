@@ -11,12 +11,10 @@ from ai.gemini_client import generate_text
 
 logger = logging.getLogger("dcn.aggregator")
 
-# Task types that just get concatenated (no Gemini call)
-CONCAT_TYPES = {
-    "codebase_review", "website_builder", "data_processing",
-    "image_processing", "web_scraping", "audio_transcription",
-    "sentiment_classification",
-}
+from config import CONCAT_TASK_TYPES
+
+# Re-export for backward compat
+CONCAT_TYPES = CONCAT_TASK_TYPES
 
 
 async def aggregate_job(conn, job_id: str):
