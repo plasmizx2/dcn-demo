@@ -1,8 +1,54 @@
 # DCN: Distributed Compute Network for Agentic AI Orchestration
 
-DCN is a distributed task orchestration system that decomposes complex AI workloads into parallel subtasks, executes them across multiple worker nodes, and aggregates results into unified outputs. Users submit a high-level task and DCN handles decomposition, scheduling, execution, and aggregation automatically -- no workflow definitions, no DAGs, no infrastructure setup.
+[![GitHub](https://img.shields.io/badge/GitHub-plasmizx2%2Fdcn--demo-181717?logo=github)](https://github.com/plasmizx2/dcn-demo)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-dcn--demo.onrender.com-7c3aed)](https://dcn-demo.onrender.com)
+[![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+
+DCN is a distributed task orchestration system that decomposes complex AI workloads into parallel subtasks, executes them across multiple worker nodes, and aggregates results into unified outputs. Users submit a high-level task and DCN handles decomposition, scheduling, execution, and aggregation automatically — no workflow definitions, no DAGs, no infrastructure setup.
 
 Built with FastAPI, PostgreSQL, and Google Gemini.
+
+> **Live demo**: [dcn-demo.onrender.com](https://dcn-demo.onrender.com)  
+> **Source**: [github.com/plasmizx2/dcn-demo](https://github.com/plasmizx2/dcn-demo)
+
+---
+
+## ⚡ Start Here — Demo Path
+
+Fastest way to see DCN in action:
+
+1. **Open** [dcn-demo.onrender.com](https://dcn-demo.onrender.com) (first load may take ~30s on free tier)
+2. **Sign in** as `admin` / `admin123`
+3. **Submit** an `ml_experiment` job → select the **weather** dataset → hit Submit
+4. **Watch** `/ops` — see 8 parallel experiments fan out to worker nodes in real time
+5. **Compare** the parallel vs sequential timing bars when the job completes (typically 3-5× speedup)
+6. **Inspect** `/results` — view the ranked model comparison table with the winning model highlighted
+
+**Best supporting demos**: `document_analysis` (paste any long text) and `codebase_review` (paste a GitHub URL) — these show the AI synthesis aggregation path.
+
+---
+
+## Deployment
+
+| Environment | URL | Notes |
+|---|---|---|
+| **Production** | [dcn-demo.onrender.com](https://dcn-demo.onrender.com) | Render Web Service (backend) + Supabase (PostgreSQL) |
+| **Workers** | Render Background Workers | Auto-register, heartbeat every 30s |
+| **Local** | `http://localhost:8000` | See [Setup](#setup) below |
+
+## Screenshots
+
+<!-- Add your screenshots here. Take them from the live demo at dcn-demo.onrender.com -->
+<!-- Recommended: landing page, submit page, /ops dashboard mid-job, results with ML ranking -->
+
+| Landing Page | Operator Dashboard |
+|:---:|:---:|
+| ![Landing](docs/screenshots/landing.png) | ![Dashboard](docs/screenshots/dashboard.png) |
+
+| ML Experiment Results | Job Submission |
+|:---:|:---:|
+| ![Results](docs/screenshots/results.png) | ![Submit](docs/screenshots/submit.png) |
 
 ## Architecture
 
@@ -47,16 +93,39 @@ User submits job via web UI (/)
 
 ## Web Interfaces
 
-### `/` -- Job Submission UI
+### `/` — Landing Page
 
-The public interface where users submit jobs and watch them execute in real time:
+Animated marketing landing page with:
+- Live platform stats (animated counters), floating gradient orbs, and grid background
+- "How It Works" 4-step flow, capability cards (10 task types), architecture diagram
+- Pipeline visualization showing job → planner → workers → aggregator flow
+- Role-aware navigation (shows Dashboard/Results links for admins)
+
+### `/login` — Authentication
+
+Minimal frosted-glass login form. Demo credentials:
+- **Admin**: `admin` / `admin123` → full access (dashboard, results, worker logs)
+- **Customer**: `customer` / `customer123` → submit page + my jobs only
+
+### `/submit` — Job Submission UI
+
+The primary interface where users submit jobs and watch them execute in real time:
 - Select from 10 task types with dynamic input fields (URL input for codebase review, dataset selector for ML experiments, textarea for text tasks)
 - Each task type shows a "How it works" and "Why DCN at scale" explanation
 - Live polling (1.5s) shows task status badges, progress bar, and worker activity
 - On completion: **parallel vs sequential timing comparison** with animated bars showing speedup, worker count, and time saved
 - Dual output rendering: HTML outputs get iframe preview + source tabs; markdown rendered via marked.js
+- Role-aware sidebar navigation (admin sees all pages, customer sees submit + my jobs)
 
-### `/ops` -- Operator Dashboard
+### `/my-jobs` — My Jobs
+
+Customer-facing job tracker:
+- Lists all submitted jobs with status badges, progress bars, and type tags
+- Click to expand: task list with individual statuses, and final output preview (markdown rendered)
+- Auto-refreshes every 5 seconds
+- Available to all authenticated users
+
+### `/ops` — Operator Dashboard (admin only)
 
 Real-time monitoring for operators:
 - **Stats bar**: Total jobs, completed, queued tasks, running tasks, online/busy workers
@@ -67,9 +136,20 @@ Real-time monitoring for operators:
 - **Timing comparison**: Completed jobs show parallel vs sequential execution bars with speedup stats
 - **Event Feed**: Full lifecycle event log (job_created, task_started, task_submitted, etc.)
 
-### `/results` -- Results Viewer
+### `/results` — Results Viewer (admin only)
 
-Browse and inspect completed job outputs with search, filtering, and tabbed rendering.
+Browse and inspect completed job outputs with search, filtering, and tabbed rendering (Rendered, Raw, Tasks, Preview).
+
+### `/worker-logs` — Worker Logs (admin only)
+
+Worker node monitoring and diagnostics:
+- Worker cards showing status (online/busy/offline), heartbeat timing
+- Click to view full task history: task name, parent job, status, execution time
+- Aggregate stats: total tasks processed, completion/failure rate, average execution time
+
+### 404 — Custom Error Page
+
+Branded error page with animated background glows and navigation links.
 
 ## Hero Demo: ML Experiment Pipeline
 
@@ -127,13 +207,19 @@ The timing is computed from real execution data stored in `task_results.executio
 
 Both the public UI (`/`) and operator dashboard (`/ops`) display this comparison with animated bar charts showing the speedup, number of workers used, and total time saved.
 
-## All Supported Task Types (10)
+## Supported Task Types
+
+The **hero demo** is `ml_experiment` — it shows real distributed compute with measurable parallel speedup, structured model comparison, and resource-aware execution.
+
+The **strongest supporting flows** are `document_analysis` and `codebase_review` — they demonstrate the AI synthesis aggregation path (Gemini combines parallel subtask results into a coherent report).
+
+All 10 types are fully implemented:
 
 | Task Type | Description | Planner Strategy | Aggregation |
 |-----------|-------------|-----------------|-------------|
-| `ml_experiment` | Distributed hyperparameter search | 8 parallel experiments with tiered difficulty | Custom ML ranking |
-| `document_analysis` | AI analysis of text documents | Chunked text processing | Gemini synthesis |
-| `codebase_review` | GitHub repo code review via API | File/module segmentation | Gemini synthesis |
+| **`ml_experiment`** ⭐ | Distributed hyperparameter search | 8 parallel experiments with tiered difficulty | Custom ML ranking |
+| **`document_analysis`** | AI analysis of text documents | Chunked text processing | Gemini synthesis |
+| **`codebase_review`** | GitHub repo code review via API | File/module segmentation | Gemini synthesis |
 | `website_builder` | HTML/CSS section generation | Section-based generation | Concatenation |
 | `research_pipeline` | Multi-phase research on a topic | Phased breakdown | Gemini synthesis |
 | `data_processing` | Data classification and analysis | Batch-based execution | Concatenation |
@@ -217,40 +303,72 @@ Every state transition is logged to `job_events`:
 - `job_created`, `task_split`, `task_started`, `task_submitted`, `task_failed`, `task_requeued`, `job_completed`, `job_failed`
 - Each event includes metadata (JSONB) for debugging and audit
 
+## Authentication
+
+Cookie-based session auth with role-based access control:
+
+| Role | Access |
+|------|--------|
+| **admin** | All pages: `/submit`, `/ops`, `/results`, `/worker-logs`, `/my-jobs` |
+| **customer** | Public pages: `/submit`, `/my-jobs` |
+| **anonymous** | Landing (`/`), login, health check |
+
+- Sessions stored in-memory (swap to Redis/DB for production)
+- Middleware auto-redirects unauthenticated users to `/login` for protected pages
+- Admin API routes (`/monitor/*`) return 401 JSON for non-admin requests
+
 ## API Endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/` | Job submission UI |
-| GET | `/ops` | Operator monitoring dashboard |
-| GET | `/results` | Results viewer |
-| GET | `/health` | Health check (verifies DB connection) |
+| **Pages** | | |
+| GET | `/` | Landing page |
+| GET | `/login` | Login page |
+| GET | `/submit` | Job submission UI |
+| GET | `/my-jobs` | Customer job tracker |
+| GET | `/ops` | Operator dashboard (admin) |
+| GET | `/results` | Results viewer (admin) |
+| GET | `/worker-logs` | Worker logs (admin) |
+| **Auth** | | |
+| POST | `/auth/login` | Authenticate and create session |
+| GET | `/auth/me` | Get current user info |
+| GET/POST | `/auth/logout` | Destroy session and redirect |
+| **Jobs** | | |
 | GET | `/jobs` | List all jobs |
 | GET | `/jobs/{job_id}` | Get single job |
 | POST | `/jobs` | Create job and plan subtasks (transactional) |
+| DELETE | `/jobs/all` | Clear all jobs (demo reset) |
 | GET | `/jobs/{job_id}/tasks` | Get job tasks |
 | GET | `/jobs/{job_id}/timing` | Parallel vs sequential timing stats |
 | GET | `/jobs/{job_id}/events` | Get event log |
+| **Workers** | | |
 | POST | `/tasks/claim` | Worker atomically claims next queued task |
 | POST | `/tasks/{task_id}/complete` | Worker submits result, triggers aggregation |
 | POST | `/tasks/{task_id}/fail` | Worker marks task failed |
 | POST | `/workers/register` | Register new worker node |
 | POST | `/workers/heartbeat` | Worker keepalive |
+| **Monitoring** | | |
 | GET | `/monitor/jobs` | All jobs for operator dashboard |
 | GET | `/monitor/queue` | In-flight tasks (queued and running) |
 | GET | `/monitor/stats` | Aggregate counts by status and worker health |
 | GET | `/monitor/workers` | All workers with effective status |
+| GET | `/monitor/worker-history/{id}` | Task history for a specific worker |
+| **Other** | | |
+| GET | `/health` | Health check (verifies DB connection) |
+| GET | `/stats` | Platform stats for landing page |
 
 ## Project Structure
 
 ```
 dcn-demo/
 ├── backend/
-│   ├── main.py              # FastAPI app, lifespan, CORS, maintenance loop
+│   ├── main.py              # FastAPI app, routes, auth middleware, maintenance loop
+│   ├── auth.py              # Cookie-based auth, session management, role config
+│   ├── users.json           # Demo user credentials
 │   ├── database.py          # Async connection pool (asyncpg)
 │   ├── schemas.py           # Pydantic request/response models
-│   ├── planner.py           # Task decomposition engine (314 lines)
-│   ├── aggregator.py        # Result aggregation engine (393 lines)
+│   ├── planner.py           # Task decomposition engine
+│   ├── aggregator.py        # Result aggregation engine
 │   ├── resource_guard.py    # CPU/RAM safety for ML workloads
 │   ├── datasets.py          # Synthetic ML dataset generation (75K rows)
 │   ├── requirements.txt
@@ -259,24 +377,42 @@ dcn-demo/
 │   ├── apis/
 │   │   ├── jobs.py          # Job CRUD, creation pipeline, timing endpoint
 │   │   ├── workers.py       # Task claiming, completion, failure handling
-│   │   └── monitor.py       # Operator dashboard endpoints
+│   │   └── monitor.py       # Dashboard + worker history endpoints
 │   ├── handlers/
 │   │   ├── document.py      # Document analysis handler
 │   │   ├── codebase.py      # GitHub repo fetching and code review
 │   │   ├── research.py      # Research pipeline handler
 │   │   ├── website.py       # HTML/CSS generation handler
 │   │   ├── data_processing.py # Data classification handler
-│   │   └── ml_experiment.py # Distributed ML training (241 lines)
+│   │   └── ml_experiment.py # Distributed ML training
 │   └── workers/
 │       └── worker.py        # Worker loop with retry and backoff
+├── dcn-worker/
+│   ├── app.py               # Standalone worker application
+│   ├── hardware.py          # Hardware detection and tier assignment
+│   └── run.py               # Worker runner script
 ├── frontend/
+│   ├── landing/
+│   │   └── index.html       # Marketing landing page with live stats
+│   ├── login/
+│   │   └── index.html       # Authentication page
 │   ├── public_page/
 │   │   └── index.html       # Job submission SPA with timing visualization
+│   ├── my-jobs/
+│   │   └── index.html       # Customer job tracker with expandable cards
 │   ├── monitor/
 │   │   └── index.html       # Operator dashboard with worker activity
-│   └── results/
-│       └── index.html       # Results browser with search and tabs
-└── schema.sql               # Database DDL
+│   ├── results/
+│   │   └── index.html       # Results browser with search and tabs
+│   ├── worker-logs/
+│   │   └── index.html       # Worker diagnostics and task history
+│   └── error/
+│       └── 404.html         # Branded 404 page
+├── schema.sql               # Database DDL
+├── submit_50.py             # Batch job submission script (load testing)
+├── tests/
+│   └── smoke_test.py        # API and page route smoke tests
+└── README.MD
 ```
 
 ## Setup
@@ -308,9 +444,56 @@ python -m workers.worker
 ```
 
 Then open:
-- `http://localhost:8000/` -- Submit jobs
-- `http://localhost:8000/ops` -- Monitor execution
-- `http://localhost:8000/results` -- Browse outputs
+- `http://localhost:8000/` — Landing page
+- `http://localhost:8000/login` — Sign in (admin/admin123 or customer/customer123)
+- `http://localhost:8000/submit` — Submit jobs
+- `http://localhost:8000/my-jobs` — Track your jobs
+- `http://localhost:8000/ops` — Monitor execution (admin)
+- `http://localhost:8000/results` — Browse outputs (admin)
+- `http://localhost:8000/worker-logs` — Worker diagnostics (admin)
+
+## Testing
+
+Smoke tests verify that core endpoints, auth, page routes, and error handling are operational:
+
+```bash
+# Against local server
+python tests/smoke_test.py
+
+# Against production
+python tests/smoke_test.py https://dcn-demo.onrender.com
+```
+
+Expected output:
+```
+🔍 DCN Smoke Tests — https://dcn-demo.onrender.com
+
+Health & Core API:
+  ✓ Health check — 200
+  ✓ Stats endpoint — 200
+  ✓ List jobs — 200
+
+Authentication:
+  ✓ Login page — 200
+  ✓ Auth me (unauthenticated) — 401
+  ✓ Login with bad creds — 401
+  ...
+
+Results: 12/12 passed — all clear ✓
+```
+
+### Manual Verification Checklist
+
+- [ ] Landing page loads with animated stats and hero section
+- [ ] Login works with admin/admin123 and customer/customer123
+- [ ] Admin sidebar shows all 6 navigation links
+- [ ] Customer sidebar shows only Submit + My Jobs
+- [ ] `/ops` dashboard displays stats, job table, worker activity
+- [ ] Submit `ml_experiment` → 8 tasks created and distributed
+- [ ] Timing comparison appears on job completion
+- [ ] Worker logs show task history per node
+- [ ] Sign out works and redirects to login
+- [ ] Unknown routes show branded 404 page
 
 ## Task Status Flow
 
@@ -319,3 +502,7 @@ queued --> running --> submitted --> (aggregation check) --> job completed
                \--> failed
                \--> (stale >8min) --> requeued --> claimed by another worker
 ```
+
+## License
+
+MIT

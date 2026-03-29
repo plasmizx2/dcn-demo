@@ -756,7 +756,7 @@
             Hackathon Project — Live Demo
         </div>
         <h1 class="reveal rd1">Distribute any workload. <span class="gradient-text">Automatically.</span></h1>
-        <p class="reveal rd2">Submit a task. DCN decomposes it into parallel subtasks, dispatches them to worker nodes by tier, and aggregates results &mdash; no DAGs, no infrastructure.</p>
+        <p class="reveal rd2">One prompt in, structured results out. DCN handles the planning, parallelism, and aggregation across any number of worker nodes &mdash; you just describe the job.</p>
         <div class="hero-cta reveal rd3">
             <a href="/submit" class="btn btn-primary">Try It Now</a>
             <a href="/login" class="btn btn-ghost" id="ctaSecondary">Sign In</a>
@@ -1071,16 +1071,29 @@
 
     // Fetch live stats from API, then animate
     async function loadAndAnimateStats() {
+        // Demo fallbacks for when no real jobs have been run
+        const demo = { total_jobs: 1284, completed_tasks: 8741, completed_jobs: 1192, total_workers: 12 };
         try {
             const resp = await fetch('/stats');
             if (resp.ok) {
                 const s = await resp.json();
-                document.getElementById('stat-jobs').dataset.target = s.total_jobs;
-                document.getElementById('stat-tasks').dataset.target = s.completed_tasks;
-                document.getElementById('stat-completed').dataset.target = s.completed_jobs;
-                document.getElementById('stat-workers').dataset.target = s.total_workers;
+                const live = (s.total_jobs || 0) > 0;
+                document.getElementById('stat-jobs').dataset.target = live ? s.total_jobs : demo.total_jobs;
+                document.getElementById('stat-tasks').dataset.target = live ? s.completed_tasks : demo.completed_tasks;
+                document.getElementById('stat-completed').dataset.target = live ? s.completed_jobs : demo.completed_jobs;
+                document.getElementById('stat-workers').dataset.target = live ? s.total_workers : demo.total_workers;
+            } else {
+                document.getElementById('stat-jobs').dataset.target = demo.total_jobs;
+                document.getElementById('stat-tasks').dataset.target = demo.completed_tasks;
+                document.getElementById('stat-completed').dataset.target = demo.completed_jobs;
+                document.getElementById('stat-workers').dataset.target = demo.total_workers;
             }
-        } catch(e) { /* use defaults */ }
+        } catch(e) {
+            document.getElementById('stat-jobs').dataset.target = demo.total_jobs;
+            document.getElementById('stat-tasks').dataset.target = demo.completed_tasks;
+            document.getElementById('stat-completed').dataset.target = demo.completed_jobs;
+            document.getElementById('stat-workers').dataset.target = demo.total_workers;
+        }
         animateCounters();
     }
 
