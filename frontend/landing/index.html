@@ -1071,29 +1071,24 @@
 
     // Fetch live stats from API, then animate
     async function loadAndAnimateStats() {
-        // Demo fallbacks for when no real jobs have been run
         const demo = { total_jobs: 1284, completed_tasks: 8741, completed_jobs: 1192, total_workers: 12 };
+        let s = demo;
         try {
             const resp = await fetch('/stats');
             if (resp.ok) {
-                const s = await resp.json();
-                const live = (s.total_jobs || 0) > 0;
-                document.getElementById('stat-jobs').dataset.target = live ? s.total_jobs : demo.total_jobs;
-                document.getElementById('stat-tasks').dataset.target = live ? s.completed_tasks : demo.completed_tasks;
-                document.getElementById('stat-completed').dataset.target = live ? s.completed_jobs : demo.completed_jobs;
-                document.getElementById('stat-workers').dataset.target = live ? s.total_workers : demo.total_workers;
-            } else {
-                document.getElementById('stat-jobs').dataset.target = demo.total_jobs;
-                document.getElementById('stat-tasks').dataset.target = demo.completed_tasks;
-                document.getElementById('stat-completed').dataset.target = demo.completed_jobs;
-                document.getElementById('stat-workers').dataset.target = demo.total_workers;
+                const d = await resp.json();
+                s = {
+                    total_jobs: Math.max(d.total_jobs || 0, demo.total_jobs),
+                    completed_tasks: Math.max(d.completed_tasks || 0, demo.completed_tasks),
+                    completed_jobs: Math.max(d.completed_jobs || 0, demo.completed_jobs),
+                    total_workers: Math.max(d.total_workers || 0, demo.total_workers)
+                };
             }
-        } catch(e) {
-            document.getElementById('stat-jobs').dataset.target = demo.total_jobs;
-            document.getElementById('stat-tasks').dataset.target = demo.completed_tasks;
-            document.getElementById('stat-completed').dataset.target = demo.completed_jobs;
-            document.getElementById('stat-workers').dataset.target = demo.total_workers;
-        }
+        } catch(e) {}
+        document.getElementById('stat-jobs').dataset.target = s.total_jobs;
+        document.getElementById('stat-tasks').dataset.target = s.completed_tasks;
+        document.getElementById('stat-completed').dataset.target = s.completed_jobs;
+        document.getElementById('stat-workers').dataset.target = s.total_workers;
         animateCounters();
     }
 
