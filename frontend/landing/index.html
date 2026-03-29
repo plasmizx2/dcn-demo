@@ -11,9 +11,9 @@
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --bg: #14161e;
-            --surface: rgba(255,255,255,0.08);
-            --border: rgba(255,255,255,0.12);
+            --bg: #0c0e14;
+            --surface: rgba(255,255,255,0.06);
+            --border: rgba(255,255,255,0.10);
             --text: #f0f0f2;
             --muted: #b4b4bc;
             --dim: #8a8a96;
@@ -31,18 +31,22 @@
             overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
         }
-        /* subtle noise texture for depth */
-        body::after {
-            content: '';
+
+        /* ─── GRID BACKGROUND ─── */
+        .grid-bg {
             position: fixed;
             inset: 0;
-            background: radial-gradient(ellipse at 30% 20%, rgba(124,58,237,0.06) 0%, transparent 50%),
-                        radial-gradient(ellipse at 70% 80%, rgba(59,130,246,0.04) 0%, transparent 50%);
+            background-image:
+                linear-gradient(rgba(124,58,237,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(124,58,237,0.03) 1px, transparent 1px);
+            background-size: 64px 64px;
             pointer-events: none;
             z-index: 0;
+            mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 20%, transparent 70%);
+            -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 20%, transparent 70%);
         }
 
-        .container { max-width: 1100px; margin: 0 auto; padding: 0 32px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 40px; position: relative; z-index: 1; }
 
         .gradient-text {
             background: linear-gradient(135deg, #a78bfa, #818cf8, #60a5fa);
@@ -60,30 +64,51 @@
             flex-direction: column;
         }
 
-        .hero-bg {
+        /* Animated gradient orbs */
+        .hero-glow {
             position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            overflow: hidden;
+            border-radius: 50%;
+            filter: blur(80px);
             pointer-events: none;
             z-index: 0;
         }
-        .hero-bg::before {
-            content: '';
-            position: absolute;
-            top: -40%;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 140%;
-            height: 80%;
-            background: radial-gradient(ellipse at center, rgba(124,58,237,0.18) 0%, rgba(99,102,241,0.10) 30%, rgba(59,130,246,0.06) 50%, transparent 70%);
+        .hero-glow-1 {
+            top: 10%; left: 30%;
+            width: 500px; height: 500px;
+            background: rgba(124,58,237,0.15);
+            animation: float1 8s ease-in-out infinite;
+        }
+        .hero-glow-2 {
+            top: 20%; right: 20%;
+            width: 400px; height: 400px;
+            background: rgba(59,130,246,0.10);
+            animation: float2 10s ease-in-out infinite;
+        }
+        .hero-glow-3 {
+            top: 40%; left: 60%;
+            width: 300px; height: 300px;
+            background: rgba(99,102,241,0.08);
+            animation: float3 12s ease-in-out infinite;
+        }
+        @keyframes float1 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-40px, 30px) scale(1.1); }
+        }
+        @keyframes float2 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -40px) scale(1.05); }
+        }
+        @keyframes float3 {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-20px, -30px) scale(1.15); }
         }
 
         .hero-top {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 32px;
-            max-width: 1100px;
+            padding: 0 40px;
+            max-width: 1200px;
             margin: 0 auto;
             width: 100%;
             position: relative;
@@ -93,7 +118,9 @@
             font-weight: 800;
             font-size: 18px;
             letter-spacing: -0.5px;
-            color: #fff;
+            background: linear-gradient(135deg, #a78bfa, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             text-decoration: none;
         }
         .hero-links {
@@ -107,7 +134,7 @@
             text-decoration: none;
             transition: color 0.2s;
         }
-        .hero-links a:hover { color: var(--muted); }
+        .hero-links a:hover { color: #fff; }
 
         .hero-center {
             flex: 1;
@@ -118,19 +145,34 @@
             text-align: center;
             position: relative;
             z-index: 2;
-            padding: 80px 32px 60px;
+            padding: 80px 40px 60px;
         }
-        .hero-label {
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border-radius: 100px;
+            border: 1px solid rgba(124,58,237,0.3);
+            background: rgba(124,58,237,0.08);
             font-size: 12px;
             font-weight: 600;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: var(--accent);
-            margin-bottom: 24px;
-            opacity: 0.8;
+            color: #a78bfa;
+            margin-bottom: 32px;
+            letter-spacing: 0.3px;
+        }
+        .hero-badge-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: #a78bfa;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(167,139,250,0.4); }
+            50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(167,139,250,0); }
         }
         .hero-center h1 {
-            font-size: clamp(40px, 6vw, 72px);
+            font-size: clamp(44px, 6vw, 76px);
             font-weight: 800;
             letter-spacing: -3px;
             line-height: 1.0;
@@ -138,7 +180,7 @@
             max-width: 800px;
         }
         .hero-center p {
-            font-size: 17px;
+            font-size: 18px;
             line-height: 1.7;
             color: var(--muted);
             max-width: 560px;
@@ -158,7 +200,7 @@
             font-size: 14px;
             font-weight: 600;
             text-decoration: none;
-            transition: all 0.2s;
+            transition: all 0.25s;
             cursor: pointer;
             border: none;
             font-family: inherit;
@@ -166,11 +208,11 @@
         .btn-primary {
             background: linear-gradient(135deg, var(--accent), var(--accent3));
             color: #fff;
-            box-shadow: 0 0 40px rgba(99,102,241,0.2);
+            box-shadow: 0 0 40px rgba(99,102,241,0.25), 0 0 80px rgba(124,58,237,0.10);
         }
         .btn-primary:hover {
-            box-shadow: 0 0 60px rgba(99,102,241,0.35);
-            transform: translateY(-1px);
+            box-shadow: 0 0 60px rgba(99,102,241,0.4), 0 0 120px rgba(124,58,237,0.15);
+            transform: translateY(-2px);
         }
         .btn-ghost {
             background: transparent;
@@ -179,8 +221,8 @@
         }
         .btn-ghost:hover {
             color: #fff;
-            border-color: rgba(255,255,255,0.15);
-            background: rgba(255,255,255,0.03);
+            border-color: rgba(255,255,255,0.20);
+            background: rgba(255,255,255,0.04);
         }
 
         .hero-stats {
@@ -194,8 +236,8 @@
             text-align: center;
         }
         .hero-stat-value {
-            font-size: 28px;
-            font-weight: 700;
+            font-size: 32px;
+            font-weight: 800;
             letter-spacing: -1px;
         }
         .hero-stat-label {
@@ -205,21 +247,22 @@
             font-weight: 500;
         }
 
-        /* ─── SECTION COMMON ─── */
+        /* ─── SECTIONS ─── */
         section {
-            padding: 100px 0;
+            padding: 120px 0;
+            position: relative;
         }
         .section-label {
-            font-size: 11px;
-            font-weight: 600;
+            font-size: 12px;
+            font-weight: 700;
             letter-spacing: 2px;
             text-transform: uppercase;
             color: var(--accent);
             margin-bottom: 16px;
         }
         .section-title {
-            font-size: clamp(28px, 3.5vw, 42px);
-            font-weight: 700;
+            font-size: clamp(28px, 3.5vw, 44px);
+            font-weight: 800;
             letter-spacing: -1.5px;
             line-height: 1.15;
             margin-bottom: 16px;
@@ -236,6 +279,8 @@
             border-top: 1px solid var(--border);
             border-bottom: 1px solid var(--border);
             padding: 20px 0;
+            position: relative;
+            z-index: 1;
         }
         .tech-inner {
             display: flex;
@@ -266,50 +311,67 @@
             color: var(--dim);
             transition: color 0.2s;
         }
-        .tech-list span:hover { color: var(--muted); }
+        .tech-list span:hover { color: #fff; }
 
         /* ─── HOW IT WORKS ─── */
         .steps {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 1px;
-            background: var(--border);
-            border-radius: 16px;
-            overflow: hidden;
+            gap: 2px;
             margin-top: 56px;
+            background: var(--border);
+            border-radius: 20px;
+            overflow: hidden;
         }
         .step {
-            background: rgba(20,22,30,0.95);
-            padding: 36px 28px;
             position: relative;
-            transition: background 0.3s;
+            background: var(--bg);
+            padding: 40px 32px 36px;
+            transition: all 0.35s ease;
+            overflow: hidden;
         }
-        .step:hover { background: rgba(255,255,255,0.04); }
+        .step::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(300px circle at var(--mx, 50%) var(--my, 50%), rgba(124,58,237,0.08), transparent 60%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .step:hover::after { opacity: 1; }
+        .step:hover {
+            background: rgba(18,18,28,1);
+        }
         .step-number {
-            font-size: 48px;
-            font-weight: 800;
-            background: linear-gradient(180deg, rgba(124,58,237,0.25), rgba(59,130,246,0.10));
+            font-size: 64px;
+            font-weight: 900;
+            background: linear-gradient(180deg, #a78bfa 0%, #6366f1 50%, rgba(59,130,246,0.3) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
             line-height: 1;
             margin-bottom: 20px;
-            letter-spacing: -2px;
+            letter-spacing: -3px;
         }
         .step h3 {
-            font-size: 15px;
+            font-size: 20px;
             font-weight: 700;
-            margin-bottom: 10px;
-            letter-spacing: -0.3px;
+            margin-bottom: 12px;
             color: #fff;
+            letter-spacing: -0.5px;
         }
         .step p {
-            font-size: 13px;
-            line-height: 1.65;
-            color: var(--muted);
+            font-size: 15px;
+            line-height: 1.7;
+            color: #b4b4bc;
         }
 
         /* ─── CAPABILITIES ─── */
+        .capabilities-section {
+            border-top: 1px solid var(--border);
+            background: linear-gradient(180deg, transparent 0%, rgba(124,58,237,0.02) 50%, transparent 100%);
+        }
         .capabilities-header {
             display: flex;
             justify-content: space-between;
@@ -322,136 +384,107 @@
             font-weight: 500;
         }
 
-        /* Supabase-inspired card grid */
         .cap-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(2, 1fr);
             gap: 16px;
         }
+
         .cap-card {
             position: relative;
-            background: rgba(20,22,30,0.95);
-            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
             border-radius: 16px;
             padding: 28px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            cursor: default;
+            transition: all 0.3s ease;
             overflow: hidden;
-        }
-        .cap-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: var(--card-accent);
-            opacity: 0.6;
-            transition: opacity 0.3s;
+            cursor: default;
         }
         .cap-card::after {
             content: '';
             position: absolute;
-            top: -60%;
-            left: -20%;
-            width: 140%;
-            height: 100%;
-            background: radial-gradient(ellipse at center, var(--card-glow) 0%, transparent 70%);
-            opacity: 0;
-            transition: opacity 0.4s;
+            inset: 0;
+            border-radius: 16px;
+            background: radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(124,58,237,0.06), transparent 40%);
             pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
         }
-        .cap-card:hover {
-            border-color: rgba(255,255,255,0.15);
-            transform: translateY(-2px);
-        }
-        .cap-card:hover::before { opacity: 1; }
         .cap-card:hover::after { opacity: 1; }
-
-        /* Featured card spans full width */
-        .cap-card.featured {
-            grid-column: 1 / -1;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 32px;
-            padding: 36px;
+        .cap-card:hover {
+            border-color: rgba(124,58,237,0.25);
+            background: rgba(255,255,255,0.05);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
         }
 
-        /* Card header with icon */
+        .cap-card-top {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 12px;
+        }
         .cap-icon {
-            width: 36px;
-            height: 36px;
+            width: 40px;
+            height: 40px;
             border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 16px;
-            background: var(--card-icon-bg);
-            border: 1px solid var(--card-icon-border);
+            flex-shrink: 0;
         }
         .cap-icon svg {
-            width: 18px;
-            height: 18px;
-            color: var(--card-icon-color);
+            width: 20px;
+            height: 20px;
         }
         .cap-card h3 {
             font-size: 16px;
             font-weight: 700;
             color: #fff;
-            margin-bottom: 8px;
             letter-spacing: -0.3px;
         }
         .cap-card p {
             font-size: 13px;
-            line-height: 1.6;
+            line-height: 1.65;
             color: var(--muted);
-            margin-bottom: 12px;
         }
-
-        /* Code snippet inside card */
-        .cap-code {
-            background: rgba(0,0,0,0.35);
-            border: 1px solid rgba(255,255,255,0.06);
-            border-radius: 10px;
-            padding: 14px 16px;
-            font-family: 'SF Mono', 'Fira Code', monospace;
-            font-size: 11px;
-            line-height: 1.7;
-            color: rgba(255,255,255,0.50);
-            overflow: hidden;
-        }
-        .cap-code .kw { color: #c084fc; }
-        .cap-code .fn { color: #60a5fa; }
-        .cap-code .str { color: #4ade80; }
-        .cap-code .cm { color: #52525b; }
-        .cap-code .num { color: #fbbf24; }
-
         .cap-tag {
             display: inline-block;
+            margin-top: 10px;
             font-size: 10px;
             font-weight: 700;
             letter-spacing: 0.8px;
             text-transform: uppercase;
             padding: 3px 10px;
-            border-radius: 20px;
-            margin-bottom: 12px;
+            border-radius: 100px;
+            background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(59,130,246,0.15));
+            color: #a78bfa;
+            border: 1px solid rgba(124,58,237,0.2);
         }
 
-        /* Per-card color schemes */
-        .cap-card[data-color="purple"]  { --card-accent: linear-gradient(90deg, #7c3aed, #a78bfa); --card-glow: rgba(124,58,237,0.06); --card-icon-bg: rgba(124,58,237,0.12); --card-icon-border: rgba(124,58,237,0.2); --card-icon-color: #a78bfa; }
-        .cap-card[data-color="blue"]    { --card-accent: linear-gradient(90deg, #3b82f6, #60a5fa); --card-glow: rgba(59,130,246,0.06); --card-icon-bg: rgba(59,130,246,0.12); --card-icon-border: rgba(59,130,246,0.2); --card-icon-color: #60a5fa; }
-        .cap-card[data-color="green"]   { --card-accent: linear-gradient(90deg, #22c55e, #4ade80); --card-glow: rgba(34,197,94,0.06); --card-icon-bg: rgba(34,197,94,0.12); --card-icon-border: rgba(34,197,94,0.2); --card-icon-color: #4ade80; }
-        .cap-card[data-color="orange"]  { --card-accent: linear-gradient(90deg, #f97316, #fb923c); --card-glow: rgba(249,115,22,0.06); --card-icon-bg: rgba(249,115,22,0.12); --card-icon-border: rgba(249,115,22,0.2); --card-icon-color: #fb923c; }
-        .cap-card[data-color="pink"]    { --card-accent: linear-gradient(90deg, #ec4899, #f472b6); --card-glow: rgba(236,72,153,0.06); --card-icon-bg: rgba(236,72,153,0.12); --card-icon-border: rgba(236,72,153,0.2); --card-icon-color: #f472b6; }
-        .cap-card[data-color="cyan"]    { --card-accent: linear-gradient(90deg, #06b6d4, #22d3ee); --card-glow: rgba(6,182,212,0.06); --card-icon-bg: rgba(6,182,212,0.12); --card-icon-border: rgba(6,182,212,0.2); --card-icon-color: #22d3ee; }
-        .cap-card[data-color="yellow"]  { --card-accent: linear-gradient(90deg, #eab308, #facc15); --card-glow: rgba(234,179,8,0.06); --card-icon-bg: rgba(234,179,8,0.12); --card-icon-border: rgba(234,179,8,0.2); --card-icon-color: #facc15; }
-        .cap-card[data-color="rose"]    { --card-accent: linear-gradient(90deg, #e11d48, #fb7185); --card-glow: rgba(225,29,72,0.06); --card-icon-bg: rgba(225,29,72,0.12); --card-icon-border: rgba(225,29,72,0.2); --card-icon-color: #fb7185; }
+        /* Icon color variants */
+        .cap-icon.purple { background: rgba(124,58,237,0.12); color: #a78bfa; }
+        .cap-icon.blue { background: rgba(59,130,246,0.12); color: #60a5fa; }
+        .cap-icon.green { background: rgba(34,197,94,0.12); color: #4ade80; }
+        .cap-icon.orange { background: rgba(249,115,22,0.12); color: #fb923c; }
+        .cap-icon.pink { background: rgba(236,72,153,0.12); color: #f472b6; }
+        .cap-icon.cyan { background: rgba(6,182,212,0.12); color: #22d3ee; }
+        .cap-icon.yellow { background: rgba(234,179,8,0.12); color: #facc15; }
+        .cap-icon.rose { background: rgba(244,63,94,0.12); color: #fb7185; }
+        .cap-icon.lime { background: rgba(132,204,22,0.12); color: #a3e635; }
+        .cap-icon.indigo { background: rgba(99,102,241,0.12); color: #818cf8; }
 
-        .cap-tag.purple { background: rgba(124,58,237,0.15); color: #a78bfa; }
-
-        @media (max-width: 900px) {
-            .cap-grid { grid-template-columns: 1fr; }
-            .cap-card.featured { grid-template-columns: 1fr; }
+        /* Featured cap card */
+        .cap-card.featured {
+            border-color: rgba(124,58,237,0.25);
+            background: linear-gradient(135deg, rgba(124,58,237,0.06), rgba(59,130,246,0.03));
+        }
+        .cap-card.featured::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), var(--accent3));
         }
 
         /* ─── PIPELINE DEMO ─── */
@@ -465,10 +498,19 @@
             align-items: center;
         }
         .pipeline {
-            background: rgba(255,255,255,0.05);
+            background: rgba(255,255,255,0.03);
             border: 1px solid var(--border);
             border-radius: 16px;
             padding: 32px;
+            position: relative;
+            overflow: hidden;
+        }
+        .pipeline::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(124,58,237,0.4), transparent);
         }
         .pipeline-title {
             font-size: 11px;
@@ -492,6 +534,11 @@
             border: 1px solid rgba(124,58,237,0.15);
             color: #c4b5fd;
             margin: 3px;
+            transition: all 0.2s;
+        }
+        .pipeline-node:hover {
+            background: rgba(124,58,237,0.15);
+            border-color: rgba(124,58,237,0.3);
         }
         .pipeline-node.accent {
             background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(59,130,246,0.15));
@@ -501,7 +548,7 @@
         }
         .pipeline-arrow {
             text-align: center;
-            color: rgba(255,255,255,0.15);
+            color: rgba(124,58,237,0.3);
             font-size: 12px;
             margin: 4px 0;
         }
@@ -519,21 +566,23 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 8px;
             margin: 48px 0;
             flex-wrap: wrap;
         }
         .arch-node {
-            padding: 14px 22px;
-            background: var(--surface);
+            padding: 16px 24px;
+            background: rgba(255,255,255,0.04);
             border: 1px solid var(--border);
-            border-radius: 10px;
+            border-radius: 12px;
             text-align: center;
-            transition: all 0.2s;
+            transition: all 0.25s;
         }
         .arch-node:hover {
             border-color: rgba(124,58,237,0.3);
-            background: rgba(124,58,237,0.04);
+            background: rgba(124,58,237,0.06);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
         }
         .arch-node .label {
             font-size: 10px;
@@ -545,30 +594,34 @@
         }
         .arch-node .name {
             font-size: 14px;
-            font-weight: 600;
+            font-weight: 700;
+            color: #fff;
         }
         .arch-arrow {
-            color: rgba(255,255,255,0.15);
-            font-size: 14px;
+            color: rgba(124,58,237,0.3);
+            font-size: 16px;
             padding: 0 4px;
         }
         .arch-details {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 1px;
-            background: var(--border);
-            border-radius: 12px;
-            overflow: hidden;
+            gap: 16px;
         }
         .arch-detail {
-            background: rgba(20,22,30,0.95);
-            padding: 28px 24px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px 20px;
+            transition: all 0.25s;
+        }
+        .arch-detail:hover {
+            border-color: rgba(124,58,237,0.2);
+            background: rgba(255,255,255,0.05);
         }
         .arch-detail h4 {
-            font-size: 13px;
-            font-weight: 600;
+            font-size: 14px;
+            font-weight: 700;
             margin-bottom: 8px;
-            letter-spacing: -0.2px;
             color: #fff;
         }
         .arch-detail p {
@@ -578,8 +631,8 @@
         }
         .arch-detail code {
             font-size: 11px;
-            background: rgba(124,58,237,0.1);
-            padding: 1px 5px;
+            background: rgba(124,58,237,0.12);
+            padding: 2px 6px;
             border-radius: 4px;
             color: #c4b5fd;
             font-family: 'SF Mono', 'Fira Code', monospace;
@@ -610,23 +663,23 @@
             text-decoration: none;
             transition: color 0.2s;
         }
-        .footer-links a:hover { color: var(--muted); }
+        .footer-links a:hover { color: #fff; }
 
         /* ─── ANIMATIONS ─── */
         .reveal {
             opacity: 0;
-            transform: translateY(20px);
-            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
-                        transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            transform: translateY(24px);
+            transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+                        transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
         }
         .reveal.visible {
             opacity: 1;
             transform: translateY(0);
         }
-        .rd1 { transition-delay: 0.06s; }
-        .rd2 { transition-delay: 0.12s; }
-        .rd3 { transition-delay: 0.18s; }
-        .rd4 { transition-delay: 0.24s; }
+        .rd1 { transition-delay: 0.08s; }
+        .rd2 { transition-delay: 0.16s; }
+        .rd3 { transition-delay: 0.24s; }
+        .rd4 { transition-delay: 0.32s; }
 
         /* ─── RESPONSIVE ─── */
         @media (max-width: 900px) {
@@ -644,15 +697,22 @@
             .hero-stats { flex-direction: column; gap: 16px; }
             .hero-links { gap: 20px; }
             .footer-inner { flex-direction: column; gap: 16px; text-align: center; }
+            .container { padding: 0 20px; }
         }
     </style>
 </head>
 <body>
 
+<!-- GRID BACKGROUND -->
+<div class="grid-bg"></div>
+
 <!-- HERO -->
 <section class="hero">
-    <div class="hero-bg"></div>
-    <div class="hero-top reveal">
+    <div class="hero-glow hero-glow-1"></div>
+    <div class="hero-glow hero-glow-2"></div>
+    <div class="hero-glow hero-glow-3"></div>
+
+    <div class="hero-top reveal visible">
         <a href="/landing" class="logo">DCN</a>
         <div class="hero-links">
             <a href="/">Submit</a>
@@ -661,9 +721,12 @@
         </div>
     </div>
     <div class="hero-center">
-        <div class="hero-label reveal">Distributed Compute Network</div>
-        <h1 class="reveal rd1">Distribute Any AI Workload. <span class="gradient-text">Automatically.</span></h1>
-        <p class="reveal rd2">Submit a task. DCN decomposes it into parallel subtasks, dispatches them to worker nodes, and aggregates results &mdash; no DAGs, no infrastructure, no workflow definitions.</p>
+        <div class="hero-badge reveal">
+            <span class="hero-badge-dot"></span>
+            Hackathon Project — Live Demo
+        </div>
+        <h1 class="reveal rd1">Distribute any workload. <span class="gradient-text">Automatically.</span></h1>
+        <p class="reveal rd2">Submit a task. DCN decomposes it into parallel subtasks, dispatches them to worker nodes by tier, and aggregates results &mdash; no DAGs, no infrastructure.</p>
         <div class="hero-cta reveal rd3">
             <a href="/" class="btn btn-primary">Try It Now</a>
             <a href="/ops" class="btn btn-ghost">View Dashboard</a>
@@ -714,23 +777,23 @@
         <div class="section-label reveal">How It Works</div>
         <div class="section-title reveal">Four steps. Zero configuration.</div>
         <div class="section-desc reveal">From raw input to aggregated results in seconds. The entire pipeline is automatic.</div>
-        <div class="steps reveal rd2">
-            <div class="step">
+        <div class="steps">
+            <div class="step reveal">
                 <div class="step-number">01</div>
                 <h3>Submit</h3>
                 <p>User submits a job with a task type and input payload via the web dashboard or API.</p>
             </div>
-            <div class="step">
+            <div class="step reveal rd1">
                 <div class="step-number">02</div>
                 <h3>Decompose</h3>
                 <p>The planner analyzes the job and breaks it into independent subtasks optimized for parallel execution.</p>
             </div>
-            <div class="step">
+            <div class="step reveal rd2">
                 <div class="step-number">03</div>
                 <h3>Execute</h3>
                 <p>Worker nodes atomically claim tasks and process them simultaneously across the distributed pool.</p>
             </div>
-            <div class="step">
+            <div class="step reveal rd3">
                 <div class="step-number">04</div>
                 <h3>Aggregate</h3>
                 <p>Results are merged via concatenation or AI synthesis into a single, unified output.</p>
@@ -740,93 +803,106 @@
 </section>
 
 <!-- CAPABILITIES -->
-<section id="features" style="border-top: 1px solid var(--border);">
+<section id="features" class="capabilities-section">
     <div class="container">
         <div class="capabilities-header">
             <div>
                 <div class="section-label reveal">Capabilities</div>
                 <div class="section-title reveal">Task types</div>
             </div>
-            <div class="cap-count reveal">10 types</div>
+            <div class="cap-count reveal">10 supported types</div>
         </div>
-        <div class="cap-grid reveal rd1">
-            <!-- FEATURED: ML Experiment -->
-            <div class="cap-card featured" data-color="purple">
-                <div>
-                    <span class="cap-tag purple">Flagship</span>
-                    <h3>ML Experiment Pipeline</h3>
-                    <p>Train 8 models in parallel with cross-validation, feature engineering, and ranked results. Real scikit-learn models on 75K-row datasets distributed across worker nodes.</p>
-                    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
-                        <span style="font-size:11px;padding:3px 10px;border-radius:6px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.15);color:#a78bfa;">RandomForest</span>
-                        <span style="font-size:11px;padding:3px 10px;border-radius:6px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.15);color:#60a5fa;">GradientBoosting</span>
-                        <span style="font-size:11px;padding:3px 10px;border-radius:6px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.15);color:#4ade80;">Ridge</span>
-                        <span style="font-size:11px;padding:3px 10px;border-radius:6px;background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.15);color:#facc15;">DecisionTree</span>
+        <div class="cap-grid">
+            <div class="cap-card featured reveal">
+                <div class="cap-card-top">
+                    <div class="cap-icon purple">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
                     </div>
+                    <h3>ML Experiment</h3>
                 </div>
-                <div class="cap-code">
-<span class="cm">// 8 experiments distributed across workers</span>
-<span class="kw">POST</span> <span class="fn">/jobs</span> {
-  <span class="str">"task_type"</span>: <span class="str">"ml_experiment"</span>,
-  <span class="str">"dataset"</span>: <span class="str">"weather_ri"</span> <span class="cm">// 75K rows</span>
-}
-<span class="cm">// → 8 parallel tasks → ranked results</span>
-<span class="cm">// → best model: GradientBoosting (R²=0.94)</span>
+                <p>Train multiple models in parallel with cross-validation, feature engineering, and ranked results. Supports scikit-learn pipelines with automatic hyperparameter exploration.</p>
+                <span class="cap-tag">Latest</span>
+            </div>
+            <div class="cap-card reveal rd1">
+                <div class="cap-card-top">
+                    <div class="cap-icon blue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+                    </div>
+                    <h3>Codebase Review</h3>
                 </div>
+                <p>Fetch GitHub repos, analyze code quality, identify issues, and produce comprehensive reviews across all files.</p>
             </div>
-
-            <div class="cap-card" data-color="blue">
-                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg></div>
-                <h3>Codebase Review</h3>
-                <p>Fetch GitHub repos, split by module, analyze in parallel for bugs, security, and quality.</p>
-                <div class="cap-code"><span class="fn">github.com/user/repo</span> → <span class="num">12</span> modules → <span class="str">parallel review</span></div>
+            <div class="cap-card reveal">
+                <div class="cap-card-top">
+                    <div class="cap-icon indigo">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6M9 16h6M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9l-7-7z"/></svg>
+                    </div>
+                    <h3>Document Analysis</h3>
+                </div>
+                <p>Extract key insights from long documents using AI-powered decomposition and synthesis.</p>
             </div>
-            <div class="cap-card" data-color="green">
-                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
-                <h3>Document Analysis</h3>
-                <p>Extract insights from long documents using AI-powered decomposition and synthesis.</p>
-                <div class="cap-code"><span class="num">500</span> pages → <span class="num">8</span> chunks → <span class="str">synthesized report</span></div>
+            <div class="cap-card reveal rd1">
+                <div class="cap-card-top">
+                    <div class="cap-icon green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                    </div>
+                    <h3>Research Pipeline</h3>
+                </div>
+                <p>Multi-angle AI research on any topic with parallel exploration and synthesized findings.</p>
             </div>
-            <div class="cap-card" data-color="cyan">
-                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></div>
-                <h3>Research Pipeline</h3>
-                <p>Multi-angle AI research with parallel exploration and synthesized findings.</p>
-                <div class="cap-code"><span class="str">"quantum computing"</span> → <span class="num">6</span> angles → <span class="str">report</span></div>
+            <div class="cap-card reveal">
+                <div class="cap-card-top">
+                    <div class="cap-icon orange">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+                    </div>
+                    <h3>Website Builder</h3>
+                </div>
+                <p>Generate complete HTML/CSS sections simultaneously and assemble into full pages.</p>
             </div>
-            <div class="cap-card" data-color="orange">
-                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg></div>
-                <h3>Website Builder</h3>
-                <p>Generate HTML/CSS sections simultaneously and assemble into full pages.</p>
-                <div class="cap-code"><span class="str">"landing page"</span> → hero + features + footer → <span class="fn">merge</span></div>
+            <div class="cap-card reveal rd1">
+                <div class="cap-card-top">
+                    <div class="cap-icon pink">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                    </div>
+                    <h3>Data Processing</h3>
+                </div>
+                <p>Classify, transform, and analyze datasets with distributed processing pipelines.</p>
             </div>
-            <div class="cap-card" data-color="pink">
-                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M9 12h6M7 3h10l2 4H5l2-4z"/></svg></div>
-                <h3>Data Processing</h3>
-                <p>Classify, transform, and analyze datasets with distributed batch pipelines.</p>
-                <div class="cap-code"><span class="num">10K</span> records → <span class="num">8</span> batches → <span class="str">classified output</span></div>
-            </div>
-            <div class="cap-card" data-color="cyan">
-                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>
-                <h3>Image Processing</h3>
+            <div class="cap-card reveal">
+                <div class="cap-card-top">
+                    <div class="cap-icon cyan">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                    </div>
+                    <h3>Image Processing</h3>
+                </div>
                 <p>Batch image analysis, classification, and transformation across parallel workers.</p>
-                <div class="cap-code"><span class="num">200</span> images → distributed <span class="fn">classify()</span> → <span class="str">labels</span></div>
             </div>
-            <div class="cap-card" data-color="yellow">
-                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg></div>
-                <h3>Web Scraping</h3>
-                <p>Distributed web scraping with intelligent extraction and structured output.</p>
-                <div class="cap-code"><span class="num">50</span> URLs → parallel <span class="fn">fetch()</span> → <span class="str">JSON</span></div>
+            <div class="cap-card reveal rd1">
+                <div class="cap-card-top">
+                    <div class="cap-icon lime">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+                    </div>
+                    <h3>Web Scraping</h3>
+                </div>
+                <p>Distributed web scraping with intelligent extraction and structured data output.</p>
             </div>
-            <div class="cap-card" data-color="rose">
-                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg></div>
-                <h3>Audio Transcription</h3>
-                <p>Split and transcribe audio segments in parallel for fast transcriptions.</p>
-                <div class="cap-code"><span class="num">2hr</span> audio → <span class="num">12</span> segments → <span class="str">transcript</span></div>
+            <div class="cap-card reveal">
+                <div class="cap-card-top">
+                    <div class="cap-icon yellow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+                    </div>
+                    <h3>Audio Transcription</h3>
+                </div>
+                <p>Split and transcribe audio segments in parallel for fast, accurate transcriptions.</p>
             </div>
-            <div class="cap-card" data-color="green">
-                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
-                <h3>Sentiment Classification</h3>
+            <div class="cap-card reveal rd1">
+                <div class="cap-card-top">
+                    <div class="cap-icon rose">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 000-7.78z"/></svg>
+                    </div>
+                    <h3>Sentiment Classification</h3>
+                </div>
                 <p>Analyze sentiment across large text corpora with distributed batch classification.</p>
-                <div class="cap-code"><span class="num">5K</span> reviews → <span class="fn">classify()</span> → <span class="str">pos/neg/neutral</span></div>
             </div>
         </div>
     </div>
@@ -985,6 +1061,24 @@
     }, { threshold: 0.3 });
     const statsEl = document.querySelector('.hero-stats');
     if (statsEl) heroObserver.observe(statsEl);
+
+    // Mouse-tracking glow on capability cards
+    document.querySelectorAll('.cap-card').forEach(card => {
+        card.addEventListener('mousemove', (e) => {
+            const rect = card.getBoundingClientRect();
+            card.style.setProperty('--mouse-x', ((e.clientX - rect.left) / rect.width * 100) + '%');
+            card.style.setProperty('--mouse-y', ((e.clientY - rect.top) / rect.height * 100) + '%');
+        });
+    });
+
+    // Mouse-tracking glow on step cards
+    document.querySelectorAll('.step').forEach(card => {
+        card.addEventListener('mousemove', (e) => {
+            const rect = card.getBoundingClientRect();
+            card.style.setProperty('--mx', ((e.clientX - rect.left)) + 'px');
+            card.style.setProperty('--my', ((e.clientY - rect.top)) + 'px');
+        });
+    });
 </script>
 
 </body>
