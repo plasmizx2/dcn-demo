@@ -124,7 +124,7 @@ async def serve_login(request: Request):
     # Already logged in? Redirect to appropriate page
     user = get_session(request)
     if user:
-        return RedirectResponse("/ops" if user["role"] == "admin" else "/")
+        return RedirectResponse("/ops" if user["role"] == "admin" else "/submit")
     return FileResponse(os.path.join(LOGIN_DIR, "index.html"))
 
 
@@ -139,8 +139,8 @@ async def do_login(request: Request):
         return JSONResponse({"detail": "Invalid username or password"}, status_code=401)
 
     token = create_session(user)
-    redirect = "/ops" if user["role"] == "admin" else "/"
-    response = JSONResponse({"ok": True, "role": user["role"], "redirect": redirect})
+    redirect = "/ops" if user["role"] == "admin" else "/submit"
+    response = JSONResponse({"ok": True, "role": user["role"], "name": user.get("name", user["username"]), "redirect": redirect})
     response.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="lax", max_age=86400)
     return response
 
@@ -150,7 +150,7 @@ async def auth_me(request: Request):
     user = get_session(request)
     if not user:
         return JSONResponse({"detail": "Not logged in"}, status_code=401)
-    return {"username": user["username"], "role": user["role"]}
+    return {"username": user["username"], "role": user["role"], "name": user.get("name", user["username"])}
 
 
 @app.post("/auth/logout")
@@ -193,3 +193,22 @@ async def health():
     async with pool.acquire() as conn:
         await conn.fetchval("SELECT 1")
     return {"status": "ok", "db": "connected"}
+
+
+@app.get("/stats")
+async def platform_stats():
+    """Cumulative platform stats for the landing page — all-time counts."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        total_jobs = await conn.fetchval("SELECT COUNT(*) FROM jobs") or 0
+        completed_jobs = await conn.fetchval("SELECT COUNT(*) FROM jobs WHERE status = 'completed'") or 0
+        total_tasks = await conn.fetchval("SELECT COUNT(*) FROM job_tasks") or 0
+        completed_tasks = await conn.fetchval("SELECT COUNT(*) FROM job_tasks WHERE status = 'submitted'") or 0
+        total_workers = await conn.fetchval("SELECT COUNT(*) FROM worker_nodes") or 0
+    return {
+        "total_jobs": total_jobs,
+        "completed_jobs": completed_jobs,
+        "total_tasks": total_tasks,
+        "completed_tasks": completed_tasks,
+        "total_workers": total_workers,
+    }

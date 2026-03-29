@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from handlers import document, codebase, website, research, data_processing, ml_experiment
 
-BASE_URL = "https://trula-functionless-bernardine.ngrok-free.dev"
+BASE_URL = "https://dcn-demo.onrender.com"
 
 
 def detect_worker_tier():

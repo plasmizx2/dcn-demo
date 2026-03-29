@@ -39,7 +39,7 @@ def verify_user(username: str, password: str) -> dict | None:
     users = load_users()
     user = users.get(username)
     if user and user["password"] == password:
-        return {"username": username, "role": user["role"]}
+        return {"username": username, "role": user["role"], "name": user.get("name", username)}
     return None
 
 
@@ -78,4 +78,4 @@ ADMIN_PAGES = {"/ops", "/results"}
 # API routes that require admin role
 ADMIN_API_PREFIXES = ["/monitor/"]
 # Prefixes that don't need auth (worker endpoints, public pages, jobs API)
-PUBLIC_PREFIXES = ["/login", "/health", "/submit", "/workers/", "/tasks/", "/jobs", "/auth/"]
+PUBLIC_PREFIXES = ["/login", "/health", "/submit", "/workers/", "/tasks/", "/jobs", "/auth/", "/stats"]

@@ -33,37 +33,144 @@
       z-index: 0;
     }
 
-    /* Minimal transparent nav — NOT sticky, NOT a bar */
-    .page-header {
+    /* ── Sidebar ── */
+    .app-layout {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 20px 48px 0;
-      position: relative;
-      z-index: 2;
+      min-height: 100vh;
     }
-    .page-logo {
+    .sidebar {
+      width: 240px;
+      min-width: 240px;
+      background: rgba(16,18,26,0.85);
+      border-right: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      z-index: 10;
+    }
+    .sidebar-logo {
       font-weight: 800;
-      font-size: 18px;
+      font-size: 20px;
       background: linear-gradient(135deg, #a78bfa, #60a5fa);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       text-decoration: none;
+      padding: 0 24px;
+      margin-bottom: 8px;
+      display: block;
     }
-    .page-nav {
+    .sidebar-role {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #7c3aed;
+      padding: 0 24px;
+      margin-bottom: 24px;
+    }
+    .sidebar-nav {
       display: flex;
-      gap: 6px;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      padding: 0 12px;
     }
-    .page-nav a {
-      color: rgba(255,255,255,0.40);
+    .sidebar-nav a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: rgba(255,255,255,0.45);
       text-decoration: none;
-      font-size: 13px;
+      font-size: 0.88rem;
       font-weight: 500;
-      padding: 6px 14px;
-      border-radius: 8px;
-      transition: color 0.2s;
+      padding: 10px 14px;
+      border-radius: 10px;
+      transition: all 0.15s;
     }
-    .page-nav a:hover, .page-nav a.active { color: #fff; }
+    .sidebar-nav a:hover {
+      color: #fff;
+      background: rgba(255,255,255,0.04);
+    }
+    .sidebar-nav a.active {
+      color: #fff;
+      background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(59,130,246,0.10));
+      border: 1px solid rgba(124,58,237,0.2);
+    }
+    .sidebar-nav a svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+    .sidebar-bottom {
+      padding: 16px 12px 0;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      margin-top: auto;
+    }
+    .sidebar-user {
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    .sidebar-user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #7c3aed, #3b82f6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .sidebar-user-info {
+      min-width: 0;
+    }
+    .sidebar-user-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sidebar-user-role {
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.35);
+      text-transform: capitalize;
+    }
+    .sidebar-signout {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: rgba(255,255,255,0.35);
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 500;
+      padding: 10px 14px;
+      border-radius: 10px;
+      transition: all 0.15s;
+    }
+    .sidebar-signout:hover {
+      color: #ef4444;
+      background: rgba(239,68,68,0.06);
+    }
+    .sidebar-signout svg {
+      width: 16px;
+      height: 16px;
+    }
+    .main-content {
+      margin-left: 240px;
+      flex: 1;
+      min-width: 0;
+    }
 
     .container {
       max-width: 100%;
@@ -81,6 +188,8 @@
       max-width: 860px;
     }
     @media(max-width:960px) {
+      .sidebar { display: none; }
+      .main-content { margin-left: 0; }
       .container { grid-template-columns: 1fr; padding: 24px 24px 64px; }
     }
     .left-col, .right-col {
@@ -703,24 +812,67 @@
   </style>
 </head>
 <body>
-  <!-- Header: logo + subtle nav links, no bar -->
-  <header class="page-header">
-    <div class="page-logo">DCN</div>
-    <nav class="page-nav">
-      <a href="/">Home</a>
-      <a href="/submit" class="active">Submit</a>
-      <a href="/results">Results</a>
-      <a href="#" id="authLink" style="margin-left:12px;opacity:0.6">Login</a>
+  <div class="app-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <a href="/" class="sidebar-logo">DCN</a>
+    <div class="sidebar-role" id="sidebarRole"></div>
+    <nav class="sidebar-nav" id="sidebarNav">
+      <a href="/submit" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        Submit Job
+      </a>
     </nav>
-    <script>
-    fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
-      const a=document.getElementById('authLink');
-      if(u){a.textContent=u.username;a.href='/auth/logout'}
-      else{a.textContent='Login';a.href='/login'}
-    }).catch(()=>{});
-    </script>
-  </header>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="sidebarUser" style="display:none">
+        <div class="sidebar-user-avatar" id="userAvatar">?</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name" id="userName">—</div>
+          <div class="sidebar-user-role" id="userRole">—</div>
+        </div>
+      </div>
+      <a href="/auth/logout" class="sidebar-signout" id="signoutLink" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign Out
+      </a>
+      <a href="/login" class="sidebar-signout" id="signinLink">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10,17 15,12 10,7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Sign In
+      </a>
+    </div>
+  </aside>
+  <script>
+  fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
+    const nav=document.getElementById('sidebarNav');
+    const role=document.getElementById('sidebarRole');
+    if(u){
+      document.getElementById('sidebarUser').style.display='flex';
+      document.getElementById('signoutLink').style.display='flex';
+      document.getElementById('signinLink').style.display='none';
+      document.getElementById('userName').textContent=u.name||u.username;
+      document.getElementById('userRole').textContent=u.role;
+      document.getElementById('userAvatar').textContent=(u.name||u.username).charAt(0).toUpperCase();
+      if(u.role==='admin'){
+        role.textContent='Admin Panel';
+        nav.innerHTML=`
+          <a href="/submit" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Submit Job</a>
+          <a href="/ops"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</a>
+          <a href="/results"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>Results</a>
+        `;
+      } else {
+        role.textContent='Customer';
+        nav.innerHTML=`
+          <a href="/submit" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Submit Job</a>
+        `;
+      }
+    } else {
+      role.textContent='';
+    }
+  }).catch(()=>{});
+  </script>
 
+  <!-- Main content area -->
+  <div class="main-content">
   <div class="container" id="mainContainer">
     <!-- LEFT: Form -->
     <div class="left-col">
@@ -1202,5 +1354,7 @@
       document.getElementById('progressBar').style.width = '0%';
     }
   </script>
+  </div><!-- /main-content -->
+  </div><!-- /app-layout -->
 </body>
 </html>

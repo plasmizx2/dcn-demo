@@ -716,15 +716,23 @@
         <a href="/" class="logo">DCN</a>
         <div class="hero-links">
             <a href="/submit">Submit</a>
-            <a href="/ops">Dashboard</a>
-            <a href="/results">Results</a>
+            <a href="/ops" id="navDashboard">Dashboard</a>
+            <a href="/results" id="navResults">Results</a>
             <a href="#" id="authLink" style="opacity:0.6">Login</a>
         </div>
         <script>
         fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
           const a=document.getElementById('authLink');
-          if(u){a.textContent=u.username;a.href='/auth/logout'}
-          else{a.textContent='Login';a.href='/login'}
+          if(u){
+            a.textContent=u.name||u.username;
+            a.href='/auth/logout';
+            if(u.role==='customer'){
+              document.getElementById('navDashboard').style.display='none';
+              document.getElementById('navResults').style.display='none';
+            }
+          } else {
+            a.textContent='Login';a.href='/login';
+          }
         }).catch(()=>{});
         </script>
     </div>
@@ -737,24 +745,31 @@
         <p class="reveal rd2">Submit a task. DCN decomposes it into parallel subtasks, dispatches them to worker nodes by tier, and aggregates results &mdash; no DAGs, no infrastructure.</p>
         <div class="hero-cta reveal rd3">
             <a href="/submit" class="btn btn-primary">Try It Now</a>
-            <a href="/ops" class="btn btn-ghost">View Dashboard</a>
+            <a href="/login" class="btn btn-ghost" id="ctaSecondary">Sign In</a>
         </div>
-        <div class="hero-stats reveal rd4">
+        <script>
+        fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
+          const btn=document.getElementById('ctaSecondary');
+          if(u&&u.role==='admin'){btn.textContent='View Dashboard';btn.href='/ops';}
+          else if(u){btn.textContent='Submit a Job';btn.href='/submit';}
+        }).catch(()=>{});
+        </script>
+        <div class="hero-stats reveal rd4" id="heroStats">
             <div class="hero-stat">
-                <div class="hero-stat-value gradient-text" data-target="10">0</div>
-                <div class="hero-stat-label">Task Types</div>
+                <div class="hero-stat-value gradient-text" id="stat-jobs" data-target="0">0</div>
+                <div class="hero-stat-label">Jobs Submitted</div>
             </div>
             <div class="hero-stat">
-                <div class="hero-stat-value gradient-text" data-target="8">0</div>
-                <div class="hero-stat-label">Parallel Workers</div>
+                <div class="hero-stat-value gradient-text" id="stat-tasks" data-target="0">0</div>
+                <div class="hero-stat-label">Tasks Completed</div>
             </div>
             <div class="hero-stat">
-                <div class="hero-stat-value gradient-text" data-target="4" data-decimal="true">0</div>
-                <div class="hero-stat-label">Avg Speedup</div>
+                <div class="hero-stat-value gradient-text" id="stat-completed" data-target="0">0</div>
+                <div class="hero-stat-label">Jobs Completed</div>
             </div>
             <div class="hero-stat">
-                <div class="hero-stat-value gradient-text" data-target="75" data-suffix="K">0</div>
-                <div class="hero-stat-label">Rows Processed</div>
+                <div class="hero-stat-value gradient-text" id="stat-workers" data-target="0">0</div>
+                <div class="hero-stat-label">Worker Nodes</div>
             </div>
         </div>
     </div>
@@ -1027,8 +1042,6 @@
         </div>
         <div class="footer-links">
             <a href="/submit">Submit Job</a>
-            <a href="/ops">Dashboard</a>
-            <a href="/results">Results</a>
         </div>
     </div>
 </footer>
@@ -1042,12 +1055,24 @@
     }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
     document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 
-    // Animated counters
+    // Fetch live stats from API, then animate
+    async function loadAndAnimateStats() {
+        try {
+            const resp = await fetch('/stats');
+            if (resp.ok) {
+                const s = await resp.json();
+                document.getElementById('stat-jobs').dataset.target = s.total_jobs;
+                document.getElementById('stat-tasks').dataset.target = s.completed_tasks;
+                document.getElementById('stat-completed').dataset.target = s.completed_jobs;
+                document.getElementById('stat-workers').dataset.target = s.total_workers;
+            }
+        } catch(e) { /* use defaults */ }
+        animateCounters();
+    }
+
     function animateCounters() {
         document.querySelectorAll('[data-target]').forEach(el => {
             const target = parseFloat(el.dataset.target);
-            const isDecimal = el.dataset.decimal === 'true';
-            const suffix = el.dataset.suffix || '';
             const duration = 1600;
             const start = performance.now();
             function update(now) {
@@ -1055,7 +1080,7 @@
                 const progress = Math.min(elapsed / duration, 1);
                 const eased = 1 - Math.pow(1 - progress, 4);
                 const current = target * eased;
-                el.textContent = (isDecimal ? current.toFixed(1) : Math.round(current)) + suffix;
+                el.textContent = Math.round(current);
                 if (progress < 1) requestAnimationFrame(update);
             }
             requestAnimationFrame(update);
@@ -1064,7 +1089,7 @@
 
     const heroObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
-            if (entry.isIntersecting) { animateCounters(); heroObserver.disconnect(); }
+            if (entry.isIntersecting) { loadAndAnimateStats(); heroObserver.disconnect(); }
         });
     }, { threshold: 0.3 });
     const statsEl = document.querySelector('.hero-stats');

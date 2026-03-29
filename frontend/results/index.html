@@ -21,6 +21,26 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 /* TOP HEADER */
 .topnav{display:none}
 
+/* ── Admin Nav Sidebar ── */
+.admin-nav-sidebar{width:240px;min-width:240px;background:rgba(16,18,26,0.85);border-right:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;padding:24px 0;position:fixed;top:0;left:0;bottom:0;z-index:10}
+.admin-nav-sidebar .sidebar-logo{font-weight:800;font-size:20px;background:linear-gradient(135deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-decoration:none;padding:0 24px;margin-bottom:8px;display:block}
+.admin-nav-sidebar .sidebar-role{font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#7c3aed;padding:0 24px;margin-bottom:24px}
+.admin-nav-sidebar .nav-links{display:flex;flex-direction:column;gap:2px;flex:1;padding:0 12px}
+.admin-nav-sidebar .nav-links a{display:flex;align-items:center;gap:10px;color:rgba(255,255,255,0.45);text-decoration:none;font-size:0.88rem;font-weight:500;padding:10px 14px;border-radius:10px;transition:all 0.15s}
+.admin-nav-sidebar .nav-links a:hover{color:#fff;background:rgba(255,255,255,0.04)}
+.admin-nav-sidebar .nav-links a.active{color:#fff;background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(59,130,246,0.10));border:1px solid rgba(124,58,237,0.2)}
+.admin-nav-sidebar .nav-links a svg{width:18px;height:18px;flex-shrink:0}
+.sidebar-bottom{padding:16px 12px 0;border-top:1px solid rgba(255,255,255,0.06);margin-top:auto}
+.sidebar-user{padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.sidebar-user-avatar{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:0.82rem;font-weight:700;color:#fff;flex-shrink:0}
+.sidebar-user-name{font-size:0.85rem;font-weight:600;color:#fff}
+.sidebar-user-role-label{font-size:0.7rem;color:rgba(255,255,255,0.35);text-transform:capitalize}
+.sidebar-signout{display:flex;align-items:center;gap:10px;color:rgba(255,255,255,0.35);text-decoration:none;font-size:0.82rem;font-weight:500;padding:10px 14px;border-radius:10px;transition:all 0.15s}
+.sidebar-signout:hover{color:#ef4444;background:rgba(239,68,68,0.06)}
+.sidebar-signout svg{width:16px;height:16px}
+.outer-layout{display:flex;height:100vh}
+.results-main{margin-left:240px;flex:1;min-width:0}
+
 /* LAYOUT */
 .layout{display:flex;height:100vh}
 
@@ -154,28 +174,49 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 </head>
 <body>
 
-<!-- TOP NAV -->
-<div class="topnav">
-  <div class="topnav-left">
-    <a href="/" class="topnav-logo">DCN</a>
-    <span class="topnav-sep">/</span>
-    <span class="topnav-page">Results</span>
+<div class="outer-layout">
+<!-- Admin Nav Sidebar -->
+<aside class="admin-nav-sidebar">
+  <a href="/" class="sidebar-logo">DCN</a>
+  <div class="sidebar-role">Admin Panel</div>
+  <div class="nav-links">
+    <a href="/submit">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      Submit Job
+    </a>
+    <a href="/ops">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </a>
+    <a href="/results" class="active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+      Results
+    </a>
   </div>
-  <div class="topnav-links">
-    <a href="/">Home</a>
-    <a href="/">Submit</a>
-    <a href="/ops">Dashboard</a>
-    <a href="#" id="authLink" style="opacity:0.6">Login</a>
+  <div class="sidebar-bottom">
+    <div class="sidebar-user" id="sidebarUser">
+      <div class="sidebar-user-avatar" id="userAvatar">A</div>
+      <div>
+        <div class="sidebar-user-name" id="userName">Admin</div>
+        <div class="sidebar-user-role-label">Admin</div>
+      </div>
+    </div>
+    <a href="/auth/logout" class="sidebar-signout">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign Out
+    </a>
   </div>
-  <script>
-  fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
-    const a=document.getElementById('authLink');
-    if(u){a.textContent=u.username;a.href='/auth/logout'}
-    else{a.textContent='Login';a.href='/login'}
-  }).catch(()=>{});
-  </script>
-</div>
+</aside>
+<script>
+fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
+  if(u){
+    document.getElementById('userName').textContent=u.name||u.username;
+    document.getElementById('userAvatar').textContent=(u.name||u.username).charAt(0).toUpperCase();
+  }
+}).catch(()=>{});
+</script>
 
+<div class="results-main">
 <div class="layout">
   <!-- SIDEBAR -->
   <div class="sidebar">
@@ -404,5 +445,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     }, 500);
   }
 </script>
+</div><!-- /results-main -->
+</div><!-- /outer-layout -->
 </body>
 </html>
