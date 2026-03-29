@@ -167,7 +167,7 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
             {
                 "task_name": "experiment_random_forest_heavy",
                 "task_description": f"5-fold CV RandomForest (500 trees, depth=20) on {dataset_name}",
-                "task_payload": {**base, "experiment_type": "random_forest_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 20}, "min_tier": 4},
+                "task_payload": {**base, "experiment_type": "random_forest_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 20}, "min_tier": 3},
             },
             {
                 "task_name": "experiment_gradient_boosting",
@@ -182,7 +182,7 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
             {
                 "task_name": "experiment_gb_tuned",
                 "task_description": f"5-fold CV GradientBoosting tuned (500 trees, depth=8, lr=0.05)",
-                "task_payload": {**base, "experiment_type": "gradient_boosting_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 8, "learning_rate": 0.05}, "min_tier": 4},
+                "task_payload": {**base, "experiment_type": "gradient_boosting_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 8, "learning_rate": 0.05}, "min_tier": 3},
             },
         ]
     else:
@@ -211,7 +211,7 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
             {
                 "task_name": "experiment_random_forest_heavy",
                 "task_description": f"5-fold CV RandomForest (500 trees, depth=20) on {dataset_name}",
-                "task_payload": {**base, "experiment_type": "random_forest_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 20}, "min_tier": 4},
+                "task_payload": {**base, "experiment_type": "random_forest_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 20}, "min_tier": 3},
             },
             {
                 "task_name": "experiment_gradient_boosting",
@@ -226,7 +226,7 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
             {
                 "task_name": "experiment_gb_tuned",
                 "task_description": f"5-fold CV GradientBoosting tuned (500 trees, depth=8, lr=0.05)",
-                "task_payload": {**base, "experiment_type": "gradient_boosting_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 8, "learning_rate": 0.05}, "min_tier": 4},
+                "task_payload": {**base, "experiment_type": "gradient_boosting_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 8, "learning_rate": 0.05}, "min_tier": 3},
             },
         ]
 

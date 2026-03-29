@@ -3,112 +3,189 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DCN — Distributed Computation Network</title>
+  <title>DCN -- Distributed Computation Network</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0a0a0f;
-      color: #e0e0e0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #14161e;
+      color: #e8e8ec;
       min-height: 100vh;
+      overflow-x: hidden;
     }
 
+    /* Page gradient mesh */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 900px;
+      height: 900px;
+      background: radial-gradient(circle, rgba(124,58,237,0.12) 0%, rgba(59,130,246,0.06) 40%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Minimal breadcrumb — no bar, no background */
+    .page-header {
+      display: none;
+    }
+
+    /* Container */
     .container {
-      max-width: 800px;
+      max-width: 1400px;
       margin: 0 auto;
-      padding: 40px 24px;
+      padding: 48px 48px 80px;
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      align-items: start;
+    }
+    .container.single-col {
+      grid-template-columns: 1fr;
+      max-width: 860px;
+    }
+    @media(max-width:960px) {
+      .container { grid-template-columns: 1fr; padding: 32px 24px 64px; }
+      .page-header { padding: 20px 24px 0; }
+    }
+    .left-col, .right-col {
+      min-width: 0;
     }
 
-    /* Header */
-    .header {
-      text-align: center;
-      margin-bottom: 48px;
-    }
-    .header h1 {
-      font-size: 2rem;
-      font-weight: 700;
-      color: #fff;
-      letter-spacing: -0.5px;
-    }
-    .header h1 span {
-      color: #6c63ff;
-    }
-    .header p {
-      color: #888;
-      margin-top: 8px;
-      font-size: 0.95rem;
-    }
-
-    /* Card */
+    /* Card with gradient border */
     .card {
-      background: #141420;
-      border: 1px solid #1e1e30;
-      border-radius: 12px;
-      padding: 28px;
-      margin-bottom: 24px;
+      position: relative;
+      background: rgba(255,255,255,0.06);
+      border-radius: 18px;
+      padding: 40px;
+      margin-bottom: 28px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid transparent;
+      background-clip: padding-box;
+      transition: box-shadow 0.3s ease;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 18px;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(124,58,237,0.25), rgba(59,130,246,0.15), rgba(255,255,255,0.06));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+    .card:hover {
+      box-shadow: 0 0 40px rgba(124,58,237,0.06), 0 0 80px rgba(59,130,246,0.03);
     }
     .card h2 {
-      font-size: 1.1rem;
-      font-weight: 600;
+      font-size: 1.2rem;
+      font-weight: 700;
       color: #fff;
-      margin-bottom: 20px;
+      margin-bottom: 28px;
+      letter-spacing: -0.3px;
     }
 
     /* Form */
     label {
       display: block;
-      font-size: 0.85rem;
-      color: #999;
-      margin-bottom: 6px;
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.55);
+      margin-bottom: 8px;
       font-weight: 500;
+      letter-spacing: 0.2px;
     }
     input, select, textarea {
       width: 100%;
-      padding: 10px 14px;
-      background: #0d0d15;
-      border: 1px solid #2a2a40;
-      border-radius: 8px;
-      color: #e0e0e0;
-      font-size: 0.95rem;
-      font-family: inherit;
-      margin-bottom: 16px;
-      transition: border-color 0.2s;
+      padding: 13px 18px;
+      background: rgba(18,20,28,0.9);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 12px;
+      color: #e8e8ec;
+      font-size: 0.93rem;
+      font-family: 'Inter', inherit;
+      margin-bottom: 22px;
+      transition: all 0.2s ease;
     }
     input:focus, select:focus, textarea:focus {
       outline: none;
-      border-color: #6c63ff;
+      border-color: rgba(124,58,237,0.45);
+      box-shadow: 0 0 0 3px rgba(124,58,237,0.08), 0 0 24px rgba(124,58,237,0.04);
     }
     textarea {
-      min-height: 100px;
+      min-height: 120px;
       resize: vertical;
     }
     select {
       cursor: pointer;
       appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23666' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
-      background-position: right 14px center;
+      background-position: right 16px center;
     }
 
+    /* Submit button */
     .btn {
-      display: inline-block;
-      padding: 12px 32px;
-      background: #6c63ff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 15px 32px;
+      background: linear-gradient(135deg, #7c3aed, #3b82f6);
       color: #fff;
       border: none;
-      border-radius: 8px;
+      border-radius: 12px;
       font-size: 0.95rem;
       font-weight: 600;
+      font-family: 'Inter', inherit;
       cursor: pointer;
-      transition: background 0.2s, opacity 0.2s;
+      transition: all 0.2s ease;
       width: 100%;
+      position: relative;
+      overflow: hidden;
     }
-    .btn:hover { background: #5a52e0; }
+    .btn:hover {
+      transform: scale(1.02);
+      box-shadow: 0 0 30px rgba(124,58,237,0.3), 0 0 60px rgba(59,130,246,0.1);
+    }
+    .btn:active {
+      transform: scale(0.99);
+    }
     .btn:disabled {
-      opacity: 0.5;
+      opacity: 0.6;
       cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    .btn .btn-spinner {
+      display: none;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    .btn.loading .btn-spinner {
+      display: inline-block;
+    }
+    .btn.loading .btn-label {
+      /* keep visible alongside spinner */
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
 
     /* Status */
@@ -120,370 +197,575 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 16px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid #1e1e30;
+      margin-bottom: 22px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
     }
     .job-id-row code {
-      font-size: 0.8rem;
-      color: #888;
-      background: #0d0d15;
-      padding: 4px 10px;
-      border-radius: 6px;
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.30);
+      background: rgba(255,255,255,0.03);
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
     }
 
     .status-badge {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 0.8rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 100px;
+      font-size: 0.75rem;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
-    .status-pending { background: #2a2a40; color: #888; }
-    .status-running { background: #1a2940; color: #4a9eff; }
-    .status-completed { background: #1a3a2a; color: #4ade80; }
+    .status-badge::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    .status-pending { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.45); }
+    .status-pending::before { background: rgba(255,255,255,0.3); }
+    .status-running { background: rgba(59,130,246,0.1); color: #60a5fa; }
+    .status-running::before { background: #3b82f6; animation: pulse-dot 1.5s infinite; }
+    .status-completed { background: rgba(74,222,128,0.1); color: #4ade80; }
+    .status-completed::before { background: #4ade80; }
+    .status-failed { background: rgba(239,68,68,0.1); color: #f87171; }
+    .status-failed::before { background: #ef4444; }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
 
     /* Task list */
     .task-list {
       list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
     .task-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 0;
-      border-bottom: 1px solid #1a1a28;
+      padding: 15px 18px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 12px;
+      border-left: 3px solid rgba(255,255,255,0.08);
+      transition: all 0.2s ease;
     }
-    .task-item:last-child { border-bottom: none; }
+    .task-item:hover {
+      background: rgba(255,255,255,0.035);
+    }
+    .task-item.ti-queued {
+      border-left-color: rgba(255,255,255,0.12);
+    }
+    .task-item.ti-running {
+      border-left-color: #3b82f6;
+      background: rgba(59,130,246,0.03);
+    }
+    .task-item.ti-submitted {
+      border-left-color: #4ade80;
+    }
+    .task-item.ti-failed {
+      border-left-color: #ef4444;
+    }
     .task-name {
-      font-size: 0.9rem;
-      color: #ccc;
+      font-size: 0.88rem;
+      color: rgba(255,255,255,0.7);
+      font-weight: 500;
     }
     .task-status {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       font-weight: 600;
-      padding: 3px 10px;
-      border-radius: 12px;
+      padding: 4px 12px;
+      border-radius: 100px;
       text-transform: uppercase;
+      letter-spacing: 0.3px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
     }
-    .ts-queued { background: #2a2a40; color: #888; }
-    .ts-running { background: #1a2940; color: #4a9eff; }
-    .ts-submitted { background: #1a3a2a; color: #4ade80; }
-    .ts-failed { background: #3a1a1a; color: #ff6b6b; }
-
-    /* Output */
-    .output-block {
-      background: #0d0d15;
-      border: 1px solid #1e1e30;
-      border-radius: 8px;
-      padding: 20px;
-      font-size: 0.9rem;
-      line-height: 1.6;
-      color: #ccc;
-      max-height: 600px;
-      overflow-y: auto;
+    .task-status::before {
+      content: '';
+      display: inline-block;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
     }
-    .output-block h1, .output-block h2, .output-block h3, .output-block h4 {
-      color: #fff; margin: 14px 0 6px 0;
-    }
-    .output-block h1 { font-size: 1.3rem; }
-    .output-block h2 { font-size: 1.1rem; }
-    .output-block h3 { font-size: 1rem; }
-    .output-block p { margin: 8px 0; }
-    .output-block ul, .output-block ol { margin: 8px 0 8px 24px; }
-    .output-block li { margin: 4px 0; }
-    .output-block strong { color: #e0e0e0; }
-    .output-block code {
-      background: #1a1a2e; padding: 1px 5px; border-radius: 3px;
-      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85rem; color: #a78bfa;
-    }
-    .output-block pre {
-      background: #0a0a14; border: 1px solid #1e1e30; border-radius: 6px;
-      padding: 14px; margin: 10px 0; overflow-x: auto;
-    }
-    .output-block pre code { background: none; padding: 0; color: #ccc; }
-    .output-block blockquote {
-      border-left: 3px solid #6c63ff; padding-left: 14px; margin: 10px 0; color: #999;
-    }
-    .output-block hr { border: none; border-top: 1px solid #1e1e30; margin: 14px 0; }
-    .output-block table {
-      width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.82rem;
-    }
-    .output-block th {
-      text-align: left; padding: 8px 10px; background: #1a1a2e;
-      border-bottom: 2px solid #6c63ff; color: #ccc; font-size: 0.75rem;
-      text-transform: uppercase; letter-spacing: 0.3px;
-    }
-    .output-block td {
-      padding: 6px 10px; border-bottom: 1px solid #1e1e30; color: #bbb;
-    }
-    .output-block tr:first-child td { color: #4caf50; font-weight: 600; }
-
-    .html-preview-public {
-      background: #fff; border: 1px solid #1e1e30; border-radius: 8px;
-      width: 100%; height: 400px; min-height: 200px; resize: vertical; overflow: auto;
-    }
-    .output-tabs {
-      display: flex; gap: 8px; margin-bottom: 12px;
-    }
-    .output-tab {
-      padding: 6px 14px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
-      text-transform: uppercase; cursor: pointer; border: 1px solid #2a2a40;
-      background: #0d0d15; color: #888;
-    }
-    .output-tab.active { background: #6c63ff; color: #fff; border-color: #6c63ff; }
-
-    /* Error */
-    .error-msg {
-      background: #3a1a1a;
-      border: 1px solid #5a2020;
-      color: #ff6b6b;
-      padding: 12px 16px;
-      border-radius: 8px;
-      font-size: 0.9rem;
-      margin-bottom: 16px;
-      display: none;
-    }
+    .ts-queued { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.4); }
+    .ts-queued::before { background: rgba(255,255,255,0.25); }
+    .ts-running { background: rgba(59,130,246,0.1); color: #60a5fa; }
+    .ts-running::before { background: #3b82f6; animation: pulse-dot 1.5s infinite; }
+    .ts-submitted { background: rgba(74,222,128,0.1); color: #4ade80; }
+    .ts-submitted::before { background: #4ade80; }
+    .ts-failed { background: rgba(239,68,68,0.1); color: #f87171; }
+    .ts-failed::before { background: #ef4444; }
 
     /* Progress bar */
     .progress-bar-bg {
       width: 100%;
       height: 6px;
-      background: #1e1e30;
-      border-radius: 3px;
-      margin-bottom: 20px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 100px;
+      margin-bottom: 26px;
       overflow: hidden;
     }
     .progress-bar-fill {
       height: 100%;
-      background: #6c63ff;
-      border-radius: 3px;
+      background: linear-gradient(90deg, #7c3aed, #3b82f6);
+      border-radius: 100px;
       transition: width 0.5s ease;
       width: 0%;
+      position: relative;
+    }
+    .progress-bar-fill::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%);
+      animation: shimmer 2s infinite;
+    }
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    /* Output */
+    .output-block {
+      background: rgba(15,17,23,0.9);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 14px;
+      padding: 32px;
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: rgba(255,255,255,0.65);
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    .output-block::-webkit-scrollbar {
+      width: 6px;
+    }
+    .output-block::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .output-block::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+    }
+    .output-block h1, .output-block h2, .output-block h3, .output-block h4 {
+      color: #fff; margin: 20px 0 8px 0; letter-spacing: -0.3px;
+    }
+    .output-block h1 { font-size: 1.4rem; font-weight: 700; }
+    .output-block h2 { font-size: 1.15rem; font-weight: 700; }
+    .output-block h3 { font-size: 1rem; font-weight: 600; }
+    .output-block p { margin: 10px 0; }
+    .output-block ul, .output-block ol { margin: 10px 0 10px 24px; }
+    .output-block li { margin: 6px 0; }
+    .output-block strong { color: rgba(255,255,255,0.85); }
+    .output-block a { color: #60a5fa; text-decoration: none; }
+    .output-block a:hover { text-decoration: underline; }
+    .output-block code {
+      background: rgba(124,58,237,0.1); padding: 2px 7px; border-radius: 6px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; font-size: 0.84rem; color: #a78bfa;
+    }
+    .output-block pre {
+      background: #060609; border: 1px solid rgba(255,255,255,0.10); border-radius: 10px;
+      padding: 18px; margin: 14px 0; overflow-x: auto;
+    }
+    .output-block pre code { background: none; padding: 0; color: rgba(255,255,255,0.6); }
+    .output-block blockquote {
+      border-left: 3px solid #7c3aed; padding-left: 16px; margin: 14px 0; color: rgba(255,255,255,0.4);
+    }
+    .output-block hr { border: none; border-top: 1px solid rgba(255,255,255,0.10); margin: 18px 0; }
+    .output-block table {
+      width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.82rem;
+    }
+    .output-block th {
+      text-align: left; padding: 10px 12px; background: rgba(255,255,255,0.10);
+      border-bottom: 2px solid rgba(124,58,237,0.3); color: rgba(255,255,255,0.6); font-size: 0.75rem;
+      text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600;
+    }
+    .output-block td {
+      padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); color: rgba(255,255,255,0.55);
+    }
+    .output-block tr:first-child td { color: #4ade80; font-weight: 600; }
+
+    .html-preview-public {
+      background: #fff; border: 1px solid rgba(255,255,255,0.10); border-radius: 12px;
+      width: 100%; height: 400px; min-height: 200px; resize: vertical; overflow: auto;
+    }
+    .output-tabs {
+      display: flex; gap: 8px; margin-bottom: 14px;
+    }
+    .output-tab {
+      padding: 7px 16px; border-radius: 10px; font-size: 0.78rem; font-weight: 600;
+      text-transform: uppercase; cursor: pointer; border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.02); color: rgba(255,255,255,0.4);
+      transition: all 0.2s ease; letter-spacing: 0.3px;
+    }
+    .output-tab:hover {
+      border-color: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.6);
+    }
+    .output-tab.active {
+      background: linear-gradient(135deg, #7c3aed, #3b82f6);
+      color: #fff;
+      border-color: transparent;
+    }
+
+    /* Error */
+    .error-msg {
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.2);
+      color: #f87171;
+      padding: 14px 18px;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      margin-bottom: 20px;
+      display: none;
+      font-weight: 500;
     }
 
     /* Timing comparison */
     .timing-card {
-      background: linear-gradient(135deg, rgba(108,99,255,0.08) 0%, rgba(76,175,80,0.06) 100%);
-      border: 1px solid #1e1e30;
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 24px;
+      position: relative;
+      background: rgba(255,255,255,0.02);
+      border-radius: 18px;
+      padding: 36px;
+      margin-bottom: 28px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid transparent;
+      background-clip: padding-box;
+    }
+    .timing-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 18px;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(34,197,94,0.25), rgba(16,185,129,0.15), rgba(255,255,255,0.04));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
     }
     .timing-card h3 {
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       font-weight: 700;
-      color: #6c63ff;
+      background: linear-gradient(135deg, #7c3aed, #3b82f6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
       text-transform: uppercase;
-      letter-spacing: 0.8px;
-      margin-bottom: 16px;
+      letter-spacing: 1px;
+      margin-bottom: 28px;
     }
     .timing-bars {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
     }
     .timing-row {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
     }
     .timing-label {
       font-size: 0.82rem;
-      color: #999;
-      min-width: 90px;
-      font-weight: 500;
+      color: rgba(255,255,255,0.55);
+      min-width: 100px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
     }
     .timing-bar-track {
       flex: 1;
-      height: 28px;
-      background: #1a1a2e;
-      border-radius: 6px;
+      height: 36px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 10px;
       overflow: hidden;
       position: relative;
     }
     .timing-bar-fill {
       height: 100%;
-      border-radius: 6px;
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: flex-end;
-      padding-right: 10px;
-      font-size: 0.75rem;
+      padding-right: 14px;
+      font-size: 0.82rem;
       font-weight: 700;
       color: #fff;
-      transition: width 1s ease;
+      transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
       min-width: fit-content;
     }
     .timing-bar-fill.sequential {
-      background: linear-gradient(90deg, #ff6b6b, #ee5a24);
+      background: linear-gradient(90deg, #ef4444, #f97316);
     }
     .timing-bar-fill.parallel {
-      background: linear-gradient(90deg, #4caf50, #2ecc71);
+      background: linear-gradient(90deg, #22c55e, #10b981);
     }
     .timing-stats {
       display: flex;
-      gap: 16px;
-      margin-top: 16px;
+      gap: 14px;
+      margin-top: 24px;
       flex-wrap: wrap;
     }
     .timing-stat {
-      background: #141420;
-      border: 1px solid #1e1e30;
-      border-radius: 8px;
-      padding: 12px 18px;
+      position: relative;
+      background: rgba(255,255,255,0.03);
+      border-radius: 14px;
+      padding: 18px 22px;
       text-align: center;
       flex: 1;
       min-width: 100px;
+      border: 1px solid transparent;
+      background-clip: padding-box;
+    }
+    .timing-stat::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 14px;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
     }
     .timing-stat .stat-val {
-      font-size: 1.4rem;
-      font-weight: 700;
+      font-size: 1.8rem;
+      font-weight: 800;
       color: #fff;
+      letter-spacing: -0.5px;
     }
-    .timing-stat .stat-val.highlight { color: #4caf50; }
+    .timing-stat .stat-val.highlight {
+      background: linear-gradient(135deg, #22c55e, #10b981);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
     .timing-stat .stat-lbl {
-      font-size: 0.72rem;
-      color: #888;
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.35);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-top: 2px;
+      letter-spacing: 0.6px;
+      margin-top: 4px;
+      font-weight: 600;
     }
 
     /* New job button */
     .btn-secondary {
-      background: transparent;
-      border: 1px solid #2a2a40;
-      color: #888;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.5);
       padding: 8px 20px;
-      border-radius: 8px;
-      font-size: 0.85rem;
+      border-radius: 10px;
+      font-size: 0.82rem;
+      font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.2s ease;
+      font-family: 'Inter', inherit;
     }
     .btn-secondary:hover {
-      border-color: #6c63ff;
+      border-color: rgba(124,58,237,0.4);
       color: #fff;
+      background: rgba(124,58,237,0.08);
     }
 
     /* Task description panel */
     .task-description-panel {
-      background: linear-gradient(135deg, rgba(108,99,255,0.06) 0%, rgba(108,99,255,0.02) 100%);
-      border: 1px solid #1e1e30;
-      border-left: 3px solid #6c63ff;
-      border-radius: 0 10px 10px 0;
-      padding: 16px 20px;
-      margin-bottom: 20px;
+      position: relative;
+      background: rgba(124,58,237,0.06);
+      border-radius: 16px;
+      padding: 32px;
       animation: descFadeIn 0.3s ease;
+      position: sticky;
+      top: 32px;
+      border: 1px solid transparent;
+      background-clip: padding-box;
+    }
+    .task-description-panel::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 16px;
+      padding: 1px;
+      background: linear-gradient(180deg, rgba(124,58,237,0.30), rgba(59,130,246,0.12), rgba(255,255,255,0.03));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+    .task-description-panel::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, #7c3aed, #3b82f6);
+      border-radius: 3px 0 0 3px;
     }
     @keyframes descFadeIn {
-      from { opacity: 0; transform: translateY(-6px); }
+      from { opacity: 0; transform: translateY(-8px); }
       to   { opacity: 1; transform: translateY(0); }
     }
+    .task-description-panel .desc-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(124,58,237,0.12);
+      margin-bottom: 10px;
+      font-size: 0.85rem;
+    }
     .task-description-panel .desc-title {
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-weight: 700;
-      color: #6c63ff;
+      background: linear-gradient(135deg, #7c3aed, #3b82f6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
       text-transform: uppercase;
       letter-spacing: 0.8px;
-      margin-bottom: 6px;
+      margin-bottom: 10px;
     }
     .task-description-panel .desc-body {
       font-size: 0.85rem;
-      color: #b0b0c0;
-      line-height: 1.55;
-      margin-bottom: 10px;
+      color: rgba(255,255,255,0.62);
+      line-height: 1.65;
+      margin-bottom: 16px;
     }
     .task-description-panel .desc-why {
-      font-size: 0.8rem;
-      color: #777;
-      line-height: 1.5;
-      padding-top: 8px;
-      border-top: 1px solid rgba(108,99,255,0.12);
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.45);
+      line-height: 1.55;
+      padding-top: 14px;
+      border-top: 1px solid rgba(124,58,237,0.12);
     }
     .task-description-panel .desc-why strong {
-      color: #999;
+      color: rgba(255,255,255,0.65);
+    }
+
+    /* Scrollbar for body */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #14161e;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.08);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255,255,255,0.12);
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <!-- Header -->
-    <div class="header">
-      <h1><span>DCN</span> Orchestration Demo</h1>
-      <p>Distributed task processing powered by AI workers</p>
+  <!-- Header: logo + subtle nav links, no bar -->
+  <header class="page-header">
+    <div class="page-logo">DCN</div>
+    <nav class="page-nav">
+      <a href="/landing">Home</a>
+      <a href="/" class="active">Dashboard</a>
+      <a href="/results">Results</a>
+    </nav>
+  </header>
 
+  <div class="container" id="mainContainer">
+    <!-- LEFT: Form -->
+    <div class="left-col">
+      <!-- Error -->
+      <div class="error-msg" id="errorMsg"></div>
+
+      <!-- Input Form -->
+      <div class="card" id="formCard">
+        <h2>Submit a Job</h2>
+
+        <label for="title">Job Title</label>
+        <input type="text" id="title" placeholder="e.g. Review my project">
+
+        <label for="taskType">Task Type</label>
+        <select id="taskType">
+            <option value="codebase_review">Codebase Review</option>
+            <option value="document_analysis">Document Analysis</option>
+            <option value="research_pipeline">Research Pipeline</option>
+            <option value="website_builder">Website Builder</option>
+            <option value="data_processing">Data Processing</option>
+            <option value="ml_experiment">ML Experiment</option>
+            <option value="image_processing">Image Processing</option>
+            <option value="web_scraping">Web Scraping</option>
+            <option value="audio_transcription">Audio Transcription</option>
+            <option value="sentiment_classification">Sentiment Classification</option>
+        </select>
+
+        <div id="inputGroup">
+          <label for="inputText" id="inputLabel">Input</label>
+          <textarea id="inputText" placeholder="Enter your input here..."></textarea>
+        </div>
+
+        <button class="btn" id="submitBtn" onclick="submitJob()">
+          <span class="btn-spinner"></span>
+          <span class="btn-label">Submit Job</span>
+        </button>
+      </div>
     </div>
 
-    <!-- Error -->
-    <div class="error-msg" id="errorMsg"></div>
-
-    <!-- Input Form -->
-    <div class="card" id="formCard">
-      <h2>Submit a Job</h2>
-
-      <label for="title">Job Title</label>
-      <input type="text" id="title" placeholder="e.g. Review my project">
-
-      <label for="taskType">Task Type</label>
-      <select id="taskType">
-          <option value="codebase_review">Codebase Review</option>
-          <option value="document_analysis">Document Analysis</option>
-          <option value="research_pipeline">Research Pipeline</option>
-          <option value="website_builder">Website Builder</option>
-          <option value="data_processing">Data Processing</option>
-          <option value="ml_experiment">ML Experiment</option>
-          <option value="image_processing">Image Processing</option>
-          <option value="web_scraping">Web Scraping</option>
-          <option value="audio_transcription">Audio Transcription</option>
-          <option value="sentiment_classification">Sentiment Classification</option>
-      </select>
-
+    <!-- RIGHT: Description / Status / Output -->
+    <div class="right-col">
+      <!-- Task description (shown before submit) -->
       <div id="taskDescriptionPanel" class="task-description-panel"></div>
 
-      <div id="inputGroup">
-        <label for="inputText" id="inputLabel">Input</label>
-        <textarea id="inputText" placeholder="Enter your input here..."></textarea>
+      <!-- Status (shown after submit) -->
+      <div class="card status-section" id="statusCard">
+        <div class="job-id-row">
+          <h2 style="margin-bottom:0">Job Status</h2>
+          <code id="jobIdDisplay"></code>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <span class="status-badge status-pending" id="jobStatus">PENDING</span>
+          <span style="font-size:0.82rem; color:rgba(255,255,255,0.35); font-weight:500;" id="taskCount"></span>
+        </div>
+
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+
+        <ul class="task-list" id="taskList"></ul>
       </div>
 
-      <button class="btn" id="submitBtn" onclick="submitJob()">Submit Job</button>
-    </div>
-
-    <!-- Status -->
-    <div class="card status-section" id="statusCard">
-      <div class="job-id-row">
-        <h2 style="margin-bottom:0">Job Status</h2>
-        <code id="jobIdDisplay"></code>
+      <!-- Timing Comparison -->
+      <div class="timing-card" id="timingCard" style="display:none;">
+        <h3>Distributed Execution Performance</h3>
+        <div class="timing-bars" id="timingBars"></div>
+        <div class="timing-stats" id="timingStats"></div>
       </div>
 
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <span class="status-badge status-pending" id="jobStatus">PENDING</span>
-        <span style="font-size:0.85rem; color:#888;" id="taskCount"></span>
+      <!-- Output -->
+      <div class="card output-section" id="outputCard">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+          <h2 style="margin-bottom:0">Final Output</h2>
+          <button class="btn-secondary" onclick="resetForm()">New Job</button>
+        </div>
+        <div class="output-block" id="outputBlock"></div>
       </div>
-
-      <div class="progress-bar-bg">
-        <div class="progress-bar-fill" id="progressBar"></div>
-      </div>
-
-      <ul class="task-list" id="taskList"></ul>
-    </div>
-
-    <!-- Timing Comparison -->
-    <div class="timing-card" id="timingCard" style="display:none;">
-      <h3>Distributed Execution Performance</h3>
-      <div class="timing-bars" id="timingBars"></div>
-      <div class="timing-stats" id="timingStats"></div>
-    </div>
-
-    <!-- Output -->
-    <div class="card output-section" id="outputCard">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <h2 style="margin-bottom:0">Final Output</h2>
-        <button class="btn-secondary" onclick="resetForm()">New Job</button>
-      </div>
-      <div class="output-block" id="outputBlock"></div>
     </div>
   </div>
 
@@ -557,6 +839,9 @@
       const panel = document.getElementById('taskDescriptionPanel');
       if (info) {
         panel.innerHTML = `
+          <div class="desc-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          </div>
           <div class="desc-title">How it works</div>
           <div class="desc-body">${info.desc}</div>
           <div class="desc-why"><strong>Why DCN at scale:</strong> ${info.why}</div>
@@ -615,7 +900,8 @@
 
       const btn = document.getElementById('submitBtn');
       btn.disabled = true;
-      btn.textContent = 'Submitting...';
+      btn.classList.add('loading');
+      btn.querySelector('.btn-label').textContent = 'Submitting...';
 
       try {
         // Build payload based on task type
@@ -659,10 +945,12 @@
         const job = await resp.json();
         currentJobId = job.id;
 
-        // Show status card, hide form
+        // Show status card, hide form + description
         document.getElementById('formCard').style.display = 'none';
+        document.getElementById('taskDescriptionPanel').style.display = 'none';
         document.getElementById('statusCard').style.display = 'block';
         document.getElementById('jobIdDisplay').textContent = currentJobId;
+        document.getElementById('mainContainer').classList.add('single-col');
 
         // Start polling
         pollInterval = setInterval(pollJob, 1500);
@@ -672,7 +960,8 @@
         showError('Failed to submit job: ' + e.message);
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Submit Job';
+        btn.classList.remove('loading');
+        btn.querySelector('.btn-label').textContent = 'Submit Job';
       }
     }
 
@@ -708,7 +997,7 @@
         // Update task list
         const list = document.getElementById('taskList');
         list.innerHTML = tasks.map(t => `
-          <li class="task-item">
+          <li class="task-item ti-${t.status}">
             <span class="task-name">${t.task_name}</span>
             <span class="task-status ts-${t.status}">${t.status}</span>
           </li>
@@ -729,10 +1018,10 @@
           document.getElementById('outputCard').style.display = 'block';
           document.getElementById('outputBlock').innerHTML = `
             <div style="text-align:center; padding:32px 0;">
-              <div style="font-size:2rem; margin-bottom:12px;">⚠️</div>
-              <h3 style="color:#ff6b6b; margin-bottom:8px;">Job Failed</h3>
-              <p style="color:#888;">${failedCount} of ${tasks.length} tasks failed during processing.</p>
-              <p style="color:#666; font-size:0.85rem; margin-top:12px;">This can happen when workers encounter errors or lose connection.</p>
+              <div style="font-size:2rem; margin-bottom:12px;">&#9888;&#65039;</div>
+              <h3 style="color:#f87171; margin-bottom:8px;">Job Failed</h3>
+              <p style="color:rgba(255,255,255,0.4);">${failedCount} of ${tasks.length} tasks failed during processing.</p>
+              <p style="color:rgba(255,255,255,0.25); font-size:0.85rem; margin-top:12px;">This can happen when workers encounter errors or lose connection.</p>
             </div>
           `;
         }
@@ -869,9 +1158,11 @@
       if (pollInterval) clearInterval(pollInterval);
 
       document.getElementById('formCard').style.display = 'block';
+      document.getElementById('taskDescriptionPanel').style.display = '';
       document.getElementById('statusCard').style.display = 'none';
       document.getElementById('outputCard').style.display = 'none';
       document.getElementById('timingCard').style.display = 'none';
+      document.getElementById('mainContainer').classList.remove('single-col');
       document.getElementById('title').value = '';
       document.getElementById('inputText').value = '';
       document.getElementById('taskList').innerHTML = '';

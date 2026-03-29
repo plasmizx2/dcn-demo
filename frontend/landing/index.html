@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DCN - Distributed Compute Network</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #14161e;
+            --surface: rgba(255,255,255,0.08);
+            --border: rgba(255,255,255,0.12);
+            --text: #f0f0f2;
+            --muted: #b4b4bc;
+            --dim: #8a8a96;
+            --accent: #7c3aed;
+            --accent2: #6366f1;
+            --accent3: #3b82f6;
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+        /* subtle noise texture for depth */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at 30% 20%, rgba(124,58,237,0.06) 0%, transparent 50%),
+                        radial-gradient(ellipse at 70% 80%, rgba(59,130,246,0.04) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container { max-width: 1100px; margin: 0 auto; padding: 0 32px; }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #a78bfa, #818cf8, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* ─── HERO ─── */
+        .hero {
+            position: relative;
+            padding: 48px 0 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .hero-bg {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .hero-bg::before {
+            content: '';
+            position: absolute;
+            top: -40%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 140%;
+            height: 80%;
+            background: radial-gradient(ellipse at center, rgba(124,58,237,0.18) 0%, rgba(99,102,241,0.10) 30%, rgba(59,130,246,0.06) 50%, transparent 70%);
+        }
+
+        .hero-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            max-width: 1100px;
+            margin: 0 auto;
+            width: 100%;
+            position: relative;
+            z-index: 2;
+        }
+        .logo {
+            font-weight: 800;
+            font-size: 18px;
+            letter-spacing: -0.5px;
+            color: #fff;
+            text-decoration: none;
+        }
+        .hero-links {
+            display: flex;
+            gap: 32px;
+        }
+        .hero-links a {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--dim);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .hero-links a:hover { color: var(--muted); }
+
+        .hero-center {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+            z-index: 2;
+            padding: 80px 32px 60px;
+        }
+        .hero-label {
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 24px;
+            opacity: 0.8;
+        }
+        .hero-center h1 {
+            font-size: clamp(40px, 6vw, 72px);
+            font-weight: 800;
+            letter-spacing: -3px;
+            line-height: 1.0;
+            margin-bottom: 24px;
+            max-width: 800px;
+        }
+        .hero-center p {
+            font-size: 17px;
+            line-height: 1.7;
+            color: var(--muted);
+            max-width: 560px;
+            margin-bottom: 40px;
+        }
+        .hero-cta {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: none;
+            font-family: inherit;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent3));
+            color: #fff;
+            box-shadow: 0 0 40px rgba(99,102,241,0.2);
+        }
+        .btn-primary:hover {
+            box-shadow: 0 0 60px rgba(99,102,241,0.35);
+            transform: translateY(-1px);
+        }
+        .btn-ghost {
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid var(--border);
+        }
+        .btn-ghost:hover {
+            color: #fff;
+            border-color: rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.03);
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 48px;
+            margin-top: 64px;
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
+        }
+        .hero-stat {
+            text-align: center;
+        }
+        .hero-stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -1px;
+        }
+        .hero-stat-label {
+            font-size: 12px;
+            color: var(--dim);
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
+        /* ─── SECTION COMMON ─── */
+        section {
+            padding: 100px 0;
+        }
+        .section-label {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 16px;
+        }
+        .section-title {
+            font-size: clamp(28px, 3.5vw, 42px);
+            font-weight: 700;
+            letter-spacing: -1.5px;
+            line-height: 1.15;
+            margin-bottom: 16px;
+        }
+        .section-desc {
+            font-size: 16px;
+            line-height: 1.7;
+            color: var(--muted);
+            max-width: 500px;
+        }
+
+        /* ─── TECH STRIP ─── */
+        .tech-strip {
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            padding: 20px 0;
+        }
+        .tech-inner {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+        .tech-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+        .tech-divider {
+            width: 1px;
+            height: 16px;
+            background: var(--border);
+        }
+        .tech-list {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        .tech-list span {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--dim);
+            transition: color 0.2s;
+        }
+        .tech-list span:hover { color: var(--muted); }
+
+        /* ─── HOW IT WORKS ─── */
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            margin-top: 56px;
+        }
+        .step {
+            background: rgba(20,22,30,0.95);
+            padding: 36px 28px;
+            position: relative;
+            transition: background 0.3s;
+        }
+        .step:hover { background: rgba(255,255,255,0.04); }
+        .step-number {
+            font-size: 48px;
+            font-weight: 800;
+            background: linear-gradient(180deg, rgba(124,58,237,0.25), rgba(59,130,246,0.10));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1;
+            margin-bottom: 20px;
+            letter-spacing: -2px;
+        }
+        .step h3 {
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: -0.3px;
+            color: #fff;
+        }
+        .step p {
+            font-size: 13px;
+            line-height: 1.65;
+            color: var(--muted);
+        }
+
+        /* ─── CAPABILITIES ─── */
+        .capabilities-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 48px;
+        }
+        .cap-count {
+            font-size: 13px;
+            color: var(--dim);
+            font-weight: 500;
+        }
+
+        /* Supabase-inspired card grid */
+        .cap-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .cap-card {
+            position: relative;
+            background: rgba(20,22,30,0.95);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 28px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: default;
+            overflow: hidden;
+        }
+        .cap-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--card-accent);
+            opacity: 0.6;
+            transition: opacity 0.3s;
+        }
+        .cap-card::after {
+            content: '';
+            position: absolute;
+            top: -60%;
+            left: -20%;
+            width: 140%;
+            height: 100%;
+            background: radial-gradient(ellipse at center, var(--card-glow) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.4s;
+            pointer-events: none;
+        }
+        .cap-card:hover {
+            border-color: rgba(255,255,255,0.15);
+            transform: translateY(-2px);
+        }
+        .cap-card:hover::before { opacity: 1; }
+        .cap-card:hover::after { opacity: 1; }
+
+        /* Featured card spans full width */
+        .cap-card.featured {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            padding: 36px;
+        }
+
+        /* Card header with icon */
+        .cap-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            background: var(--card-icon-bg);
+            border: 1px solid var(--card-icon-border);
+        }
+        .cap-icon svg {
+            width: 18px;
+            height: 18px;
+            color: var(--card-icon-color);
+        }
+        .cap-card h3 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 8px;
+            letter-spacing: -0.3px;
+        }
+        .cap-card p {
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--muted);
+            margin-bottom: 12px;
+        }
+
+        /* Code snippet inside card */
+        .cap-code {
+            background: rgba(0,0,0,0.35);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 14px 16px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 11px;
+            line-height: 1.7;
+            color: rgba(255,255,255,0.50);
+            overflow: hidden;
+        }
+        .cap-code .kw { color: #c084fc; }
+        .cap-code .fn { color: #60a5fa; }
+        .cap-code .str { color: #4ade80; }
+        .cap-code .cm { color: #52525b; }
+        .cap-code .num { color: #fbbf24; }
+
+        .cap-tag {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            padding: 3px 10px;
+            border-radius: 20px;
+            margin-bottom: 12px;
+        }
+
+        /* Per-card color schemes */
+        .cap-card[data-color="purple"]  { --card-accent: linear-gradient(90deg, #7c3aed, #a78bfa); --card-glow: rgba(124,58,237,0.06); --card-icon-bg: rgba(124,58,237,0.12); --card-icon-border: rgba(124,58,237,0.2); --card-icon-color: #a78bfa; }
+        .cap-card[data-color="blue"]    { --card-accent: linear-gradient(90deg, #3b82f6, #60a5fa); --card-glow: rgba(59,130,246,0.06); --card-icon-bg: rgba(59,130,246,0.12); --card-icon-border: rgba(59,130,246,0.2); --card-icon-color: #60a5fa; }
+        .cap-card[data-color="green"]   { --card-accent: linear-gradient(90deg, #22c55e, #4ade80); --card-glow: rgba(34,197,94,0.06); --card-icon-bg: rgba(34,197,94,0.12); --card-icon-border: rgba(34,197,94,0.2); --card-icon-color: #4ade80; }
+        .cap-card[data-color="orange"]  { --card-accent: linear-gradient(90deg, #f97316, #fb923c); --card-glow: rgba(249,115,22,0.06); --card-icon-bg: rgba(249,115,22,0.12); --card-icon-border: rgba(249,115,22,0.2); --card-icon-color: #fb923c; }
+        .cap-card[data-color="pink"]    { --card-accent: linear-gradient(90deg, #ec4899, #f472b6); --card-glow: rgba(236,72,153,0.06); --card-icon-bg: rgba(236,72,153,0.12); --card-icon-border: rgba(236,72,153,0.2); --card-icon-color: #f472b6; }
+        .cap-card[data-color="cyan"]    { --card-accent: linear-gradient(90deg, #06b6d4, #22d3ee); --card-glow: rgba(6,182,212,0.06); --card-icon-bg: rgba(6,182,212,0.12); --card-icon-border: rgba(6,182,212,0.2); --card-icon-color: #22d3ee; }
+        .cap-card[data-color="yellow"]  { --card-accent: linear-gradient(90deg, #eab308, #facc15); --card-glow: rgba(234,179,8,0.06); --card-icon-bg: rgba(234,179,8,0.12); --card-icon-border: rgba(234,179,8,0.2); --card-icon-color: #facc15; }
+        .cap-card[data-color="rose"]    { --card-accent: linear-gradient(90deg, #e11d48, #fb7185); --card-glow: rgba(225,29,72,0.06); --card-icon-bg: rgba(225,29,72,0.12); --card-icon-border: rgba(225,29,72,0.2); --card-icon-color: #fb7185; }
+
+        .cap-tag.purple { background: rgba(124,58,237,0.15); color: #a78bfa; }
+
+        @media (max-width: 900px) {
+            .cap-grid { grid-template-columns: 1fr; }
+            .cap-card.featured { grid-template-columns: 1fr; }
+        }
+
+        /* ─── PIPELINE DEMO ─── */
+        .demo-section {
+            border-top: 1px solid var(--border);
+        }
+        .demo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 64px;
+            align-items: center;
+        }
+        .pipeline {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+        }
+        .pipeline-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 24px;
+        }
+        .pipeline-stage {
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        .pipeline-node {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            background: rgba(124,58,237,0.08);
+            border: 1px solid rgba(124,58,237,0.15);
+            color: #c4b5fd;
+            margin: 3px;
+        }
+        .pipeline-node.accent {
+            background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(59,130,246,0.15));
+            border-color: rgba(124,58,237,0.3);
+            color: #fff;
+            font-weight: 600;
+        }
+        .pipeline-arrow {
+            text-align: center;
+            color: rgba(255,255,255,0.15);
+            font-size: 12px;
+            margin: 4px 0;
+        }
+        .demo-caption {
+            margin-top: 16px;
+            font-size: 12px;
+            color: var(--dim);
+            line-height: 1.6;
+            text-align: center;
+        }
+
+        /* ─── ARCHITECTURE ─── */
+        .arch-section { border-top: 1px solid var(--border); }
+        .arch-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin: 48px 0;
+            flex-wrap: wrap;
+        }
+        .arch-node {
+            padding: 14px 22px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .arch-node:hover {
+            border-color: rgba(124,58,237,0.3);
+            background: rgba(124,58,237,0.04);
+        }
+        .arch-node .label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--dim);
+            margin-bottom: 4px;
+        }
+        .arch-node .name {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .arch-arrow {
+            color: rgba(255,255,255,0.15);
+            font-size: 14px;
+            padding: 0 4px;
+        }
+        .arch-details {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .arch-detail {
+            background: rgba(20,22,30,0.95);
+            padding: 28px 24px;
+        }
+        .arch-detail h4 {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: -0.2px;
+            color: #fff;
+        }
+        .arch-detail p {
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--muted);
+        }
+        .arch-detail code {
+            font-size: 11px;
+            background: rgba(124,58,237,0.1);
+            padding: 1px 5px;
+            border-radius: 4px;
+            color: #c4b5fd;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+
+        /* ─── FOOTER ─── */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 32px 0;
+        }
+        .footer-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .footer-text {
+            font-size: 13px;
+            color: var(--dim);
+        }
+        .footer-text strong { color: var(--muted); font-weight: 600; }
+        .footer-links {
+            display: flex;
+            gap: 24px;
+        }
+        .footer-links a {
+            font-size: 12px;
+            color: var(--dim);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .footer-links a:hover { color: var(--muted); }
+
+        /* ─── ANIMATIONS ─── */
+        .reveal {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+                        transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .rd1 { transition-delay: 0.06s; }
+        .rd2 { transition-delay: 0.12s; }
+        .rd3 { transition-delay: 0.18s; }
+        .rd4 { transition-delay: 0.24s; }
+
+        /* ─── RESPONSIVE ─── */
+        @media (max-width: 900px) {
+            .steps { grid-template-columns: repeat(2, 1fr); }
+            .cap-grid { grid-template-columns: 1fr; }
+            .demo-grid { grid-template-columns: 1fr; gap: 40px; }
+            .arch-details { grid-template-columns: repeat(2, 1fr); }
+            .hero-stats { gap: 32px; }
+        }
+        @media (max-width: 600px) {
+            .steps { grid-template-columns: 1fr; }
+            .arch-details { grid-template-columns: 1fr; }
+            .arch-flow { flex-direction: column; }
+            .arch-arrow { transform: rotate(90deg); }
+            .hero-stats { flex-direction: column; gap: 16px; }
+            .hero-links { gap: 20px; }
+            .footer-inner { flex-direction: column; gap: 16px; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-top reveal">
+        <a href="/landing" class="logo">DCN</a>
+        <div class="hero-links">
+            <a href="/">Submit</a>
+            <a href="/ops">Dashboard</a>
+            <a href="/results">Results</a>
+        </div>
+    </div>
+    <div class="hero-center">
+        <div class="hero-label reveal">Distributed Compute Network</div>
+        <h1 class="reveal rd1">Distribute Any AI Workload. <span class="gradient-text">Automatically.</span></h1>
+        <p class="reveal rd2">Submit a task. DCN decomposes it into parallel subtasks, dispatches them to worker nodes, and aggregates results &mdash; no DAGs, no infrastructure, no workflow definitions.</p>
+        <div class="hero-cta reveal rd3">
+            <a href="/" class="btn btn-primary">Try It Now</a>
+            <a href="/ops" class="btn btn-ghost">View Dashboard</a>
+        </div>
+        <div class="hero-stats reveal rd4">
+            <div class="hero-stat">
+                <div class="hero-stat-value gradient-text" data-target="10">0</div>
+                <div class="hero-stat-label">Task Types</div>
+            </div>
+            <div class="hero-stat">
+                <div class="hero-stat-value gradient-text" data-target="8">0</div>
+                <div class="hero-stat-label">Parallel Workers</div>
+            </div>
+            <div class="hero-stat">
+                <div class="hero-stat-value gradient-text" data-target="4" data-decimal="true">0</div>
+                <div class="hero-stat-label">Avg Speedup</div>
+            </div>
+            <div class="hero-stat">
+                <div class="hero-stat-value gradient-text" data-target="75" data-suffix="K">0</div>
+                <div class="hero-stat-label">Rows Processed</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- TECH STRIP -->
+<div class="tech-strip reveal">
+    <div class="container">
+        <div class="tech-inner">
+            <div class="tech-label">Built with</div>
+            <div class="tech-divider"></div>
+            <div class="tech-list">
+                <span>FastAPI</span>
+                <span>PostgreSQL</span>
+                <span>Gemini AI</span>
+                <span>Claude</span>
+                <span>scikit-learn</span>
+                <span>asyncpg</span>
+                <span>Python 3</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section id="how-it-works">
+    <div class="container">
+        <div class="section-label reveal">How It Works</div>
+        <div class="section-title reveal">Four steps. Zero configuration.</div>
+        <div class="section-desc reveal">From raw input to aggregated results in seconds. The entire pipeline is automatic.</div>
+        <div class="steps reveal rd2">
+            <div class="step">
+                <div class="step-number">01</div>
+                <h3>Submit</h3>
+                <p>User submits a job with a task type and input payload via the web dashboard or API.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">02</div>
+                <h3>Decompose</h3>
+                <p>The planner analyzes the job and breaks it into independent subtasks optimized for parallel execution.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">03</div>
+                <h3>Execute</h3>
+                <p>Worker nodes atomically claim tasks and process them simultaneously across the distributed pool.</p>
+            </div>
+            <div class="step">
+                <div class="step-number">04</div>
+                <h3>Aggregate</h3>
+                <p>Results are merged via concatenation or AI synthesis into a single, unified output.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CAPABILITIES -->
+<section id="features" style="border-top: 1px solid var(--border);">
+    <div class="container">
+        <div class="capabilities-header">
+            <div>
+                <div class="section-label reveal">Capabilities</div>
+                <div class="section-title reveal">Task types</div>
+            </div>
+            <div class="cap-count reveal">10 types</div>
+        </div>
+        <div class="cap-grid reveal rd1">
+            <!-- FEATURED: ML Experiment -->
+            <div class="cap-card featured" data-color="purple">
+                <div>
+                    <span class="cap-tag purple">Flagship</span>
+                    <h3>ML Experiment Pipeline</h3>
+                    <p>Train 8 models in parallel with cross-validation, feature engineering, and ranked results. Real scikit-learn models on 75K-row datasets distributed across worker nodes.</p>
+                    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+                        <span style="font-size:11px;padding:3px 10px;border-radius:6px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.15);color:#a78bfa;">RandomForest</span>
+                        <span style="font-size:11px;padding:3px 10px;border-radius:6px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.15);color:#60a5fa;">GradientBoosting</span>
+                        <span style="font-size:11px;padding:3px 10px;border-radius:6px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.15);color:#4ade80;">Ridge</span>
+                        <span style="font-size:11px;padding:3px 10px;border-radius:6px;background:rgba(234,179,8,0.08);border:1px solid rgba(234,179,8,0.15);color:#facc15;">DecisionTree</span>
+                    </div>
+                </div>
+                <div class="cap-code">
+<span class="cm">// 8 experiments distributed across workers</span>
+<span class="kw">POST</span> <span class="fn">/jobs</span> {
+  <span class="str">"task_type"</span>: <span class="str">"ml_experiment"</span>,
+  <span class="str">"dataset"</span>: <span class="str">"weather_ri"</span> <span class="cm">// 75K rows</span>
+}
+<span class="cm">// → 8 parallel tasks → ranked results</span>
+<span class="cm">// → best model: GradientBoosting (R²=0.94)</span>
+                </div>
+            </div>
+
+            <div class="cap-card" data-color="blue">
+                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg></div>
+                <h3>Codebase Review</h3>
+                <p>Fetch GitHub repos, split by module, analyze in parallel for bugs, security, and quality.</p>
+                <div class="cap-code"><span class="fn">github.com/user/repo</span> → <span class="num">12</span> modules → <span class="str">parallel review</span></div>
+            </div>
+            <div class="cap-card" data-color="green">
+                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
+                <h3>Document Analysis</h3>
+                <p>Extract insights from long documents using AI-powered decomposition and synthesis.</p>
+                <div class="cap-code"><span class="num">500</span> pages → <span class="num">8</span> chunks → <span class="str">synthesized report</span></div>
+            </div>
+            <div class="cap-card" data-color="cyan">
+                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></div>
+                <h3>Research Pipeline</h3>
+                <p>Multi-angle AI research with parallel exploration and synthesized findings.</p>
+                <div class="cap-code"><span class="str">"quantum computing"</span> → <span class="num">6</span> angles → <span class="str">report</span></div>
+            </div>
+            <div class="cap-card" data-color="orange">
+                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg></div>
+                <h3>Website Builder</h3>
+                <p>Generate HTML/CSS sections simultaneously and assemble into full pages.</p>
+                <div class="cap-code"><span class="str">"landing page"</span> → hero + features + footer → <span class="fn">merge</span></div>
+            </div>
+            <div class="cap-card" data-color="pink">
+                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M9 12h6M7 3h10l2 4H5l2-4z"/></svg></div>
+                <h3>Data Processing</h3>
+                <p>Classify, transform, and analyze datasets with distributed batch pipelines.</p>
+                <div class="cap-code"><span class="num">10K</span> records → <span class="num">8</span> batches → <span class="str">classified output</span></div>
+            </div>
+            <div class="cap-card" data-color="cyan">
+                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>
+                <h3>Image Processing</h3>
+                <p>Batch image analysis, classification, and transformation across parallel workers.</p>
+                <div class="cap-code"><span class="num">200</span> images → distributed <span class="fn">classify()</span> → <span class="str">labels</span></div>
+            </div>
+            <div class="cap-card" data-color="yellow">
+                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg></div>
+                <h3>Web Scraping</h3>
+                <p>Distributed web scraping with intelligent extraction and structured output.</p>
+                <div class="cap-code"><span class="num">50</span> URLs → parallel <span class="fn">fetch()</span> → <span class="str">JSON</span></div>
+            </div>
+            <div class="cap-card" data-color="rose">
+                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg></div>
+                <h3>Audio Transcription</h3>
+                <p>Split and transcribe audio segments in parallel for fast transcriptions.</p>
+                <div class="cap-code"><span class="num">2hr</span> audio → <span class="num">12</span> segments → <span class="str">transcript</span></div>
+            </div>
+            <div class="cap-card" data-color="green">
+                <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+                <h3>Sentiment Classification</h3>
+                <p>Analyze sentiment across large text corpora with distributed batch classification.</p>
+                <div class="cap-code"><span class="num">5K</span> reviews → <span class="fn">classify()</span> → <span class="str">pos/neg/neutral</span></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- PIPELINE DEMO -->
+<section class="demo-section">
+    <div class="container">
+        <div class="demo-grid">
+            <div>
+                <div class="section-label reveal">Live Demo</div>
+                <div class="section-title reveal">ML Experiment Pipeline</div>
+                <div class="section-desc reveal">Real scikit-learn models, real metrics, real distributed execution. 8 models trained in parallel across distributed workers.</div>
+            </div>
+            <div class="pipeline reveal rd2">
+                <div class="pipeline-title">Execution Flow</div>
+                <div class="pipeline-stage">
+                    <div class="pipeline-node accent">Job: ML Experiment</div>
+                </div>
+                <div class="pipeline-arrow">&darr;</div>
+                <div class="pipeline-stage">
+                    <div class="pipeline-node accent">Planner</div>
+                </div>
+                <div class="pipeline-arrow">&darr;</div>
+                <div class="pipeline-stage">
+                    <div class="pipeline-node">LinearRegression</div>
+                    <div class="pipeline-node">Ridge</div>
+                    <div class="pipeline-node">DecisionTree</div>
+                    <div class="pipeline-node">RandomForest</div>
+                </div>
+                <div class="pipeline-stage">
+                    <div class="pipeline-node">RandomForest v2</div>
+                    <div class="pipeline-node">GradientBoosting</div>
+                    <div class="pipeline-node">GBoosting v2</div>
+                    <div class="pipeline-node">Feature Reduced</div>
+                </div>
+                <div class="pipeline-arrow">&darr;</div>
+                <div class="pipeline-stage">
+                    <div class="pipeline-node accent">Aggregator &rarr; Ranked Results</div>
+                </div>
+                <div class="demo-caption">
+                    75K-row datasets &middot; 5-fold cross-validation &middot; All experiments run concurrently
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section class="arch-section">
+    <div class="container">
+        <div class="section-label reveal">Architecture</div>
+        <div class="section-title reveal">Built for reliability at every layer.</div>
+        <div class="section-desc reveal">Atomic task claiming, event sourcing, and async processing from end to end.</div>
+
+        <div class="arch-flow reveal rd1">
+            <div class="arch-node">
+                <div class="label">Client</div>
+                <div class="name">User</div>
+            </div>
+            <div class="arch-arrow">&rarr;</div>
+            <div class="arch-node">
+                <div class="label">Gateway</div>
+                <div class="name">API</div>
+            </div>
+            <div class="arch-arrow">&rarr;</div>
+            <div class="arch-node">
+                <div class="label">Orchestration</div>
+                <div class="name">Planner</div>
+            </div>
+            <div class="arch-arrow">&rarr;</div>
+            <div class="arch-node">
+                <div class="label">Compute</div>
+                <div class="name">Workers</div>
+            </div>
+            <div class="arch-arrow">&rarr;</div>
+            <div class="arch-node">
+                <div class="label">Synthesis</div>
+                <div class="name">Aggregator</div>
+            </div>
+            <div class="arch-arrow">&rarr;</div>
+            <div class="arch-node">
+                <div class="label">Delivery</div>
+                <div class="name">Output</div>
+            </div>
+        </div>
+
+        <div class="arch-details reveal rd2">
+            <div class="arch-detail">
+                <h4>Atomic Task Claiming</h4>
+                <p>PostgreSQL <code>FOR UPDATE SKIP LOCKED</code> ensures no two workers ever claim the same task.</p>
+            </div>
+            <div class="arch-detail">
+                <h4>Full Audit Trail</h4>
+                <p>Event sourcing records every state transition &mdash; job creation, task splits, worker claims, and completions.</p>
+            </div>
+            <div class="arch-detail">
+                <h4>Exponential Backoff</h4>
+                <p>Workers retry with 5s &rarr; 15s &rarr; 30s backoff. Rate-limited requests trigger doubled backoff.</p>
+            </div>
+            <div class="arch-detail">
+                <h4>Async Throughout</h4>
+                <p>FastAPI async endpoints paired with <code>asyncpg</code> connection pooling for non-blocking I/O.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+    <div class="container footer-inner">
+        <div class="footer-text">
+            Built for the <strong>New England Inter-Collegiate AI Hackathon 2026</strong>
+        </div>
+        <div class="footer-links">
+            <a href="/">Submit Job</a>
+            <a href="/ops">Dashboard</a>
+            <a href="/results">Results</a>
+        </div>
+    </div>
+</footer>
+
+<script>
+    // Scroll reveal
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) entry.target.classList.add('visible');
+        });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    // Animated counters
+    function animateCounters() {
+        document.querySelectorAll('[data-target]').forEach(el => {
+            const target = parseFloat(el.dataset.target);
+            const isDecimal = el.dataset.decimal === 'true';
+            const suffix = el.dataset.suffix || '';
+            const duration = 1600;
+            const start = performance.now();
+            function update(now) {
+                const elapsed = now - start;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 4);
+                const current = target * eased;
+                el.textContent = (isDecimal ? current.toFixed(1) : Math.round(current)) + suffix;
+                if (progress < 1) requestAnimationFrame(update);
+            }
+            requestAnimationFrame(update);
+        });
+    }
+
+    const heroObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) { animateCounters(); heroObserver.disconnect(); }
+        });
+    }, { threshold: 0.3 });
+    const statsEl = document.querySelector('.hero-stats');
+    if (statsEl) heroObserver.observe(statsEl);
+</script>
+
+</body>
+</html>

@@ -3,246 +3,183 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DCN — Job Results</title>
+<title>DCN — Results</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0a0a0f; color: #e0e0e0; min-height: 100vh;
-  }
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#14161e;--surface:rgba(255,255,255,0.10);--surface2:rgba(255,255,255,0.06);
+  --border:rgba(255,255,255,0.12);--border2:rgba(255,255,255,0.14);
+  --text:#e8e8ec;--muted:#b4b4bc;--dim:#8a8a96;--dark:#52525b;
+  --accent:#7c3aed;--accent2:#6366f1;--accent3:#3b82f6;
+  --green:#22c55e;--red:#ef4444;--yellow:#eab308;--cyan:#06b6d4;
+}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
 
-  /* Layout */
-  .layout { display: flex; height: 100vh; }
+/* TOP HEADER */
+.topnav{display:none}
 
-  /* Sidebar */
-  .sidebar {
-    width: 320px; min-width: 320px;
-    border-right: 1px solid #1e1e30;
-    display: flex; flex-direction: column;
-    background: #0e0e18;
-  }
-  .sidebar-header {
-    padding: 20px; border-bottom: 1px solid #1e1e30;
-  }
-  .sidebar-header h1 { font-size: 1.2rem; font-weight: 700; color: #fff; }
-  .sidebar-header h1 span { color: #6c63ff; }
-  .sidebar-header p { font-size: 0.75rem; color: #666; margin-top: 4px; }
+/* LAYOUT */
+.layout{display:flex;height:100vh}
 
-  .filter-bar {
-    display: flex; gap: 6px; padding: 12px 20px;
-    border-bottom: 1px solid #1e1e30;
-    flex-wrap: wrap;
-  }
-  .filter-btn {
-    padding: 4px 12px; border-radius: 12px; border: 1px solid #2a2a40;
-    background: transparent; color: #888; font-size: 0.7rem; cursor: pointer;
-    transition: all 0.2s;
-  }
-  .filter-btn:hover { border-color: #6c63ff; color: #fff; }
-  .filter-btn.active { background: #6c63ff; border-color: #6c63ff; color: #fff; }
+/* SIDEBAR */
+.sidebar{width:340px;min-width:340px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:rgba(16,18,26,0.7)}
+.sidebar-header{padding:20px 20px 12px}
+.sidebar-header h2{font-size:0.82rem;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:0.5px}
+.sidebar-header .count{font-size:0.72rem;color:var(--dim);margin-top:4px;font-weight:400}
 
-  .job-list {
-    flex: 1; overflow-y: auto; padding: 8px;
-  }
-  .job-list::-webkit-scrollbar { width: 6px; }
-  .job-list::-webkit-scrollbar-track { background: transparent; }
-  .job-list::-webkit-scrollbar-thumb { background: #2a2a40; border-radius: 3px; }
+.search-box{padding:0 16px 12px}
+.search-wrap{position:relative}
+.search-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--dark)}
+.search-wrap input{width:100%;padding:9px 12px 9px 34px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:0.8rem;font-family:inherit;transition:all 0.2s}
+.search-wrap input:focus{outline:none;border-color:rgba(124,58,237,0.4);box-shadow:0 0 0 3px rgba(124,58,237,0.1)}
+.search-wrap input::placeholder{color:var(--dark)}
 
-  .job-item {
-    padding: 12px 14px; border-radius: 8px; cursor: pointer;
-    margin-bottom: 4px; transition: all 0.15s;
-    border: 1px solid transparent;
-  }
-  .job-item:hover { background: #141420; }
-  .job-item.selected { background: #141420; border-color: #6c63ff; }
-  .job-item .job-title {
-    font-size: 0.85rem; font-weight: 600; color: #fff;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .job-item .job-meta {
-    display: flex; gap: 8px; align-items: center; margin-top: 4px;
-    font-size: 0.7rem; color: #666;
-  }
-  .job-item .type-badge {
-    padding: 2px 8px; border-radius: 10px; font-size: 0.65rem; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.5px;
-  }
+.filter-bar{display:flex;gap:4px;padding:0 16px 12px;flex-wrap:wrap}
+.filter-btn{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:0.68rem;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit;text-transform:uppercase;letter-spacing:0.3px}
+.filter-btn:hover{border-color:var(--border2);color:var(--muted)}
+.filter-btn.active{background:linear-gradient(135deg,var(--accent),var(--accent3));border-color:transparent;color:#fff}
 
-  /* Type colors */
-  .type-codebase_review { background: #1a2a3a; color: #60a5fa; }
-  .type-document_analysis { background: #2a1a3a; color: #c084fc; }
-  .type-research_pipeline { background: #1a3a2a; color: #4ade80; }
-  .type-website_builder { background: #3a2a1a; color: #fb923c; }
-  .type-data_processing { background: #3a1a2a; color: #f472b6; }
-  .type-image_processing { background: #1a3a3a; color: #22d3ee; }
-  .type-web_scraping { background: #2a3a1a; color: #a3e635; }
-  .type-audio_transcription { background: #3a3a1a; color: #facc15; }
-  .type-sentiment_classification { background: #2a1a2a; color: #e879f9; }
+.job-list{flex:1;overflow-y:auto;padding:4px 8px}
+.job-list::-webkit-scrollbar{width:5px}
+.job-list::-webkit-scrollbar-track{background:transparent}
+.job-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.10);border-radius:3px}
 
-  .status-dot {
-    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
-  }
-  .status-completed { background: #4ade80; }
-  .status-queued { background: #fbbf24; }
-  .status-running { background: #6c63ff; }
-  .status-failed { background: #ef4444; }
+.job-item{padding:14px 16px;border-radius:10px;cursor:pointer;margin-bottom:2px;transition:all 0.15s;border:1px solid transparent}
+.job-item:hover{background:rgba(255,255,255,0.08)}
+.job-item.selected{background:rgba(124,58,237,0.06);border-color:rgba(124,58,237,0.2)}
+.job-item .job-title{font-size:0.82rem;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.job-item .job-meta{display:flex;gap:8px;align-items:center;margin-top:6px;font-size:0.68rem;color:var(--dim)}
 
-  /* Main content */
-  .content {
-    flex: 1; overflow-y: auto; padding: 0;
-  }
-  .content::-webkit-scrollbar { width: 8px; }
-  .content::-webkit-scrollbar-track { background: transparent; }
-  .content::-webkit-scrollbar-thumb { background: #2a2a40; border-radius: 4px; }
+/* TYPE BADGES */
+.type-badge{padding:3px 10px;border-radius:20px;font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
+.type-codebase_review{background:rgba(59,130,246,0.12);color:#60a5fa}
+.type-document_analysis{background:rgba(192,132,252,0.12);color:#c084fc}
+.type-research_pipeline{background:rgba(74,222,128,0.12);color:#4ade80}
+.type-website_builder{background:rgba(251,146,60,0.12);color:#fb923c}
+.type-data_processing{background:rgba(244,114,182,0.12);color:#f472b6}
+.type-ml_experiment{background:rgba(124,58,237,0.12);color:#a78bfa}
+.type-image_processing{background:rgba(34,211,238,0.12);color:#22d3ee}
+.type-web_scraping{background:rgba(163,230,53,0.12);color:#a3e635}
+.type-audio_transcription{background:rgba(250,204,21,0.12);color:#facc15}
+.type-sentiment_classification{background:rgba(232,121,249,0.12);color:#e879f9}
 
-  .content-empty {
-    display: flex; align-items: center; justify-content: center;
-    height: 100%; color: #444; font-size: 0.9rem;
-  }
+.status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.status-completed{background:var(--green)}
+.status-queued{background:var(--yellow)}
+.status-running{background:var(--accent2);animation:pulse 2s infinite}
+.status-failed{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 
-  /* Job detail header */
-  .detail-header {
-    padding: 24px 32px; border-bottom: 1px solid #1e1e30;
-    position: sticky; top: 0; background: #0a0a0f; z-index: 10;
-  }
-  .detail-header h2 {
-    font-size: 1.3rem; font-weight: 700; color: #fff;
-  }
-  .detail-meta {
-    display: flex; gap: 16px; align-items: center; margin-top: 8px;
-    font-size: 0.8rem; color: #666;
-  }
-  .detail-meta .type-badge { font-size: 0.7rem; }
+/* CONTENT */
+.content{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+.content::-webkit-scrollbar{width:6px}
+.content::-webkit-scrollbar-track{background:transparent}
+.content::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.10);border-radius:3px}
 
-  /* Tab bar */
-  .tab-bar {
-    display: flex; gap: 0; border-bottom: 1px solid #1e1e30;
-    padding: 0 32px; background: #0a0a0f;
-    position: sticky; top: 85px; z-index: 9;
-  }
-  .tab {
-    padding: 10px 20px; font-size: 0.8rem; color: #666; cursor: pointer;
-    border-bottom: 2px solid transparent; transition: all 0.2s;
-  }
-  .tab:hover { color: #fff; }
-  .tab.active { color: #6c63ff; border-bottom-color: #6c63ff; }
+.content-empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--dim);font-size:0.88rem;flex-direction:column;gap:8px}
+.content-empty svg{width:40px;height:40px;color:var(--dark);margin-bottom:4px}
 
-  /* Output */
-  .output-area { padding: 24px 32px; }
+/* DETAIL HEADER */
+.detail-header{padding:28px 36px 0;flex-shrink:0}
+.detail-header h2{font-size:1.4rem;font-weight:700;color:#fff;letter-spacing:-0.5px}
+.detail-meta{display:flex;gap:14px;align-items:center;margin-top:10px;font-size:0.78rem;color:var(--dim)}
+.detail-meta .type-badge{font-size:0.65rem}
+.copy-btn{padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.2s;font-family:inherit}
+.copy-btn:hover{border-color:rgba(124,58,237,0.4);color:#fff;background:rgba(124,58,237,0.08)}
 
-  /* Markdown styles */
-  .markdown-body { line-height: 1.7; font-size: 0.9rem; }
-  .markdown-body h1 { font-size: 1.4rem; font-weight: 700; color: #fff; margin: 24px 0 12px; border-bottom: 1px solid #1e1e30; padding-bottom: 8px; }
-  .markdown-body h2 { font-size: 1.2rem; font-weight: 700; color: #fff; margin: 20px 0 10px; }
-  .markdown-body h3 { font-size: 1rem; font-weight: 600; color: #e0e0e0; margin: 16px 0 8px; }
-  .markdown-body p { margin: 8px 0; color: #ccc; }
-  .markdown-body ul, .markdown-body ol { padding-left: 24px; margin: 8px 0; }
-  .markdown-body li { margin: 4px 0; color: #ccc; }
-  .markdown-body strong { color: #fff; }
-  .markdown-body code {
-    background: #1a1a2e; padding: 2px 6px; border-radius: 4px;
-    font-family: 'Menlo', monospace; font-size: 0.85em; color: #e879f9;
-  }
-  .markdown-body pre {
-    background: #0d0d15; border: 1px solid #1e1e30; border-radius: 8px;
-    padding: 16px; overflow-x: auto; margin: 12px 0;
-  }
-  .markdown-body pre code {
-    background: none; padding: 0; color: #e0e0e0; font-size: 0.82rem;
-  }
-  .markdown-body hr { border: none; border-top: 1px solid #1e1e30; margin: 16px 0; }
-  .markdown-body blockquote {
-    border-left: 3px solid #6c63ff; padding-left: 16px; margin: 12px 0; color: #999;
-  }
-  .markdown-body table { border-collapse: collapse; width: 100%; margin: 12px 0; }
-  .markdown-body th, .markdown-body td {
-    border: 1px solid #1e1e30; padding: 8px 12px; text-align: left; font-size: 0.85rem;
-  }
-  .markdown-body th { background: #141420; color: #fff; font-weight: 600; }
-  .markdown-body a { color: #6c63ff; text-decoration: none; }
-  .markdown-body a:hover { text-decoration: underline; }
+/* TABS */
+.tab-bar{display:flex;gap:0;padding:0 36px;margin-top:20px;border-bottom:1px solid var(--border);flex-shrink:0}
+.tab{padding:10px 20px;font-size:0.78rem;font-weight:500;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s;position:relative}
+.tab:hover{color:var(--muted)}
+.tab.active{color:#fff;border-bottom-color:var(--accent)}
 
-  /* Raw text */
-  .raw-output {
-    font-family: 'Menlo', monospace; font-size: 0.8rem;
-    white-space: pre-wrap; color: #aaa; line-height: 1.6;
-    background: #0d0d15; border-radius: 8px; padding: 20px;
-    border: 1px solid #1e1e30;
-  }
+/* OUTPUT */
+.output-area{padding:28px 36px;flex:1}
 
-  /* Task list */
-  .task-list-section { padding: 24px 32px; }
-  .task-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 10px 14px; background: #141420; border: 1px solid #1e1e30;
-    border-radius: 8px; margin-bottom: 6px; font-size: 0.82rem;
-  }
-  .task-item .task-name { flex: 1; color: #fff; font-weight: 500; }
-  .task-item .task-status {
-    padding: 2px 10px; border-radius: 10px; font-size: 0.7rem;
-    font-weight: 600; text-transform: uppercase;
-  }
-  .ts-queued { background: #2a2a1a; color: #fbbf24; }
-  .ts-running { background: #1a1a3a; color: #6c63ff; }
-  .ts-submitted { background: #1a2a1a; color: #4ade80; }
-  .ts-failed { background: #2a1a1a; color: #ef4444; }
+/* MARKDOWN */
+.markdown-body{line-height:1.75;font-size:0.88rem}
+.markdown-body h1{font-size:1.35rem;font-weight:700;color:#fff;margin:28px 0 12px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.markdown-body h2{font-size:1.15rem;font-weight:700;color:#fff;margin:24px 0 10px}
+.markdown-body h3{font-size:1rem;font-weight:600;color:var(--text);margin:20px 0 8px}
+.markdown-body p{margin:10px 0;color:#d4d4d8}
+.markdown-body ul,.markdown-body ol{padding-left:24px;margin:10px 0}
+.markdown-body li{margin:5px 0;color:#d4d4d8}
+.markdown-body strong{color:#fff}
+.markdown-body code{background:rgba(124,58,237,0.1);padding:2px 7px;border-radius:5px;font-family:'SF Mono','Fira Code',monospace;font-size:0.82em;color:#c4b5fd}
+.markdown-body pre{background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:12px;padding:18px;overflow-x:auto;margin:14px 0;position:relative}
+.markdown-body pre::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(124,58,237,0.3),transparent)}
+.markdown-body pre code{background:none;padding:0;color:#d4d4d8;font-size:0.8rem}
+.markdown-body hr{border:none;border-top:1px solid var(--border);margin:20px 0}
+.markdown-body blockquote{border-left:3px solid var(--accent);padding-left:16px;margin:14px 0;color:var(--muted)}
+.markdown-body table{border-collapse:collapse;width:100%;margin:14px 0}
+.markdown-body th,.markdown-body td{border:1px solid var(--border);padding:10px 14px;text-align:left;font-size:0.82rem}
+.markdown-body th{background:rgba(255,255,255,0.08);color:#fff;font-weight:600;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.3px}
+.markdown-body td{color:#d4d4d8}
+.markdown-body tbody tr:first-child td{color:var(--green);font-weight:600}
+.markdown-body a{color:var(--accent3);text-decoration:none}
+.markdown-body a:hover{text-decoration:underline}
 
-  /* Website preview */
-  .preview-container {
-    resize: both; overflow: auto;
-    border: 1px solid #1e1e30; border-radius: 8px;
-    background: #fff; width: 100%; height: calc(100vh - 180px);
-    min-width: 320px; min-height: 300px; position: relative;
-  }
-  .preview-frame {
-    width: 100%; height: 100%; border: none; border-radius: 8px;
-    background: #fff; display: block;
-  }
-  .preview-size-label {
-    position: absolute; bottom: 8px; right: 14px;
-    font-size: 0.65rem; color: #666; background: rgba(0,0,0,0.6);
-    padding: 2px 8px; border-radius: 4px; pointer-events: none; z-index: 2;
-  }
+/* RAW */
+.raw-output{font-family:'SF Mono','Fira Code',monospace;font-size:0.78rem;white-space:pre-wrap;color:var(--muted);line-height:1.65;background:rgba(0,0,0,0.3);border-radius:12px;padding:24px;border:1px solid var(--border)}
 
-  /* Copy button */
-  .copy-btn {
-    padding: 6px 14px; border-radius: 6px; border: 1px solid #2a2a40;
-    background: transparent; color: #888; font-size: 0.75rem; cursor: pointer;
-    transition: all 0.2s;
-  }
-  .copy-btn:hover { border-color: #6c63ff; color: #fff; }
+/* TASKS */
+.task-list-section{padding:28px 36px}
+.task-card{display:flex;align-items:center;gap:14px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;transition:all 0.15s}
+.task-card:hover{border-color:var(--border2)}
+.task-card .task-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.task-card .task-dot.queued{background:var(--yellow)}
+.task-card .task-dot.running{background:var(--accent2);animation:pulse 2s infinite}
+.task-card .task-dot.submitted{background:var(--green)}
+.task-card .task-dot.failed{background:var(--red)}
+.task-card .task-name{flex:1;font-size:0.82rem;font-weight:500;color:#fff}
+.task-card .task-status{padding:4px 12px;border-radius:20px;font-size:0.65rem;font-weight:600;text-transform:uppercase;letter-spacing:0.3px}
+.ts-queued{background:rgba(234,179,8,0.1);color:var(--yellow)}
+.ts-running{background:rgba(99,102,241,0.1);color:var(--accent2)}
+.ts-submitted{background:rgba(34,197,94,0.1);color:var(--green)}
+.ts-failed{background:rgba(239,68,68,0.1);color:var(--red)}
 
-  .no-output { color: #444; font-style: italic; padding: 40px; text-align: center; }
+/* PREVIEW */
+.preview-container{position:relative;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#fff;width:100%;height:calc(100vh - 220px);min-height:300px;resize:both}
+.preview-chrome{display:flex;align-items:center;gap:6px;padding:8px 14px;background:rgba(255,255,255,0.04);border-bottom:1px solid var(--border)}
+.preview-dot{width:10px;height:10px;border-radius:50%}
+.preview-dot.r{background:#ef4444}.preview-dot.y{background:#eab308}.preview-dot.g{background:#22c55e}
+.preview-frame{width:100%;height:calc(100% - 32px);border:none;display:block;background:#fff}
+.preview-size-label{position:absolute;bottom:8px;right:14px;font-size:0.6rem;color:var(--dim);background:rgba(0,0,0,0.7);padding:3px 8px;border-radius:4px;pointer-events:none;z-index:2}
 
-  /* Search */
-  .search-box {
-    padding: 8px 20px 12px;
-  }
-  .search-box input {
-    width: 100%; padding: 8px 12px; background: #0d0d15; border: 1px solid #2a2a40;
-    border-radius: 8px; color: #e0e0e0; font-size: 0.8rem; font-family: inherit;
-  }
-  .search-box input:focus { outline: none; border-color: #6c63ff; }
-  .search-box input::placeholder { color: #444; }
+.no-output{color:var(--dark);font-style:italic;padding:48px;text-align:center;font-size:0.88rem}
 </style>
 </head>
 <body>
+
+<!-- TOP NAV -->
+<div class="topnav">
+  <div class="topnav-left">
+    <a href="/landing" class="topnav-logo">DCN</a>
+    <span class="topnav-sep">/</span>
+    <span class="topnav-page">Results</span>
+  </div>
+  <div class="topnav-links">
+    <a href="/landing">Home</a>
+    <a href="/">Submit</a>
+    <a href="/ops">Dashboard</a>
+  </div>
+</div>
+
 <div class="layout">
-  <!-- Sidebar -->
+  <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="sidebar-header">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <h1><span>DCN</span> Results</h1>
-        <div style="display:flex;gap:6px">
-          <a href="/ops" style="padding:4px 10px;border-radius:5px;border:1px solid #2a2a40;color:#888;font-size:0.65rem;text-decoration:none;transition:all 0.2s;" onmouseover="this.style.borderColor='#6c63ff';this.style.color='#fff'" onmouseout="this.style.borderColor='#2a2a40';this.style.color='#888'">Ops</a>
-          <a href="/" style="padding:4px 10px;border-radius:5px;border:1px solid #2a2a40;color:#888;font-size:0.65rem;text-decoration:none;transition:all 0.2s;" onmouseover="this.style.borderColor='#6c63ff';this.style.color='#fff'" onmouseout="this.style.borderColor='#2a2a40';this.style.color='#888'">Submit</a>
-        </div>
-      </div>
-      <p id="jobCount">Loading...</p>
+      <h2>Job Results</h2>
+      <div class="count" id="jobCount">Loading...</div>
     </div>
     <div class="search-box">
-      <input type="text" id="searchInput" placeholder="Search jobs..." oninput="renderJobList()">
+      <div class="search-wrap">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"/></svg>
+        <input type="text" id="searchInput" placeholder="Search jobs..." oninput="renderJobList()">
+      </div>
     </div>
     <div class="filter-bar">
       <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
@@ -253,9 +190,12 @@
     <div class="job-list" id="jobList"></div>
   </div>
 
-  <!-- Main Content -->
+  <!-- CONTENT -->
   <div class="content" id="content">
-    <div class="content-empty">Select a job to view its output</div>
+    <div class="content-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+      Select a job to view its output
+    </div>
   </div>
 </div>
 
@@ -271,7 +211,7 @@
       const resp = await fetch(`${API}/jobs`);
       allJobs = await resp.json();
       allJobs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      document.getElementById('jobCount').textContent = `${allJobs.length} jobs`;
+      document.getElementById('jobCount').textContent = `${allJobs.length} job${allJobs.length !== 1 ? 's' : ''}`;
       renderJobList();
     } catch (e) {
       document.getElementById('jobCount').textContent = 'Error loading';
@@ -318,7 +258,6 @@
     const job = allJobs.find(j => j.id === jobId);
     if (!job) return;
 
-    // Auto-select best tab for this job type
     const isWebsite = job.task_type === 'website_builder';
     if (isWebsite && job.final_output && currentTab === 'rendered') {
       currentTab = 'preview';
@@ -326,7 +265,6 @@
       currentTab = 'rendered';
     }
 
-    // Fetch tasks
     let tasks = [];
     try {
       const resp = await fetch(`${API}/jobs/${jobId}/tasks`);
@@ -351,11 +289,8 @@
     let content = '';
     if (currentTab === 'rendered') {
       if (hasOutput) {
-        // Clean up section headers and code fences for display
         let cleaned = output;
-        // Turn === section_name === into proper markdown headers
         cleaned = cleaned.replace(/^=== (.+?) ===/gm, '## $1');
-        // If it looks like raw HTML (website builder viewed in rendered), wrap in code block
         const looksLikeHtml = cleaned.trim().startsWith('<') || cleaned.includes('<!DOCTYPE');
         if (looksLikeHtml && isWebsite) {
           cleaned = '```html\n' + cleaned + '\n```';
@@ -363,13 +298,14 @@
         const html = marked.parse(cleaned);
         content = `<div class="output-area"><div class="markdown-body">${html}</div></div>`;
       } else {
-        content = `<div class="no-output">No output yet — job is ${job.status}</div>`;
+        content = `<div class="no-output">No output yet &mdash; job is ${job.status}</div>`;
       }
     } else if (currentTab === 'raw') {
       content = `<div class="output-area"><div class="raw-output">${escapeHtml(output || 'No output')}</div></div>`;
     } else if (currentTab === 'tasks') {
       content = `<div class="task-list-section">${tasks.map(t => `
-        <div class="task-item">
+        <div class="task-card">
+          <div class="task-dot ${t.status}"></div>
           <span class="task-name">${t.task_name}</span>
           <span class="task-status ts-${t.status}">${t.status}</span>
         </div>
@@ -378,11 +314,11 @@
       const cleaned = cleanHtmlOutput(output);
       content = `<div class="output-area">
         <div class="preview-container" id="previewContainer">
+          <div class="preview-chrome"><div class="preview-dot r"></div><div class="preview-dot y"></div><div class="preview-dot g"></div></div>
           <iframe class="preview-frame" srcdoc="${escapeAttr(cleaned)}" sandbox="allow-scripts"></iframe>
           <div class="preview-size-label" id="previewSize"></div>
         </div>
       </div>`;
-      // Show size label after render
       setTimeout(() => {
         const c = document.getElementById('previewContainer');
         const s = document.getElementById('previewSize');
@@ -411,7 +347,7 @@
         </div>
       </div>
       <div class="tab-bar">${tabs}</div>
-      <div id="tabContent">${content}</div>
+      <div id="tabContent" style="flex:1;overflow-y:auto;">${content}</div>
     `;
   }
 
@@ -447,11 +383,11 @@
     return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  // Auto-refresh job list every 10s
+  // Auto-refresh
   loadJobs();
   setInterval(loadJobs, 10000);
 
-  // Check URL hash for direct job link
+  // Direct job link via hash
   if (window.location.hash) {
     const id = window.location.hash.slice(1);
     setTimeout(() => {

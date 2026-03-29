@@ -128,8 +128,9 @@ class WorkerEngine:
 
     def _claim(self):
         try:
+            hw = hardware.detect()
             resp = req.post(f"{self.server_url}/tasks/claim",
-                            json={"worker_node_id": self.worker_id, "task_types": self.task_types}, timeout=10)
+                            json={"worker_node_id": self.worker_id, "task_types": self.task_types, "worker_tier": hw["tier"]}, timeout=10)
             if resp.status_code == 200:
                 return resp.json()
         except Exception:
@@ -327,150 +328,167 @@ HTML_PAGE = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DCN Worker</title>
+<title>DCN Worker Node</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html { background: #0a0a0f; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #0a0a0f; color: #e0e0e0; min-height: 100vh;
-  }
-  .container { max-width: 540px; margin: 0 auto; padding: 28px 20px; }
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--bg:#14161e;--surface:rgba(255,255,255,0.08);--border:rgba(255,255,255,0.12);--border2:rgba(255,255,255,0.14);--text:#e8e8ec;--muted:#b4b4bc;--dim:#8a8a96;--dark:#52525b;--accent:#7c3aed;--accent2:#6366f1;--accent3:#3b82f6;--green:#22c55e;--red:#ef4444;--yellow:#eab308}
+  html,body{height:100%}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;overflow:hidden}
 
-  /* Header */
-  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
-  .header h1 { font-size: 1.6rem; font-weight: 700; color: #fff; }
-  .header h1 span { color: #6c63ff; }
-  .status-badge {
-    display: flex; align-items: center; gap: 8px;
-    padding: 6px 14px; border-radius: 20px;
-    background: rgba(102,99,255,0.08); border: 1px solid #1e1e30;
-    font-size: 0.8rem; font-weight: 500;
-  }
-  .status-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: #666; flex-shrink: 0;
-  }
-  .status-dot.online { background: #4ade80; animation: pulse 2s infinite; }
-  .status-dot.working { background: #6c63ff; animation: pulse 1s infinite; }
-  .status-dot.warn { background: #fbbf24; }
-  .status-dot.error { background: #ef4444; }
-  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+  /* LAYOUT */
+  .page{display:grid;grid-template-rows:auto 1fr;height:100vh}
 
-  /* Cards */
-  .card {
-    background: #141420; border: 1px solid #1e1e30;
-    border-radius: 10px; padding: 18px; margin-bottom: 14px;
+  /* NAV */
+  .topnav{height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 28px}
+  .topnav-left{display:flex;align-items:center;gap:12px}
+  .topnav-logo{font-weight:800;font-size:1rem;color:#fff;letter-spacing:-0.5px}
+  .topnav-logo span{background:linear-gradient(135deg,var(--accent),var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .topnav-sep{color:var(--dark);font-size:0.8rem}
+  .topnav-page{font-size:0.82rem;color:var(--muted);font-weight:500}
+  .status-pill{display:flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;border:1px solid var(--border);background:var(--surface);font-size:0.78rem;font-weight:600}
+  .status-dot{width:8px;height:8px;border-radius:50%;background:var(--dark);flex-shrink:0}
+  .status-dot.online{background:var(--green);box-shadow:0 0 8px rgba(34,197,94,0.4);animation:pulse 2s infinite}
+  .status-dot.working{background:var(--accent2);box-shadow:0 0 8px rgba(99,102,241,0.4);animation:pulse 1s infinite}
+  .status-dot.warn{background:var(--yellow);box-shadow:0 0 8px rgba(234,179,8,0.3)}
+  .status-dot.error{background:var(--red);box-shadow:0 0 8px rgba(239,68,68,0.3)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+  /* MAIN GRID */
+  .main{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto 1fr;gap:16px;padding:20px 28px;overflow:hidden}
+
+  /* CARDS */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 24px;transition:border-color 0.2s}
+  .card:hover{border-color:var(--border2)}
+  .card-label{font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--dim);margin-bottom:14px}
+
+  /* STATS ROW - full width */
+  .stats-row{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px 24px;position:relative;overflow:hidden}
+  .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:14px 14px 0 0}
+  .stat-card.purple::before{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .stat-card.green::before{background:var(--green)}
+  .stat-card.blue::before{background:var(--accent3)}
+  .stat-card.yellow::before{background:var(--yellow)}
+  .stat-val{font-size:2rem;font-weight:800;letter-spacing:-1px;color:#fff}
+  .stat-val.accent{background:linear-gradient(135deg,var(--accent),var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .stat-val.green{color:var(--green)}
+  .stat-val.blue{color:var(--accent3)}
+  .stat-lbl{font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim);margin-top:4px}
+  .stat-sub{font-size:0.72rem;color:var(--muted);margin-top:8px;min-height:18px}
+
+  /* HARDWARE CARD */
+  .hw-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .hw-item{text-align:center;padding:14px 8px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px}
+  .hw-label{font-size:0.62rem;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim);margin-bottom:6px}
+  .hw-value{font-size:1.05rem;font-weight:700;color:#fff}
+  .hw-value.tier{background:linear-gradient(135deg,var(--accent),var(--accent3));-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-size:1.2rem}
+  .hw-types{font-size:0.72rem;color:var(--dim);line-height:1.5}
+  .hw-types span{display:inline-block;padding:3px 10px;border-radius:20px;background:rgba(255,255,255,0.04);border:1px solid var(--border);margin:2px 3px;font-size:0.65rem;color:var(--muted);font-weight:500}
+
+  /* CONNECTION CARD */
+  .field{margin-bottom:14px}
+  .field:last-child{margin-bottom:0}
+  .field label{display:block;font-size:0.68rem;font-weight:600;color:var(--dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
+  .field input{width:100%;padding:11px 14px;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:0.85rem;font-family:inherit;transition:all 0.2s}
+  .field input:focus{outline:none;border-color:rgba(124,58,237,0.5);box-shadow:0 0 0 3px rgba(124,58,237,0.1)}
+  .field input:disabled{opacity:0.4;cursor:not-allowed}
+
+  /* BUTTON */
+  .btn-start{width:100%;padding:14px;border:none;border-radius:12px;font-size:0.95rem;font-weight:700;cursor:pointer;transition:all 0.2s;font-family:inherit;background:linear-gradient(135deg,var(--accent),var(--accent3));color:#fff;margin-top:16px}
+  .btn-start:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(124,58,237,0.35)}
+  .btn-start.stop{background:linear-gradient(135deg,#dc2626,var(--red))}
+  .btn-start.stop:hover{box-shadow:0 6px 24px rgba(239,68,68,0.35)}
+
+  /* LOG - full width bottom */
+  .log-panel{grid-column:1/-1;display:flex;flex-direction:column;min-height:0}
+  .log-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .log-box{flex:1;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:12px;padding:16px;overflow-y:auto;font-family:'SF Mono','Fira Code','Menlo',monospace;font-size:0.75rem;line-height:1.7;min-height:0}
+  .log-box::-webkit-scrollbar{width:5px}
+  .log-box::-webkit-scrollbar-track{background:transparent}
+  .log-box::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.10);border-radius:3px}
+  .log-line{padding:1px 0}
+  .log-line .ts{color:#3f3f46;margin-right:6px}
+  .log-line.info{color:var(--text)}
+  .log-line.success{color:var(--green)}
+  .log-line.error{color:var(--red)}
+  .log-line.warn{color:var(--yellow)}
+  .log-line.task{color:var(--accent3)}
+
+  /* RESPONSIVE */
+  @media(max-width:900px){
+    .main{grid-template-columns:1fr}
+    .stats-row{grid-template-columns:repeat(2,1fr)}
   }
-  .card-title { font-size: 0.75rem; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; font-weight: 600; }
-
-  /* Hardware grid */
-  .hw-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
-  .hw-item { text-align: center; }
-  .hw-label { font-size: 0.7rem; color: #666; }
-  .hw-value { font-size: 1rem; font-weight: 700; color: #e0e0e0; }
-  .hw-value.tier { color: #6c63ff; }
-  .hw-types { font-size: 0.75rem; color: #555; }
-
-  /* Config inputs */
-  .field { margin-bottom: 12px; }
-  .field label { display: block; font-size: 0.75rem; color: #666; margin-bottom: 4px; font-weight: 500; }
-  .field input {
-    width: 100%; padding: 10px 12px; background: #0d0d15; border: 1px solid #2a2a40;
-    border-radius: 8px; color: #e0e0e0; font-size: 0.9rem; font-family: inherit;
-    transition: border-color 0.2s;
-  }
-  .field input:focus { outline: none; border-color: #6c63ff; }
-  .field input:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  /* Button */
-  .btn-start {
-    width: 100%; padding: 14px; border: none; border-radius: 10px;
-    font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.2s;
-    background: #6c63ff; color: #fff;
-  }
-  .btn-start:hover { background: #5a52e0; transform: translateY(-1px); }
-  .btn-start.stop { background: #ef4444; }
-  .btn-start.stop:hover { background: #dc2626; }
-
-  /* Stats row */
-  .stats-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-  .stat { text-align: center; flex: 1; }
-  .stat-value { font-size: 1.4rem; font-weight: 700; }
-  .stat-label { font-size: 0.7rem; color: #666; }
-  .stat-value.earnings { color: #4ade80; }
-  .stat-value.tasks { color: #6c63ff; }
-
-  .current-task {
-    font-size: 0.8rem; color: #6c63ff; margin-bottom: 8px;
-    min-height: 18px;
-  }
-
-  /* Log */
-  .log-box {
-    background: #0d0d15; border-radius: 8px; padding: 12px;
-    max-height: 260px; overflow-y: auto; font-family: 'Menlo', 'Consolas', monospace;
-    font-size: 0.78rem; line-height: 1.6;
-  }
-  .log-box::-webkit-scrollbar { width: 6px; }
-  .log-box::-webkit-scrollbar-track { background: transparent; }
-  .log-box::-webkit-scrollbar-thumb { background: #2a2a40; border-radius: 3px; }
-  .log-line .ts { color: #444; }
-  .log-line.info { color: #e0e0e0; }
-  .log-line.success { color: #4ade80; }
-  .log-line.error { color: #ef4444; }
-  .log-line.warn { color: #fbbf24; }
-  .log-line.task { color: #60a5fa; }
 </style>
 </head>
 <body>
-<div class="container">
-  <!-- Header -->
-  <div class="header">
-    <h1><span>DCN</span> Worker</h1>
-    <div class="status-badge">
+<div class="page">
+  <!-- NAV -->
+  <div class="topnav">
+    <div class="topnav-left">
+      <div class="topnav-logo"><span>DCN</span> Worker</div>
+    </div>
+    <div class="status-pill">
       <div class="status-dot" id="statusDot"></div>
       <span id="statusText">Offline</span>
     </div>
   </div>
 
-  <!-- Hardware -->
-  <div class="card">
-    <div class="card-title">Hardware</div>
-    <div class="hw-grid" id="hwGrid"></div>
-    <div class="hw-types" id="hwTypes"></div>
-  </div>
-
-  <!-- Config -->
-  <div class="card" id="configCard">
-    <div class="card-title">Connection</div>
-    <div class="field">
-      <label>Server URL</label>
-      <input type="text" id="serverUrl" placeholder="http://localhost:8000">
-    </div>
-    <div class="field" style="margin-bottom:0">
-      <label>Worker Name</label>
-      <input type="text" id="workerName" placeholder="my-laptop">
-    </div>
-  </div>
-
-  <!-- Start/Stop -->
-  <button class="btn-start" id="startBtn" onclick="toggleWorker()">Start Worker</button>
-
-  <!-- Stats -->
-  <div style="margin-top:14px">
-    <div class="current-task" id="currentTask"></div>
+  <!-- MAIN -->
+  <div class="main">
+    <!-- STATS ROW -->
     <div class="stats-row">
-      <div class="stat"><div class="stat-value tasks" id="taskCount">0</div><div class="stat-label">Tasks Done</div></div>
-      <div class="stat"><div class="stat-value earnings" id="earnings">$0.00</div><div class="stat-label">Earned</div></div>
+      <div class="stat-card purple">
+        <div class="stat-val accent" id="taskCount">0</div>
+        <div class="stat-lbl">Tasks Completed</div>
+        <div class="stat-sub" id="currentTask"></div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-val green" id="earnings">$0.00</div>
+        <div class="stat-lbl">Total Earned</div>
+        <div class="stat-sub" id="earningRate"></div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-val blue" id="uptimeVal">--</div>
+        <div class="stat-lbl">Uptime</div>
+        <div class="stat-sub" id="workerIdDisplay"></div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="stat-val" id="tierVal" style="color:var(--yellow)">--</div>
+        <div class="stat-lbl">Worker Tier</div>
+        <div class="stat-sub" id="hwSummary"></div>
+      </div>
     </div>
-  </div>
 
-  <!-- Log -->
-  <div class="card">
-    <div class="card-title">Activity Log</div>
-    <div class="log-box" id="logBox">
-      <div class="log-line info"><span class="ts">[--:--:--]</span> Ready. Click Start to join the network.</div>
+    <!-- HARDWARE -->
+    <div class="card">
+      <div class="card-label">Hardware Detection</div>
+      <div class="hw-grid" id="hwGrid"></div>
+      <div class="hw-types" id="hwTypes"></div>
+    </div>
+
+    <!-- CONNECTION -->
+    <div class="card">
+      <div class="card-label">Connection</div>
+      <div class="field">
+        <label>Server URL</label>
+        <input type="text" id="serverUrl" placeholder="http://localhost:8000">
+      </div>
+      <div class="field">
+        <label>Worker Name</label>
+        <input type="text" id="workerName" placeholder="my-laptop">
+      </div>
+      <button class="btn-start" id="startBtn" onclick="toggleWorker()">Start Worker</button>
+    </div>
+
+    <!-- LOG -->
+    <div class="log-panel card" style="padding-bottom:16px">
+      <div class="card-label" style="margin-bottom:10px">Activity Log</div>
+      <div class="log-box" id="logBox">
+        <div class="log-line info"><span class="ts">[--:--:--]</span> Ready. Click Start to join the network.</div>
+      </div>
     </div>
   </div>
 </div>
@@ -478,22 +496,32 @@ HTML_PAGE = """<!DOCTYPE html>
 <script>
   let isRunning = false;
   let lastLogCount = 0;
+  let startTime = null;
 
-  // Load hardware + config on page load
   async function init() {
     const hw = await (await fetch('/api/hardware')).json();
     document.getElementById('hwGrid').innerHTML = [
       {l:'CPU', v:hw.cores+' cores'}, {l:'RAM', v:hw.ram_gb+' GB'},
       {l:'GPU', v:hw.gpu_type||'None'}, {l:'Tier', v:'Tier '+hw.tier},
     ].map(x => `<div class="hw-item"><div class="hw-label">${x.l}</div><div class="hw-value${x.l==='Tier'?' tier':''}">${x.v}</div></div>`).join('');
-    document.getElementById('hwTypes').textContent = 'Supports: ' + hw.supported_task_types.map(t=>t.replace(/_/g,' ')).join(', ');
+
+    document.getElementById('hwTypes').innerHTML = hw.supported_task_types.map(t=>`<span>${t.replace(/_/g,' ')}</span>`).join('');
+    document.getElementById('tierVal').textContent = 'T' + hw.tier;
+    document.getElementById('hwSummary').textContent = hw.cores + ' cores / ' + hw.ram_gb + ' GB';
 
     const cfg = await (await fetch('/api/config')).json();
     document.getElementById('serverUrl').value = cfg.server_url || 'http://localhost:8000';
     document.getElementById('workerName').value = cfg.worker_name || '';
 
-    // Start polling
     setInterval(pollState, 1000);
+    setInterval(updateUptime, 1000);
+  }
+
+  function updateUptime() {
+    if (!startTime || !isRunning) { document.getElementById('uptimeVal').textContent = '--'; return; }
+    const s = Math.floor((Date.now() - startTime) / 1000);
+    const h = Math.floor(s/3600); const m = Math.floor((s%3600)/60); const sec = s%60;
+    document.getElementById('uptimeVal').textContent = (h>0?h+'h ':'') + m + 'm ' + sec + 's';
   }
 
   async function toggleWorker() {
@@ -501,12 +529,14 @@ HTML_PAGE = """<!DOCTYPE html>
       const url = document.getElementById('serverUrl').value.trim();
       const name = document.getElementById('workerName').value.trim();
       if (!url || !name) { alert('Fill in server URL and worker name'); return; }
+      startTime = Date.now();
       await fetch('/api/start', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({server_url: url, worker_name: name})
       });
     } else {
+      startTime = null;
       await fetch('/api/stop', {method:'POST'});
     }
   }
@@ -515,7 +545,7 @@ HTML_PAGE = """<!DOCTYPE html>
     offline:      {dot:'', text:'Offline'},
     connecting:   {dot:'warn', text:'Connecting...'},
     setting_up:   {dot:'warn', text:'Setting Up...'},
-    idle:         {dot:'online', text:'Online — Waiting'},
+    idle:         {dot:'online', text:'Online - Waiting'},
     working:      {dot:'working', text:'Processing'},
     disconnected: {dot:'error', text:'Disconnected'},
     error:        {dot:'error', text:'Error'},
@@ -530,9 +560,15 @@ HTML_PAGE = """<!DOCTYPE html>
       document.getElementById('statusText').textContent = sm.text;
       document.getElementById('taskCount').textContent = s.tasks_completed;
       document.getElementById('earnings').textContent = '$' + s.total_earnings.toFixed(2);
-      document.getElementById('currentTask').textContent = s.current_task ? 'Working on: ' + s.current_task : '';
+      document.getElementById('currentTask').textContent = s.current_task ? 'Working on: ' + s.current_task : (s.running ? 'Waiting for tasks...' : '');
+      document.getElementById('workerIdDisplay').textContent = s.worker_id ? 'ID: ' + s.worker_id.substring(0,8) + '...' : '';
 
-      // Update button
+      if (s.tasks_completed > 0 && startTime) {
+        const mins = (Date.now() - startTime) / 60000;
+        const rate = (s.total_earnings / mins).toFixed(3);
+        document.getElementById('earningRate').textContent = '$' + rate + '/min';
+      }
+
       isRunning = s.running;
       const btn = document.getElementById('startBtn');
       const urlInput = document.getElementById('serverUrl');
@@ -542,6 +578,7 @@ HTML_PAGE = """<!DOCTYPE html>
         btn.className = 'btn-start stop';
         urlInput.disabled = true;
         nameInput.disabled = true;
+        if (!startTime) startTime = Date.now();
       } else {
         btn.textContent = 'Start Worker';
         btn.className = 'btn-start';
@@ -549,7 +586,6 @@ HTML_PAGE = """<!DOCTYPE html>
         nameInput.disabled = false;
       }
 
-      // Update logs (only if new)
       if (s.logs.length !== lastLogCount) {
         const box = document.getElementById('logBox');
         const wasAtBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 30;
