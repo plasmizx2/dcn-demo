@@ -103,7 +103,7 @@ async def delete_worker(worker_id: str, request: Request) -> dict:
     from auth import get_session
     from fastapi import HTTPException
     
-    user = get_session(request)
+    user = await get_session(request)
     if not user or user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
         

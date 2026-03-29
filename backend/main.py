@@ -88,9 +88,34 @@ async def lifespan(app: FastAPI):
                 prompt_hash         TEXT PRIMARY KEY,
                 response_text       TEXT NOT NULL,
                 created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
+            );
+            CREATE TABLE IF NOT EXISTS dcn_users (
+                id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                username            TEXT UNIQUE NOT NULL,
+                password_hash       TEXT NOT NULL,
+                role                TEXT NOT NULL,
+                created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE TABLE IF NOT EXISTS sessions (
+                token_id            TEXT PRIMARY KEY,
+                user_id             UUID NOT NULL REFERENCES dcn_users(id) ON DELETE CASCADE,
+                created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
             """
         )
+        
+        # Seed default users if empty
+        import hashlib
+        count = await conn.fetchval("SELECT COUNT(*) FROM dcn_users")
+        if count == 0:
+            admin_pwd = hashlib.sha256("admin123".encode()).hexdigest()
+            customer_pwd = hashlib.sha256("customer123".encode()).hexdigest()
+            await conn.execute(
+                "INSERT INTO dcn_users (username, password_hash, role) VALUES ($1, $2, 'admin')", "admin", admin_pwd
+            )
+            await conn.execute(
+                "INSERT INTO dcn_users (username, password_hash, role) VALUES ($1, $2, 'customer')", "customer", customer_pwd
+            )
     maintenance_task = asyncio.create_task(_maintenance_loop())
     yield
     maintenance_task.cancel()
@@ -123,7 +148,7 @@ async def auth_middleware(request: Request, call_next):
 
     # Admin-only pages → redirect to login if not admin
     if path in ADMIN_PAGES:
-        user = get_session(request)
+        user = await get_session(request)
         if not user:
             return RedirectResponse("/login", status_code=302)
         if user["role"] != "admin":
@@ -131,7 +156,7 @@ async def auth_middleware(request: Request, call_next):
 
     # Admin-only API routes → 401 JSON if not admin
     if any(path.startswith(p) for p in ADMIN_API_PREFIXES):
-        user = get_session(request)
+        user = await get_session(request)
         if not user or user["role"] != "admin":
             return JSONResponse({"detail": "Admin access required"}, status_code=401)
 
@@ -142,7 +167,7 @@ async def auth_middleware(request: Request, call_next):
 @app.get("/login")
 async def serve_login(request: Request):
     # Already logged in? Redirect to appropriate page
-    user = get_session(request)
+    user = await get_session(request)
     if user:
         return RedirectResponse("/ops" if user["role"] == "admin" else "/submit")
     return FileResponse(os.path.join(LOGIN_DIR, "index.html"))
@@ -154,11 +179,11 @@ async def do_login(request: Request):
     username = body.get("username", "")
     password = body.get("password", "")
 
-    user = verify_user(username, password)
+    user = await verify_user(username, password)
     if not user:
         return JSONResponse({"detail": "Invalid username or password"}, status_code=401)
 
-    token = create_session(user)
+    token = await create_session(user)
     redirect = "/ops" if user["role"] == "admin" else "/submit"
     response = JSONResponse({"ok": True, "role": user["role"], "name": user.get("name", user["username"]), "redirect": redirect})
     response.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="lax", max_age=SESSION_MAX_AGE_SECONDS)
@@ -167,7 +192,7 @@ async def do_login(request: Request):
 
 @app.get("/auth/me")
 async def auth_me(request: Request):
-    user = get_session(request)
+    user = await get_session(request)
     if not user:
         return JSONResponse({"detail": "Not logged in"}, status_code=401)
     return {"username": user["username"], "role": user["role"], "name": user.get("name", user["username"])}
@@ -177,7 +202,7 @@ async def auth_me(request: Request):
 async def do_logout(request: Request):
     token = request.cookies.get(SESSION_COOKIE)
     if token:
-        destroy_session(token)
+        await destroy_session(token)
     response = RedirectResponse("/login", status_code=302)
     response.delete_cookie(SESSION_COOKIE)
     return response

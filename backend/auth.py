@@ -21,60 +21,69 @@ import logging
 from fastapi import Request, HTTPException
 from fastapi.responses import RedirectResponse
 
-logger = logging.getLogger("dcn.auth")
+from database import get_pool
 
-USERS_FILE = os.path.join(os.path.dirname(__file__), "users.json")
+logger = logging.getLogger("dcn.auth")
 SESSION_COOKIE = "dcn_session"
 
-# In-memory session store: {token: {"username": ..., "role": ...}}
-# Replace with Redis/DB for production.
-_sessions: dict[str, dict] = {}
 
-
-def load_users() -> dict:
-    """Load users from JSON file. Replace with DB lookup later."""
-    try:
-        with open(USERS_FILE, "r") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        logger.error("Failed to load users from %s: %s", USERS_FILE, e)
-        return {}
-
-
-def verify_user(username: str, password: str) -> dict | None:
-    """Check credentials. Returns user dict or None. Replace with hashed passwords later."""
-    users = load_users()
-    if not users:
-        return None
-    user = users.get(username)
-    if user and user.get("password") == password:
-        return {"username": username, "role": user["role"], "name": user.get("name", username)}
+async def verify_user(username: str, password: str) -> dict | None:
+    """Check credentials against PostgreSQL. Returns user dict or None."""
+    pool = await get_pool()
+    pwd_hash = hashlib.sha256(password.encode()).hexdigest()
+    async with pool.acquire() as conn:
+        user = await conn.fetchrow(
+            "SELECT id, username, role FROM dcn_users WHERE username = $1 AND password_hash = $2",
+            username, pwd_hash
+        )
+        if user:
+            return {"id": str(user["id"]), "username": user["username"], "role": user["role"], "name": user["username"]}
     return None
 
 
-def create_session(user: dict) -> str:
-    """Create a session token for an authenticated user."""
+async def create_session(user: dict) -> str:
+    """Create a high-entropy session token and bind it in PostgreSQL."""
+    pool = await get_pool()
     token = secrets.token_hex(32)
-    _sessions[token] = user
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO sessions (token_id, user_id) VALUES ($1, $2)",
+            token, user["id"]
+        )
     return token
 
 
-def get_session(request: Request) -> dict | None:
-    """Get the current user from session cookie."""
+async def get_session(request: Request) -> dict | None:
+    """Validate token against DB and return user."""
     token = request.cookies.get(SESSION_COOKIE)
-    if token and token in _sessions:
-        return _sessions[token]
+    if not token:
+        return None
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT u.id, u.username, u.role 
+            FROM sessions s
+            JOIN dcn_users u ON s.user_id = u.id
+            WHERE s.token_id = $1
+            """,
+            token
+        )
+        if row:
+            return {"id": str(row["id"]), "username": row["username"], "role": row["role"], "name": row["username"]}
     return None
 
 
-def destroy_session(token: str):
-    """Remove a session."""
-    _sessions.pop(token, None)
+async def destroy_session(token: str):
+    """Delete session from Postgres."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM sessions WHERE token_id = $1", token)
 
 
-def require_role(request: Request, role: str):
+async def require_role(request: Request, role: str):
     """Check that the current user has the required role."""
-    user = get_session(request)
+    user = await get_session(request)
     if not user:
         return None
     if user["role"] != role:

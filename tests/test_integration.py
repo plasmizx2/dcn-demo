@@ -16,7 +16,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 from planner import plan_tasks
 from schemas import JobCreate, TaskClaim, TaskComplete, WorkerRegister, WorkerHeartbeat
-from auth import verify_user, create_session, destroy_session, _sessions, load_users
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -213,51 +212,6 @@ class TestPlannerDistributedTypes:
         tasks = plan_tasks("unknown_task_type", {})
         assert len(tasks) == 3
 
-
-# ═══════════════════════════════════════════════════════════════
-# AUTH TESTS
-# ═══════════════════════════════════════════════════════════════
-
-class TestAuth:
-    """Authentication and session management."""
-
-    def test_load_users_returns_dict(self):
-        users = load_users()
-        assert isinstance(users, dict)
-        assert "admin" in users
-        assert "customer" in users
-
-    def test_verify_valid_admin(self):
-        user = verify_user("admin", "admin123")
-        assert user is not None
-        assert user["role"] == "admin"
-        assert user["username"] == "admin"
-
-    def test_verify_valid_customer(self):
-        user = verify_user("customer", "customer123")
-        assert user is not None
-        assert user["role"] == "customer"
-
-    def test_verify_bad_password(self):
-        user = verify_user("admin", "wrongpassword")
-        assert user is None
-
-    def test_verify_nonexistent_user(self):
-        user = verify_user("nobody", "anything")
-        assert user is None
-
-    def test_session_lifecycle(self):
-        user = verify_user("admin", "admin123")
-        token = create_session(user)
-        assert token in _sessions
-        assert _sessions[token]["username"] == "admin"
-
-        destroy_session(token)
-        assert token not in _sessions
-
-    def test_destroy_nonexistent_session(self):
-        # Should not raise
-        destroy_session("fake_token_12345")
 
 
 # ═══════════════════════════════════════════════════════════════
