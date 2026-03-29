@@ -12,7 +12,7 @@ from apis.monitor import router as monitor_router
 from apis.workers import router as workers_router
 from auth import (
     verify_user, create_session, get_session, destroy_session,
-    SESSION_COOKIE, ADMIN_PAGES, ADMIN_API_PREFIXES, PUBLIC_PREFIXES,
+    hash_password, SESSION_COOKIE, ADMIN_PAGES, ADMIN_API_PREFIXES, PUBLIC_PREFIXES,
 )
 from config import (
     MAINTENANCE_INTERVAL_SECONDS, STALE_TASK_TIMEOUT_MINUTES,
@@ -105,11 +105,10 @@ async def lifespan(app: FastAPI):
         )
         
         # Seed default users if empty
-        import hashlib
         count = await conn.fetchval("SELECT COUNT(*) FROM dcn_users")
         if count == 0:
-            admin_pwd = hashlib.sha256("admin123".encode()).hexdigest()
-            customer_pwd = hashlib.sha256("customer123".encode()).hexdigest()
+            admin_pwd = hash_password("admin123")
+            customer_pwd = hash_password("customer123")
             await conn.execute(
                 "INSERT INTO dcn_users (username, password_hash, role) VALUES ($1, $2, 'admin')", "admin", admin_pwd
             )
@@ -175,7 +174,10 @@ async def serve_login(request: Request):
 
 @app.post("/auth/login")
 async def do_login(request: Request):
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"detail": "Invalid JSON body"}, status_code=400)
     username = body.get("username", "")
     password = body.get("password", "")
 
@@ -192,18 +194,22 @@ async def do_login(request: Request):
 
 @app.post("/auth/register")
 async def do_register(request: Request):
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"detail": "Invalid JSON body"}, status_code=400)
     username = body.get("username", "")
     password = body.get("password", "")
 
     if not username or not password:
         return JSONResponse({"detail": "Username and password required"}, status_code=400)
+    if len(username) < 3:
+        return JSONResponse({"detail": "Username must be at least 3 characters"}, status_code=400)
     if len(password) < 6:
         return JSONResponse({"detail": "Password must be at least 6 characters"}, status_code=400)
 
     pool = await get_pool()
-    import hashlib
-    pwd_hash = hashlib.sha256(password.encode()).hexdigest()
+    pwd_hash = hash_password(password)
 
     async with pool.acquire() as conn:
         try:
@@ -213,12 +219,14 @@ async def do_register(request: Request):
                 username, pwd_hash
             )
         except Exception as e:
-            # asyncpg UniqueViolationError or similar
-            logger.warning(f"Registration failed for {username}: {e}")
+            # asyncpg UniqueViolationError (username taken) or other DB errors
+            logger.warning("Registration failed for %s: %s", username, e)
             return JSONResponse({"detail": "Username is already taken"}, status_code=400)
 
     # Immediately log them in
     user = await verify_user(username, password)
+    if not user:
+        return JSONResponse({"detail": "Registration succeeded but login failed"}, status_code=500)
     token = await create_session(user)
     
     redirect = "/submit"

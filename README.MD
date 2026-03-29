@@ -43,6 +43,27 @@ Best supporting demos:
 
 ---
 
+## Authentication
+
+DCN uses **cookie-based sessions** backed by PostgreSQL.
+
+- **Default demo users**:
+  - `admin` / `admin123` (admin access to `/ops`, `/results`, `/worker-logs`, and `/monitor/*`)
+  - `customer` / `customer123` (access to job submission + “My Jobs”)
+- **Self-registration**:
+  - Users can create a new customer account from the login page (Sign Up toggle), which calls `POST /auth/register`.
+
+### Auth API
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/auth/login` | Login and set session cookie |
+| POST | `/auth/register` | Create a customer user and set session cookie |
+| GET | `/auth/me` | Return current session user |
+| GET/POST | `/auth/logout` | Clear session |
+
+---
+
 ## Why DCN
 
 Most AI workflows are still:

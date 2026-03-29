@@ -1,16 +1,13 @@
 """
-Demo auth — cookie-based login with JSON user store.
+DCN auth (demo-grade):
 
-TO UPGRADE TO REAL AUTH:
-  1. Replace users.json with a DB table (hashed passwords via bcrypt)
-  2. Swap verify_user() to query the DB instead of reading JSON
-  3. Replace _sessions dict with Redis or DB-backed sessions (or switch to JWT)
-  4. Add registration, password reset, etc.
-  The middleware, role checks, and cookie handling stay the same.
+- Cookie-based sessions backed by PostgreSQL (`sessions` table)
+- Users stored in PostgreSQL (`dcn_users` table)
+- Simple SHA-256 password hashing (sufficient for demo; not recommended for production)
 
-CURRENT DEMO CREDENTIALS (in users.json):
-  admin    / admin123    → role: admin  (can access /ops, /results, /monitor API)
-  customer / customer123 → role: customer (can access / only)
+Default seeded users (created at startup if `dcn_users` is empty):
+  admin    / admin123    → role: admin
+  customer / customer123 → role: customer
 """
 
 import os
@@ -26,11 +23,14 @@ from database import get_pool
 logger = logging.getLogger("dcn.auth")
 SESSION_COOKIE = "dcn_session"
 
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
 
 async def verify_user(username: str, password: str) -> dict | None:
     """Check credentials against PostgreSQL. Returns user dict or None."""
     pool = await get_pool()
-    pwd_hash = hashlib.sha256(password.encode()).hexdigest()
+    pwd_hash = hash_password(password)
     async with pool.acquire() as conn:
         user = await conn.fetchrow(
             "SELECT id, username, role FROM dcn_users WHERE username = $1 AND password_hash = $2",
