@@ -208,6 +208,18 @@
       border-left: 3px solid #6c63ff; padding-left: 14px; margin: 10px 0; color: #999;
     }
     .output-block hr { border: none; border-top: 1px solid #1e1e30; margin: 14px 0; }
+    .output-block table {
+      width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.82rem;
+    }
+    .output-block th {
+      text-align: left; padding: 8px 10px; background: #1a1a2e;
+      border-bottom: 2px solid #6c63ff; color: #ccc; font-size: 0.75rem;
+      text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .output-block td {
+      padding: 6px 10px; border-bottom: 1px solid #1e1e30; color: #bbb;
+    }
+    .output-block tr:first-child td { color: #4caf50; font-weight: 600; }
 
     .html-preview-public {
       background: #fff; border: 1px solid #1e1e30; border-radius: 8px;
@@ -250,6 +262,94 @@
       border-radius: 3px;
       transition: width 0.5s ease;
       width: 0%;
+    }
+
+    /* Timing comparison */
+    .timing-card {
+      background: linear-gradient(135deg, rgba(108,99,255,0.08) 0%, rgba(76,175,80,0.06) 100%);
+      border: 1px solid #1e1e30;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .timing-card h3 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #6c63ff;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 16px;
+    }
+    .timing-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .timing-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .timing-label {
+      font-size: 0.82rem;
+      color: #999;
+      min-width: 90px;
+      font-weight: 500;
+    }
+    .timing-bar-track {
+      flex: 1;
+      height: 28px;
+      background: #1a1a2e;
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+    .timing-bar-fill {
+      height: 100%;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 10px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #fff;
+      transition: width 1s ease;
+      min-width: fit-content;
+    }
+    .timing-bar-fill.sequential {
+      background: linear-gradient(90deg, #ff6b6b, #ee5a24);
+    }
+    .timing-bar-fill.parallel {
+      background: linear-gradient(90deg, #4caf50, #2ecc71);
+    }
+    .timing-stats {
+      display: flex;
+      gap: 16px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+    .timing-stat {
+      background: #141420;
+      border: 1px solid #1e1e30;
+      border-radius: 8px;
+      padding: 12px 18px;
+      text-align: center;
+      flex: 1;
+      min-width: 100px;
+    }
+    .timing-stat .stat-val {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .timing-stat .stat-val.highlight { color: #4caf50; }
+    .timing-stat .stat-lbl {
+      font-size: 0.72rem;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 2px;
     }
 
     /* New job button */
@@ -368,6 +468,13 @@
       </div>
 
       <ul class="task-list" id="taskList"></ul>
+    </div>
+
+    <!-- Timing Comparison -->
+    <div class="timing-card" id="timingCard" style="display:none;">
+      <h3>Distributed Execution Performance</h3>
+      <div class="timing-bars" id="timingBars"></div>
+      <div class="timing-stats" id="timingStats"></div>
     </div>
 
     <!-- Output -->
@@ -612,6 +719,7 @@
           clearInterval(pollInterval);
           document.getElementById('outputCard').style.display = 'block';
           renderOutput(job.final_output, job.task_type);
+          loadTimingComparison();
         }
 
         // Check if failed
@@ -694,6 +802,68 @@
       }
     }
 
+    async function loadTimingComparison() {
+      if (!currentJobId) return;
+      try {
+        const resp = await fetch(`${API}/jobs/${currentJobId}/timing`);
+        if (!resp.ok) return;
+        const timing = await resp.json();
+
+        if (timing.sequential_time_seconds <= 0 || timing.parallel_time_seconds <= 0) return;
+
+        const seqTime = timing.sequential_time_seconds;
+        const parTime = timing.parallel_time_seconds;
+        const maxTime = Math.max(seqTime, parTime);
+        const speedup = timing.speedup;
+        const numWorkers = timing.num_workers;
+        const numTasks = timing.total_tasks;
+
+        const barsEl = document.getElementById('timingBars');
+        barsEl.innerHTML = `
+          <div class="timing-row">
+            <div class="timing-label">Sequential</div>
+            <div class="timing-bar-track">
+              <div class="timing-bar-fill sequential" style="width: ${(seqTime / maxTime * 100)}%">
+                ${seqTime.toFixed(1)}s
+              </div>
+            </div>
+          </div>
+          <div class="timing-row">
+            <div class="timing-label">Distributed</div>
+            <div class="timing-bar-track">
+              <div class="timing-bar-fill parallel" style="width: ${(parTime / maxTime * 100)}%">
+                ${parTime.toFixed(1)}s
+              </div>
+            </div>
+          </div>
+        `;
+
+        const statsEl = document.getElementById('timingStats');
+        statsEl.innerHTML = `
+          <div class="timing-stat">
+            <div class="stat-val highlight">${speedup}x</div>
+            <div class="stat-lbl">Speedup</div>
+          </div>
+          <div class="timing-stat">
+            <div class="stat-val">${numWorkers}</div>
+            <div class="stat-lbl">Workers</div>
+          </div>
+          <div class="timing-stat">
+            <div class="stat-val">${numTasks}</div>
+            <div class="stat-lbl">Tasks</div>
+          </div>
+          <div class="timing-stat">
+            <div class="stat-val">${(seqTime - parTime).toFixed(1)}s</div>
+            <div class="stat-lbl">Time Saved</div>
+          </div>
+        `;
+
+        document.getElementById('timingCard').style.display = 'block';
+      } catch (e) {
+        console.error('Timing load error:', e);
+      }
+    }
+
     function resetForm() {
       currentJobId = null;
       if (pollInterval) clearInterval(pollInterval);
@@ -701,6 +871,7 @@
       document.getElementById('formCard').style.display = 'block';
       document.getElementById('statusCard').style.display = 'none';
       document.getElementById('outputCard').style.display = 'none';
+      document.getElementById('timingCard').style.display = 'none';
       document.getElementById('title').value = '';
       document.getElementById('inputText').value = '';
       document.getElementById('taskList').innerHTML = '';

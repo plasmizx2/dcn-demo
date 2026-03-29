@@ -33,7 +33,12 @@ async def get_job(job_id: str):
 
 @router.post("/jobs")
 async def create_job(job: JobCreate):
-    """Create a new job and log a job_created event."""
+    """Create a new job, plan subtasks, and log events (transactional)."""
+    if not job.title or not job.title.strip():
+        raise HTTPException(status_code=400, detail="Job title is required")
+    if not job.task_type or not job.task_type.strip():
+        raise HTTPException(status_code=400, detail="Task type is required")
+
     pool = await get_pool()
     async with pool.acquire() as conn:
         async with conn.transaction():
@@ -89,7 +94,9 @@ async def create_job(job: JobCreate):
                 f"Job split into {len(subtasks)} tasks",
             )
 
-    return dict(row)
+    result = dict(row)
+    result["task_count"] = len(subtasks)
+    return result
 
 
 @router.get("/jobs/{job_id}/tasks")
@@ -114,6 +121,72 @@ async def clear_all_jobs():
         await conn.execute("DELETE FROM job_tasks")
         await conn.execute("DELETE FROM jobs")
     return {"cleared": True}
+
+
+@router.get("/jobs/{job_id}/timing")
+async def get_job_timing(job_id: str):
+    """Return parallel vs sequential timing stats for a completed job."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        job = await conn.fetchrow("SELECT * FROM jobs WHERE id = $1", job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+
+        # Get task timing data
+        tasks = await conn.fetch(
+            """
+            SELECT jt.id, jt.task_name, jt.status, jt.started_at, jt.completed_at,
+                   tr.execution_time_seconds
+            FROM job_tasks jt
+            LEFT JOIN task_results tr ON tr.task_id = jt.id
+            WHERE jt.job_id = $1
+            ORDER BY jt.task_order
+            """,
+            job_id,
+        )
+
+        # Sequential time = sum of all individual execution times
+        exec_times = [float(t["execution_time_seconds"]) for t in tasks if t["execution_time_seconds"]]
+        sequential_time = sum(exec_times)
+
+        # Parallel time = wall-clock from first task started to last task completed
+        started_times = [t["started_at"] for t in tasks if t["started_at"]]
+        completed_times = [t["completed_at"] for t in tasks if t["completed_at"]]
+
+        parallel_time = 0.0
+        if started_times and completed_times:
+            wall_start = min(started_times)
+            wall_end = max(completed_times)
+            parallel_time = (wall_end - wall_start).total_seconds()
+
+        # Count unique workers
+        workers_q = await conn.fetch(
+            "SELECT DISTINCT worker_node_id FROM job_tasks WHERE job_id = $1 AND worker_node_id IS NOT NULL",
+            job_id,
+        )
+        worker_ids = [r["worker_node_id"] for r in workers_q]
+
+        speedup = round(sequential_time / parallel_time, 2) if parallel_time > 0 else 0
+
+        task_details = []
+        for t in tasks:
+            task_details.append({
+                "task_name": t["task_name"],
+                "status": t["status"],
+                "execution_time": float(t["execution_time_seconds"]) if t["execution_time_seconds"] else None,
+            })
+
+    return {
+        "job_id": job_id,
+        "status": job["status"],
+        "task_type": job["task_type"],
+        "total_tasks": len(tasks),
+        "sequential_time_seconds": round(sequential_time, 2),
+        "parallel_time_seconds": round(parallel_time, 2),
+        "speedup": speedup,
+        "num_workers": len(worker_ids),
+        "tasks": task_details,
+    }
 
 
 @router.get("/jobs/{job_id}/events")
