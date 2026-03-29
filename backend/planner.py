@@ -184,6 +184,27 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
                 "task_description": f"5-fold CV GradientBoosting tuned (500 trees, depth=8, lr=0.05)",
                 "task_payload": {**base, "experiment_type": "gradient_boosting_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 8, "learning_rate": 0.05}, "min_tier": 3},
             },
+            # ── Tier 4: datacenter-class heavy experiments ──
+            {
+                "task_name": "experiment_rf_massive",
+                "task_description": f"10-fold CV RandomForest (1000 trees, depth=30, all features) on {dataset_name} — Tier 4 only",
+                "task_payload": {**base, "experiment_type": "random_forest_regressor", "features": all_features, "cv_folds": 10, "params": {"n_estimators": 1000, "max_depth": 30}, "min_tier": 4},
+            },
+            {
+                "task_name": "experiment_gb_extreme",
+                "task_description": f"10-fold CV GradientBoosting (1000 trees, depth=12, lr=0.01) on {dataset_name} — Tier 4 only",
+                "task_payload": {**base, "experiment_type": "gradient_boosting_regressor", "features": all_features, "cv_folds": 10, "params": {"n_estimators": 1000, "max_depth": 12, "learning_rate": 0.01}, "min_tier": 4},
+            },
+            {
+                "task_name": "experiment_rf_mid_features_heavy",
+                "task_description": f"10-fold CV RandomForest (800 trees, depth=25, {len(mid_features)} features) — Tier 4 only",
+                "task_payload": {**base, "experiment_type": "random_forest_regressor", "features": mid_features, "cv_folds": 10, "params": {"n_estimators": 800, "max_depth": 25}, "min_tier": 4},
+            },
+            {
+                "task_name": "experiment_gb_fine_tuned",
+                "task_description": f"10-fold CV GradientBoosting (800 trees, depth=10, lr=0.02) — Tier 4 only",
+                "task_payload": {**base, "experiment_type": "gradient_boosting_regressor", "features": all_features, "cv_folds": 10, "params": {"n_estimators": 800, "max_depth": 10, "learning_rate": 0.02}, "min_tier": 4},
+            },
         ]
     else:
         # Classification
@@ -227,6 +248,27 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
                 "task_name": "experiment_gb_tuned",
                 "task_description": f"5-fold CV GradientBoosting tuned (500 trees, depth=8, lr=0.05)",
                 "task_payload": {**base, "experiment_type": "gradient_boosting_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 8, "learning_rate": 0.05}, "min_tier": 3},
+            },
+            # ── Tier 4: datacenter-class heavy experiments ──
+            {
+                "task_name": "experiment_rf_massive",
+                "task_description": f"10-fold CV RandomForest (1000 trees, depth=30, all features) on {dataset_name} — Tier 4 only",
+                "task_payload": {**base, "experiment_type": "random_forest_classifier", "features": all_features, "cv_folds": 10, "params": {"n_estimators": 1000, "max_depth": 30}, "min_tier": 4},
+            },
+            {
+                "task_name": "experiment_gb_extreme",
+                "task_description": f"10-fold CV GradientBoosting (1000 trees, depth=12, lr=0.01) on {dataset_name} — Tier 4 only",
+                "task_payload": {**base, "experiment_type": "gradient_boosting_classifier", "features": all_features, "cv_folds": 10, "params": {"n_estimators": 1000, "max_depth": 12, "learning_rate": 0.01}, "min_tier": 4},
+            },
+            {
+                "task_name": "experiment_rf_mid_features_heavy",
+                "task_description": f"10-fold CV RandomForest (800 trees, depth=25, {len(mid_features)} features) — Tier 4 only",
+                "task_payload": {**base, "experiment_type": "random_forest_classifier", "features": mid_features, "cv_folds": 10, "params": {"n_estimators": 800, "max_depth": 25}, "min_tier": 4},
+            },
+            {
+                "task_name": "experiment_gb_fine_tuned",
+                "task_description": f"10-fold CV GradientBoosting (800 trees, depth=10, lr=0.02) — Tier 4 only",
+                "task_payload": {**base, "experiment_type": "gradient_boosting_classifier", "features": all_features, "cv_folds": 10, "params": {"n_estimators": 800, "max_depth": 10, "learning_rate": 0.02}, "min_tier": 4},
             },
         ]
 

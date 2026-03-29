@@ -9,9 +9,9 @@ import os
 
 
 def safe_n_jobs():
-    """Return a safe n_jobs value that leaves 2 cores free for the OS."""
+    """Return a safe n_jobs value that leaves 1 core free for the OS."""
     cores = os.cpu_count() or 1
-    safe = max(1, cores - 2)
+    safe = max(1, cores - 1)
     return safe
 
 

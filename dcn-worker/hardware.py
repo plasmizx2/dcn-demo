@@ -106,13 +106,13 @@ def _compute_tier(info):
     Tier 1: Any machine (image processing, web scraping, audio transcription)
     Tier 2: 8GB+ RAM, 4+ cores (adds ml_experiment)
     Tier 3: GPU or 16GB+ RAM, 8+ cores (adds sentiment_classification, LLM tasks)
-    Tier 4: NVIDIA CUDA GPU + 128GB+ RAM + 32+ cores — DGX / datacenter class only
+    Tier 4: NVIDIA CUDA GPU + 100GB+ RAM + 16+ cores — high-end workstation / datacenter
              (adds large_scale_ml: massive distributed training, 500K+ row jobs)
     """
-    # Tier 4: real NVIDIA GPU (not Apple Silicon) + 128 GB RAM + 32 cores
+    # Tier 4: real NVIDIA GPU + 100GB+ RAM + 16+ cores
     gpu = info.get("gpu_type") or ""
     is_nvidia_cuda = gpu.startswith("nvidia:")
-    if is_nvidia_cuda and info["ram_gb"] >= 128 and info["cores"] >= 32:
+    if is_nvidia_cuda and info["ram_gb"] >= 100 and info["cores"] >= 16:
         return 4
     if info["has_gpu"] or info["ram_gb"] >= 16:
         return 3
@@ -143,7 +143,7 @@ def print_report(info):
         1: "Tier 1 — Basic (any machine)",
         2: "Tier 2 — Standard (8GB+ RAM, 4+ cores)",
         3: "Tier 3 — Enhanced (GPU or 16GB+ RAM)",
-        4: "Tier 4 — Datacenter (NVIDIA GPU + 128GB+ RAM + 32+ cores)",
+        4: "Tier 4 — Datacenter (NVIDIA GPU + 100GB+ RAM + 16+ cores)",
     }
     print("=" * 60)
     print("  DCN Worker — Hardware Detection")

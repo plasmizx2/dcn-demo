@@ -146,18 +146,34 @@ async def get_job_timing(job_id: str):
         )
 
         # Sequential time = sum of all individual execution times
+        # (how long one machine would take running tasks back-to-back)
         exec_times = [float(t["execution_time_seconds"]) for t in tasks if t["execution_time_seconds"]]
         sequential_time = sum(exec_times)
 
-        # Parallel time = wall-clock from first task started to last task completed
-        started_times = [t["started_at"] for t in tasks if t["started_at"]]
-        completed_times = [t["completed_at"] for t in tasks if t["completed_at"]]
+        # Parallel time = union of actual execution intervals, merged to
+        # remove overlap.  This counts real distributed work time — tasks
+        # running concurrently compress the total, but queue gaps (workers
+        # busy with OTHER jobs) don't inflate it.
+        intervals = sorted(
+            [(t["started_at"], t["completed_at"]) for t in tasks
+             if t["started_at"] and t["completed_at"]],
+            key=lambda x: x[0],
+        )
 
         parallel_time = 0.0
-        if started_times and completed_times:
-            wall_start = min(started_times)
-            wall_end = max(completed_times)
-            parallel_time = (wall_end - wall_start).total_seconds()
+        if intervals:
+            merged = [intervals[0]]
+            for start, end in intervals[1:]:
+                prev_start, prev_end = merged[-1]
+                if start <= prev_end:
+                    # Overlapping — extend the current interval
+                    merged[-1] = (prev_start, max(prev_end, end))
+                else:
+                    # Gap — start a new interval
+                    merged.append((start, end))
+            parallel_time = sum(
+                (end - start).total_seconds() for start, end in merged
+            )
 
         # Count unique workers
         workers_q = await conn.fetch(
