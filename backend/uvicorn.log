@@ -1,0 +1,89 @@
+INFO:     Will watch for changes in these directories: ['/Users/seandumont/Desktop/dcn-demo/backend']
+INFO:     Uvicorn running on http://127.0.0.1:8081 (Press CTRL+C to quit)
+INFO:     Started reloader process [69150] using StatReload
+INFO:     Started server process [69370]
+INFO:     Waiting for application startup.
+ERROR:    Traceback (most recent call last):
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/site-packages/asyncpg/connection.py", line 2443, in connect
+    return await connect_utils._connect(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1218, in _connect
+    conn = await _connect_addr(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1054, in _connect_addr
+    return await __connect_addr(params, True, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 1099, in __connect_addr
+    tr, pr = await connector
+             ^^^^^^^^^^^^^^^
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/site-packages/asyncpg/connect_utils.py", line 969, in _create_ssl_connection
+    tr, pr = await loop.create_connection(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/asyncio/base_events.py", line 1104, in create_connection
+    sock = await self._connect_sock(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/asyncio/base_events.py", line 1007, in _connect_sock
+    await self.sock_connect(sock, address)
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/asyncio/selector_events.py", line 651, in sock_connect
+    return await fut
+           ^^^^^^^^^
+asyncio.exceptions.CancelledError
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/site-packages/starlette/routing.py", line 694, in lifespan
+    async with self.lifespan_context(app) as maybe_state:
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/site-packages/fastapi/routing.py", line 134, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/site-packages/fastapi/routing.py", line 134, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/site-packages/fastapi/routing.py", line 134, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/seandumont/Desktop/dcn-demo/backend/main.py", line 83, in lifespan
+    pool = await get_pool()
+           ^^^^^^^^^^^^^^^^
+  File "/Users/seandumont/Desktop/dcn-demo/backend/database.py", line 16, in get_pool
+    pool = await asyncpg.create_pool(DATABASE_URL, statement_cache_size=0)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/site-packages/asyncpg/pool.py", line 439, in _async__init__
+    await self._initialize()
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/site-packages/asyncpg/pool.py", line 476, in _initialize
+    await asyncio.gather(*connect_tasks)
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/site-packages/asyncpg/pool.py", line 153, in connect
+    self._con = await self._pool._get_new_connection()
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/site-packages/asyncpg/pool.py", line 538, in _get_new_connection
+    con = await self._connect(
+          ^^^^^^^^^^^^^^^^^^^^
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/site-packages/asyncpg/connection.py", line 2442, in connect
+    async with compat.timeout(timeout):
+  File "/Users/seandumont/.pyenv/versions/3.12.3/lib/python3.12/asyncio/timeouts.py", line 115, in __aexit__
+    raise TimeoutError from exc_val
+TimeoutError
+
+ERROR:    Application startup failed. Exiting.
+WARNING:  StatReload detected changes in 'main.py'. Reloading...
+INFO:     Started server process [72545]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'auth.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [72545]
+INFO:     Started server process [72557]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
