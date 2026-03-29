@@ -19,6 +19,9 @@ MONITOR_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "monitor
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "results")
 LANDING_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "landing")
 LOGIN_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "login")
+MYJOBS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "my-jobs")
+ERROR_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "error")
+WORKER_LOGS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "worker-logs")
 
 
 async def _maintenance_loop():
@@ -184,6 +187,16 @@ async def serve_results():
     return FileResponse(os.path.join(RESULTS_DIR, "index.html"))
 
 
+@app.get("/my-jobs")
+async def serve_my_jobs():
+    return FileResponse(os.path.join(MYJOBS_DIR, "index.html"))
+
+
+@app.get("/worker-logs")
+async def serve_worker_logs():
+    return FileResponse(os.path.join(WORKER_LOGS_DIR, "index.html"))
+
+
 
 
 @app.get("/health")
@@ -193,6 +206,15 @@ async def health():
     async with pool.acquire() as conn:
         await conn.fetchval("SELECT 1")
     return {"status": "ok", "db": "connected"}
+
+
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc):
+    """Serve branded 404 page for unknown routes."""
+    # Return JSON for API requests
+    if request.url.path.startswith("/api/") or request.url.path.startswith("/monitor/"):
+        return JSONResponse({"detail": "Not found"}, status_code=404)
+    return FileResponse(os.path.join(ERROR_DIR, "404.html"), status_code=404)
 
 
 @app.get("/stats")

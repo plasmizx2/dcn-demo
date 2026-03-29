@@ -74,8 +74,8 @@ def require_role(request: Request, role: str):
 
 
 # Pages that require admin role
-ADMIN_PAGES = {"/ops", "/results"}
+ADMIN_PAGES = {"/ops", "/results", "/worker-logs"}
 # API routes that require admin role
 ADMIN_API_PREFIXES = ["/monitor/"]
 # Prefixes that don't need auth (worker endpoints, public pages, jobs API)
-PUBLIC_PREFIXES = ["/login", "/health", "/submit", "/workers/", "/tasks/", "/jobs", "/auth/", "/stats"]
+PUBLIC_PREFIXES = ["/login", "/health", "/submit", "/workers/", "/tasks/", "/jobs", "/auth/", "/stats", "/my-jobs"]

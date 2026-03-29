@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DCN — My Jobs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#14161e;--surface:rgba(255,255,255,0.06);--surface2:rgba(255,255,255,0.08);
+  --border:rgba(255,255,255,0.10);--border2:rgba(255,255,255,0.14);
+  --text:#e8e8ec;--muted:#b4b4bc;--dim:#8a8a96;--dark:#52525b;
+  --accent:#7c3aed;--accent2:#6366f1;--accent3:#3b82f6;
+  --green:#22c55e;--red:#ef4444;--yellow:#eab308;
+}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+
+/* ── Sidebar ── */
+.app-layout{display:flex;min-height:100vh}
+.sidebar{width:240px;min-width:240px;background:rgba(16,18,26,0.55);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-right:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;padding:24px 0;position:fixed;top:0;left:0;bottom:0;z-index:10}
+.sidebar-logo{font-weight:800;font-size:20px;background:linear-gradient(135deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-decoration:none;padding:0 24px;margin-bottom:8px;display:block}
+.sidebar-role{font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#7c3aed;padding:0 24px;margin-bottom:24px}
+.sidebar-nav{display:flex;flex-direction:column;gap:2px;flex:1;padding:0 12px}
+.sidebar-nav a{display:flex;align-items:center;gap:10px;color:rgba(255,255,255,0.45);text-decoration:none;font-size:0.88rem;font-weight:500;padding:10px 14px;border-radius:10px;transition:all 0.15s}
+.sidebar-nav a:hover{color:#fff;background:rgba(255,255,255,0.04)}
+.sidebar-nav a.active{color:#fff;background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(59,130,246,0.10));border:1px solid rgba(124,58,237,0.2)}
+.sidebar-nav a svg{width:18px;height:18px;flex-shrink:0}
+.sidebar-bottom{padding:16px 12px 0;border-top:1px solid rgba(255,255,255,0.06);margin-top:auto}
+.sidebar-user{padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.sidebar-user-avatar{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:0.82rem;font-weight:700;color:#fff;flex-shrink:0}
+.sidebar-user-name{font-size:0.85rem;font-weight:600;color:#fff}
+.sidebar-user-role{font-size:0.7rem;color:rgba(255,255,255,0.35);text-transform:capitalize}
+.sidebar-signout{display:flex;align-items:center;gap:10px;color:rgba(255,255,255,0.35);text-decoration:none;font-size:0.82rem;font-weight:500;padding:10px 14px;border-radius:10px;transition:all 0.15s}
+.sidebar-signout:hover{color:#ef4444;background:rgba(239,68,68,0.06)}
+.sidebar-signout svg{width:16px;height:16px}
+
+.main-content{margin-left:240px;flex:1;min-width:0;padding:32px 40px 60px}
+
+/* ── Page Header ── */
+.page-title{font-size:1.5rem;font-weight:800;color:#fff;letter-spacing:-0.5px;margin-bottom:4px}
+.page-subtitle{font-size:0.85rem;color:var(--dim);margin-bottom:28px}
+
+/* ── Job Cards ── */
+.jobs-grid{display:flex;flex-direction:column;gap:12px;max-width:900px}
+.job-card{background:rgba(255,255,255,0.03);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:24px 28px;transition:all 0.2s;cursor:pointer;position:relative;overflow:hidden}
+.job-card:hover{border-color:rgba(124,58,237,0.25);background:rgba(255,255,255,0.06);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,0,0,0.2)}
+.job-card.expanded{border-color:rgba(124,58,237,0.3)}
+.job-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.job-card h3{font-size:1rem;font-weight:700;color:#fff;letter-spacing:-0.3px}
+.job-card-meta{display:flex;gap:10px;align-items:center;margin-top:8px;font-size:0.78rem;color:var(--dim)}
+
+/* Status badges */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:100px;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;flex-shrink:0;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.badge::before{content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.badge-completed{background:rgba(34,197,94,0.12);color:#4ade80}.badge-completed::before{background:#22c55e}
+.badge-running{background:rgba(59,130,246,0.12);color:#60a5fa}.badge-running::before{background:#3b82f6;animation:pulse 1.5s infinite}
+.badge-queued{background:rgba(234,179,8,0.12);color:#facc15}.badge-queued::before{background:#eab308}
+.badge-pending{background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.5)}.badge-pending::before{background:rgba(255,255,255,0.3)}
+.badge-failed{background:rgba(239,68,68,0.12);color:#f87171}.badge-failed::before{background:#ef4444}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+.type-badge{padding:3px 10px;border-radius:20px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
+.type-codebase_review{background:rgba(59,130,246,0.12);color:#60a5fa}
+.type-document_analysis{background:rgba(192,132,252,0.12);color:#c084fc}
+.type-research_pipeline{background:rgba(74,222,128,0.12);color:#4ade80}
+.type-website_builder{background:rgba(251,146,60,0.12);color:#fb923c}
+.type-data_processing{background:rgba(244,114,182,0.12);color:#f472b6}
+.type-ml_experiment{background:rgba(124,58,237,0.12);color:#a78bfa}
+.type-image_processing{background:rgba(34,211,238,0.12);color:#22d3ee}
+.type-web_scraping{background:rgba(163,230,53,0.12);color:#a3e635}
+.type-audio_transcription{background:rgba(250,204,21,0.12);color:#facc15}
+.type-sentiment_classification{background:rgba(232,121,249,0.12);color:#e879f9}
+
+/* ── Progress Bar ── */
+.progress-bar{width:100%;height:4px;background:rgba(255,255,255,0.06);border-radius:4px;margin-top:14px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,#7c3aed,#3b82f6);border-radius:4px;transition:width 0.5s ease}
+.progress-fill.done{background:linear-gradient(90deg,#22c55e,#4ade80)}
+
+/* ── Task List inside card ── */
+.job-tasks{margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.06);display:none}
+.job-tasks.visible{display:block}
+.task-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;font-size:0.82rem}
+.task-row .task-name{color:rgba(255,255,255,0.7)}
+.task-row .task-status{font-size:0.68rem;font-weight:600;text-transform:uppercase;padding:3px 10px;border-radius:100px;letter-spacing:0.3px}
+.ts-queued{background:rgba(234,179,8,0.1);color:#facc15}
+.ts-running{background:rgba(59,130,246,0.1);color:#60a5fa}
+.ts-submitted{background:rgba(34,197,94,0.1);color:#4ade80}
+.ts-failed{background:rgba(239,68,68,0.1);color:#f87171}
+
+/* ── Output panel ── */
+.job-output{margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:none}
+.job-output.visible{display:block}
+.output-label{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim);margin-bottom:10px}
+.output-block{background:rgba(0,0,0,0.2);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:24px;max-height:400px;overflow-y:auto;font-size:0.85rem;line-height:1.7;color:rgba(255,255,255,0.65)}
+.output-block h1,.output-block h2,.output-block h3,.output-block h4{color:#fff;margin:16px 0 6px}
+.output-block h1{font-size:1.2rem}.output-block h2{font-size:1.05rem}.output-block h3{font-size:0.95rem}
+.output-block p{margin:8px 0}
+.output-block ul,.output-block ol{padding-left:24px;margin:8px 0}
+.output-block li{margin:4px 0}
+.output-block strong{color:rgba(255,255,255,0.85)}
+.output-block code{background:rgba(124,58,237,0.1);padding:2px 6px;border-radius:5px;font-family:'SF Mono','Fira Code',monospace;font-size:0.82em;color:#c4b5fd}
+.output-block pre{background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;padding:16px;margin:10px 0;overflow-x:auto}
+.output-block pre code{background:none;padding:0;color:rgba(255,255,255,0.6)}
+.output-block table{width:100%;border-collapse:collapse;margin:10px 0;font-size:0.8rem}
+.output-block th{text-align:left;padding:8px 10px;background:rgba(255,255,255,0.06);border-bottom:2px solid rgba(124,58,237,0.3);color:rgba(255,255,255,0.6);font-size:0.7rem;text-transform:uppercase;letter-spacing:0.3px;font-weight:600}
+.output-block td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);color:rgba(255,255,255,0.55)}
+
+/* ── Empty state ── */
+.empty-state{text-align:center;padding:80px 40px;color:var(--dim)}
+.empty-state svg{width:48px;height:48px;color:var(--dark);margin-bottom:16px}
+.empty-state h3{font-size:1.1rem;color:var(--muted);margin-bottom:8px}
+.empty-state p{font-size:0.88rem;margin-bottom:24px}
+.empty-state a{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;background:linear-gradient(135deg,var(--accent),var(--accent3));color:#fff;border-radius:10px;text-decoration:none;font-size:0.88rem;font-weight:600;transition:all 0.2s}
+.empty-state a:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(124,58,237,0.3)}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:3px}
+
+@media(max-width:768px){
+  .sidebar{display:none}
+  .main-content{margin-left:0;padding:24px 20px}
+}
+</style>
+</head>
+<body>
+<div class="app-layout">
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <a href="/" class="sidebar-logo">DCN</a>
+  <div class="sidebar-role" id="sidebarRole">Customer</div>
+  <nav class="sidebar-nav" id="sidebarNav">
+    <a href="/submit">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      Submit Job
+    </a>
+    <a href="/my-jobs" class="active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+      My Jobs
+    </a>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="sidebar-user" id="sidebarUser" style="display:none">
+      <div class="sidebar-user-avatar" id="userAvatar">?</div>
+      <div>
+        <div class="sidebar-user-name" id="userName">--</div>
+        <div class="sidebar-user-role" id="userRoleLabel">--</div>
+      </div>
+    </div>
+    <a href="/auth/logout" class="sidebar-signout" id="signoutLink" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign Out
+    </a>
+    <a href="/login" class="sidebar-signout" id="signinLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10,17 15,12 10,7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+      Sign In
+    </a>
+  </div>
+</aside>
+
+<script>
+fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
+  const nav=document.getElementById('sidebarNav');
+  const role=document.getElementById('sidebarRole');
+  if(u){
+    document.getElementById('sidebarUser').style.display='flex';
+    document.getElementById('signoutLink').style.display='flex';
+    document.getElementById('signinLink').style.display='none';
+    document.getElementById('userName').textContent=u.name||u.username;
+    document.getElementById('userRoleLabel').textContent=u.role;
+    document.getElementById('userAvatar').textContent=(u.name||u.username).charAt(0).toUpperCase();
+    if(u.role==='admin'){
+      role.textContent='Admin Panel';
+      nav.innerHTML=`
+        <a href="/submit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Submit Job</a>
+        <a href="/ops"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</a>
+        <a href="/results"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>Results</a>
+        <a href="/worker-logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Worker Logs</a>
+        <a href="/my-jobs" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>My Jobs</a>
+      `;
+    } else {
+      role.textContent='Customer';
+    }
+  }
+}).catch(()=>{});
+</script>
+
+<!-- Main -->
+<div class="main-content">
+  <h1 class="page-title">My Jobs</h1>
+  <p class="page-subtitle">Track the status and results of your submitted jobs.</p>
+
+  <div class="jobs-grid" id="jobsGrid">
+    <div class="empty-state" id="loadingState">
+      <p style="color:var(--dim)">Loading jobs...</p>
+    </div>
+  </div>
+</div>
+
+</div><!-- /app-layout -->
+
+<script>
+const API = window.location.origin;
+let expandedJobId = null;
+
+async function loadJobs() {
+  try {
+    const resp = await fetch(`${API}/jobs`);
+    const jobs = await resp.json();
+    jobs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    renderJobs(jobs);
+  } catch(e) {
+    document.getElementById('jobsGrid').innerHTML = `
+      <div class="empty-state">
+        <h3>Could not load jobs</h3>
+        <p>Please try again later.</p>
+      </div>`;
+  }
+}
+
+function renderJobs(jobs) {
+  const grid = document.getElementById('jobsGrid');
+  if (!jobs.length) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>
+        <h3>No jobs yet</h3>
+        <p>Submit your first job to get started.</p>
+        <a href="/submit">Submit a Job</a>
+      </div>`;
+    return;
+  }
+
+  grid.innerHTML = jobs.map(j => {
+    const typeLabel = j.task_type.replace(/_/g, ' ');
+    const date = new Date(j.created_at).toLocaleString('en-US', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    const isExpanded = expandedJobId === j.id;
+    return `
+      <div class="job-card ${isExpanded ? 'expanded' : ''}" onclick="toggleJob('${j.id}')">
+        <div class="job-card-top">
+          <div>
+            <h3>${escapeHtml(j.title)}</h3>
+            <div class="job-card-meta">
+              <span class="type-badge type-${j.task_type}">${typeLabel}</span>
+              <span>${date}</span>
+              <span style="color:var(--dark)">${j.id.substring(0,8)}</span>
+            </div>
+          </div>
+          <span class="badge badge-${j.status}">${j.status}</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="pbar-${j.id}" style="width:0%"></div></div>
+        <div class="job-tasks" id="tasks-${j.id}"></div>
+        <div class="job-output" id="output-${j.id}"></div>
+      </div>`;
+  }).join('');
+
+  // Load tasks for each job to set progress bars
+  jobs.forEach(j => loadTasksForCard(j));
+
+  // If a job was expanded, re-expand it
+  if (expandedJobId) {
+    const job = jobs.find(j => j.id === expandedJobId);
+    if (job) showJobDetails(job);
+  }
+}
+
+async function loadTasksForCard(job) {
+  try {
+    const resp = await fetch(`${API}/jobs/${job.id}/tasks`);
+    const tasks = await resp.json();
+    const done = tasks.filter(t => t.status === 'submitted').length;
+    const pct = tasks.length > 0 ? (done / tasks.length) * 100 : 0;
+    const bar = document.getElementById(`pbar-${job.id}`);
+    if (bar) {
+      bar.style.width = pct + '%';
+      if (job.status === 'completed') bar.classList.add('done');
+    }
+    // Store tasks on the job object for later
+    job._tasks = tasks;
+  } catch(e) {}
+}
+
+async function toggleJob(jobId) {
+  if (expandedJobId === jobId) {
+    expandedJobId = null;
+    const tasks = document.getElementById(`tasks-${jobId}`);
+    const output = document.getElementById(`output-${jobId}`);
+    if (tasks) tasks.classList.remove('visible');
+    if (output) output.classList.remove('visible');
+    document.querySelector(`[onclick="toggleJob('${jobId}')"]`)?.classList.remove('expanded');
+    return;
+  }
+  expandedJobId = jobId;
+
+  // Collapse all others
+  document.querySelectorAll('.job-tasks.visible').forEach(el => el.classList.remove('visible'));
+  document.querySelectorAll('.job-output.visible').forEach(el => el.classList.remove('visible'));
+  document.querySelectorAll('.job-card.expanded').forEach(el => el.classList.remove('expanded'));
+
+  // Fetch fresh data
+  try {
+    const [jobResp, tasksResp] = await Promise.all([
+      fetch(`${API}/jobs/${jobId}`),
+      fetch(`${API}/jobs/${jobId}/tasks`)
+    ]);
+    const job = await jobResp.json();
+    const tasks = await tasksResp.json();
+    job._tasks = tasks;
+    showJobDetails(job);
+  } catch(e) {}
+}
+
+function showJobDetails(job) {
+  const tasks = job._tasks || [];
+  const tasksEl = document.getElementById(`tasks-${job.id}`);
+  const outputEl = document.getElementById(`output-${job.id}`);
+  const card = document.querySelector(`[onclick="toggleJob('${job.id}')"]`);
+
+  if (card) card.classList.add('expanded');
+
+  // Show tasks
+  if (tasksEl) {
+    tasksEl.innerHTML = tasks.map(t => `
+      <div class="task-row">
+        <span class="task-name">${escapeHtml(t.task_name)}</span>
+        <span class="task-status ts-${t.status}">${t.status}</span>
+      </div>
+    `).join('');
+    tasksEl.classList.add('visible');
+  }
+
+  // Show output if completed
+  if (outputEl && job.final_output) {
+    const cleaned = job.final_output.replace(/^=== \S+ ===\s*\n?/gm, '');
+    const preview = cleaned.length > 4000 ? cleaned.substring(0, 4000) + '\n\n*... (truncated — view full output in Results)*' : cleaned;
+    outputEl.innerHTML = `
+      <div class="output-label">Final Output</div>
+      <div class="output-block">${marked.parse(preview)}</div>
+    `;
+    outputEl.classList.add('visible');
+  } else if (outputEl && job.status === 'failed') {
+    outputEl.innerHTML = `
+      <div class="output-label">Result</div>
+      <div class="output-block" style="text-align:center;padding:24px;color:#f87171;">
+        Job failed during processing.
+      </div>
+    `;
+    outputEl.classList.add('visible');
+  }
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+// Load and auto-refresh
+loadJobs();
+setInterval(loadJobs, 5000);
+</script>
+</body>
+</html>

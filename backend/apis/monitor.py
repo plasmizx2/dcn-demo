@@ -94,3 +94,32 @@ async def monitor_workers():
             """
         )
     return [dict(r) for r in rows]
+
+
+@router.get("/worker-history/{worker_id}")
+async def worker_history(worker_id: str):
+    """Return task history for a specific worker node."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT
+                tr.id,
+                tr.task_id,
+                tr.result_text,
+                tr.execution_time_seconds,
+                tr.status,
+                tr.submitted_at as created_at,
+                jt.task_name,
+                jt.job_id,
+                j.title as job_title
+            FROM task_results tr
+            JOIN job_tasks jt ON jt.id = tr.task_id
+            JOIN jobs j ON j.id = jt.job_id
+            WHERE tr.worker_node_id = $1::uuid
+            ORDER BY tr.submitted_at DESC
+            LIMIT 100
+            """,
+            worker_id,
+        )
+    return [dict(r) for r in rows]

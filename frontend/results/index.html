@@ -22,7 +22,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .topnav{display:none}
 
 /* ── Admin Nav Sidebar ── */
-.admin-nav-sidebar{width:240px;min-width:240px;background:rgba(16,18,26,0.85);border-right:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;padding:24px 0;position:fixed;top:0;left:0;bottom:0;z-index:10}
+.admin-nav-sidebar{width:240px;min-width:240px;background:rgba(16,18,26,0.55);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-right:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;padding:24px 0;position:fixed;top:0;left:0;bottom:0;z-index:10}
 .admin-nav-sidebar .sidebar-logo{font-weight:800;font-size:20px;background:linear-gradient(135deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-decoration:none;padding:0 24px;margin-bottom:8px;display:block}
 .admin-nav-sidebar .sidebar-role{font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#7c3aed;padding:0 24px;margin-bottom:24px}
 .admin-nav-sidebar .nav-links{display:flex;flex-direction:column;gap:2px;flex:1;padding:0 12px}
@@ -45,7 +45,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .layout{display:flex;height:100vh}
 
 /* SIDEBAR */
-.sidebar{width:340px;min-width:340px;border-right:1px solid var(--border);display:flex;flex-direction:column;background:rgba(16,18,26,0.7)}
+.sidebar{width:340px;min-width:340px;border-right:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;background:rgba(16,18,26,0.45);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
 .sidebar-header{padding:20px 20px 12px}
 .sidebar-header h2{font-size:0.82rem;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:0.5px}
 .sidebar-header .count{font-size:0.72rem;color:var(--dim);margin-top:4px;font-weight:400}
@@ -67,9 +67,9 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .job-list::-webkit-scrollbar-track{background:transparent}
 .job-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.10);border-radius:3px}
 
-.job-item{padding:14px 16px;border-radius:10px;cursor:pointer;margin-bottom:2px;transition:all 0.15s;border:1px solid transparent}
-.job-item:hover{background:rgba(255,255,255,0.08)}
-.job-item.selected{background:rgba(124,58,237,0.06);border-color:rgba(124,58,237,0.2)}
+.job-item{padding:14px 16px;border-radius:10px;cursor:pointer;margin-bottom:2px;transition:all 0.15s;border:1px solid transparent;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.job-item:hover{background:rgba(255,255,255,0.05)}
+.job-item.selected{background:rgba(124,58,237,0.04);border-color:rgba(124,58,237,0.15)}
 .job-item .job-title{font-size:0.82rem;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .job-item .job-meta{display:flex;gap:8px;align-items:center;margin-top:6px;font-size:0.68rem;color:var(--dim)}
 
@@ -191,6 +191,14 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     <a href="/results" class="active">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
       Results
+    </a>
+    <a href="/worker-logs">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      Worker Logs
+    </a>
+    <a href="/my-jobs">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+      My Jobs
     </a>
   </div>
   <div class="sidebar-bottom">

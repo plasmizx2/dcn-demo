@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DCN — Page Not Found</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0c0e14;--accent:#7c3aed;--accent3:#3b82f6;--dim:#8a8a96;--border:rgba(255,255,255,0.10)}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:#f0f0f2;min-height:100vh;display:flex;align-items:center;justify-content:center;-webkit-font-smoothing:antialiased;overflow:hidden}
+
+/* Animated background */
+.bg-glow{position:fixed;border-radius:50%;filter:blur(100px);pointer-events:none;z-index:0}
+.bg-glow-1{top:20%;left:35%;width:500px;height:500px;background:rgba(124,58,237,0.10);animation:float1 10s ease-in-out infinite}
+.bg-glow-2{top:40%;right:25%;width:400px;height:400px;background:rgba(59,130,246,0.08);animation:float2 12s ease-in-out infinite}
+@keyframes float1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-30px,20px) scale(1.1)}}
+@keyframes float2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(20px,-30px) scale(1.05)}}
+
+.container{text-align:center;position:relative;z-index:1;max-width:500px;padding:48px;background:rgba(255,255,255,0.02);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.06);border-radius:24px}
+
+.error-code{font-size:clamp(100px,20vw,180px);font-weight:900;letter-spacing:-8px;line-height:1;background:linear-gradient(135deg,#a78bfa,#818cf8,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:16px;opacity:0.85}
+
+h1{font-size:1.5rem;font-weight:700;color:#fff;margin-bottom:12px;letter-spacing:-0.5px}
+p{font-size:0.95rem;color:var(--dim);line-height:1.6;margin-bottom:32px}
+
+.actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:10px;font-size:0.88rem;font-weight:600;text-decoration:none;transition:all 0.2s;font-family:inherit;border:none;cursor:pointer}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent3));color:#fff;box-shadow:0 0 30px rgba(99,102,241,0.2)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 50px rgba(99,102,241,0.35)}
+.btn-ghost{background:rgba(255,255,255,0.03);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:var(--dim);border:1px solid var(--border)}
+.btn-ghost:hover{color:#fff;border-color:rgba(255,255,255,0.2);background:rgba(255,255,255,0.06)}
+
+.logo{position:fixed;top:24px;left:32px;font-weight:800;font-size:18px;background:linear-gradient(135deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-decoration:none}
+</style>
+</head>
+<body>
+
+<div class="bg-glow bg-glow-1"></div>
+<div class="bg-glow bg-glow-2"></div>
+
+<a href="/" class="logo">DCN</a>
+
+<div class="container">
+  <div class="error-code">404</div>
+  <h1>Page not found</h1>
+  <p>The page you're looking for doesn't exist or has been moved. Check the URL or head back to familiar territory.</p>
+  <div class="actions">
+    <a href="/" class="btn btn-primary">Go Home</a>
+    <a href="/submit" class="btn btn-ghost">Submit a Job</a>
+  </div>
+</div>
+
+</body>
+</html>
