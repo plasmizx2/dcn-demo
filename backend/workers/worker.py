@@ -20,6 +20,55 @@ from handlers import document, codebase, website, research, data_processing, ml_
 
 BASE_URL = "http://localhost:8000"
 
+
+def detect_worker_tier():
+    """
+    Determine this machine's capability tier based on actual hardware.
+
+    Tier 1: minimal (< 4 cores OR < 4 GB RAM)
+    Tier 2: standard (4+ cores, 4+ GB RAM)
+    Tier 3: capable (6+ cores, 8+ GB RAM)
+    Tier 4: heavy   (8+ cores, 16+ GB RAM)
+    """
+    import os
+
+    cores = os.cpu_count() or 1
+
+    ram_gb = None
+    try:
+        import psutil
+        ram_gb = psutil.virtual_memory().total / (1024 ** 3)
+    except ImportError:
+        # No psutil — try reading /proc/meminfo (Linux)
+        try:
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if line.startswith("MemTotal:"):
+                        kb = int(line.split()[1])
+                        ram_gb = kb / (1024 ** 2)
+                        break
+        except (FileNotFoundError, ValueError):
+            ram_gb = 4  # safe fallback
+
+    if ram_gb is None:
+        ram_gb = 4
+
+    # Determine tier
+    if cores >= 8 and ram_gb >= 16:
+        tier = 4
+    elif cores >= 6 and ram_gb >= 8:
+        tier = 3
+    elif cores >= 4 and ram_gb >= 4:
+        tier = 2
+    else:
+        tier = 1
+
+    print(f"[hw detect] cores={cores}, ram={ram_gb:.1f}GB -> tier {tier}")
+    return tier
+
+
+WORKER_TIER = detect_worker_tier()
+
 # Map task_type -> handler
 HANDLERS = {
     "document_analysis": document.handle,
@@ -52,7 +101,7 @@ AI_TASK_TYPES = [
 def claim_task(worker_node_id):
     resp = requests.post(
         f"{BASE_URL}/tasks/claim",
-        json={"worker_node_id": worker_node_id, "task_types": AI_TASK_TYPES, "worker_tier": 4},
+        json={"worker_node_id": worker_node_id, "task_types": AI_TASK_TYPES, "worker_tier": WORKER_TIER},
     )
     if resp.status_code == 200:
         return resp.json()
@@ -119,6 +168,7 @@ def process_task(task, job):
 def run_worker(worker_node_id):
     print(f"=== AI Worker started: {worker_node_id} ===")
     print(f"    Polling {BASE_URL}")
+    print(f"    Tier: {WORKER_TIER} (cores={os.cpu_count()}, ram detected)")
     print()
 
     while True:
