@@ -1,7 +1,30 @@
 #!/usr/bin/env python3
 """
 DCN Worker — Desktop GUI App (Web-based)
-Double-click to run. Opens in your browser.
+Double-click to run. OpeFirst, push your latest changes:
+
+  cd ~/Desktop/sean\ files/dcn-demo
+  git add -A
+  git commit -m "Add demo auth with login page"
+  git push
+
+  Then go to render.com and:
+
+  1. Sign up / log in with your GitHub account (plasmizx2)
+  2. Click New → Web Service
+  3. Connect your dcn-demo repo
+  4. Set these:
+    - Root Directory: backend
+    - Runtime: Python
+    - Build Command: pip install -r requirements.txt
+    - Start Command: uvicorn main:app --host 0.0.0.0 --port $PORT
+  5. Add Environment Variables:
+    - DATABASE_URL — your Supabase postgres connection string
+    - GEMINI_API_KEY — your Google Gemini key
+  6. Pick the Free tier
+  7. Click Create Web Service
+
+  Let me know once it's deployed and I'll update the worker config to point at the Render URL.ns in your browser.
 https://trula-functionless-bernardine.ngrok-free.dev/
 """
 
