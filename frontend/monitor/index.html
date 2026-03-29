@@ -754,7 +754,15 @@
         <a href="/landing" class="header-nav-link">Home</a>
         <a href="/" class="header-nav-link">Submit</a>
         <a href="/results" class="header-nav-link">Results</a>
+        <a href="#" id="authLink" class="header-nav-link" style="opacity:0.6">Login</a>
       </div>
+      <script>
+      fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
+        const a=document.getElementById('authLink');
+        if(u){a.textContent=u.username;a.href='/auth/logout'}
+        else{a.textContent='Login';a.href='/login'}
+      }).catch(()=>{});
+      </script>
       <button class="header-btn-danger" onclick="clearAllJobs()">Clear All Jobs</button>
     </div>
   </header>

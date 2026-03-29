@@ -710,7 +710,15 @@
       <a href="/landing">Home</a>
       <a href="/" class="active">Dashboard</a>
       <a href="/results">Results</a>
+      <a href="#" id="authLink" style="margin-left:12px;opacity:0.6">Login</a>
     </nav>
+    <script>
+    fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
+      const a=document.getElementById('authLink');
+      if(u){a.textContent=u.username;a.href='/auth/logout'}
+      else{a.textContent='Login';a.href='/login'}
+    }).catch(()=>{});
+    </script>
   </header>
 
   <div class="container" id="mainContainer">

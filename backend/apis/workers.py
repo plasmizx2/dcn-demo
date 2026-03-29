@@ -36,7 +36,10 @@ async def claim_task(body: TaskClaim):
         if not worker:
             raise HTTPException(status_code=404, detail="Worker not found")
 
-        # Build claim query — optionally filter by task types the worker supports, enforce min_tier, and prioritize high difficulty tasks
+        # Build claim query — filter by supported task types, enforce min_tier,
+        # and prioritize: tasks matching the worker's own tier first (so T4
+        # workers grab T4 work before falling back to easier tasks), then by
+        # job priority, then FIFO.
         if body.task_types:
             task = await conn.fetchrow(
                 """
@@ -48,7 +51,10 @@ async def claim_task(body: TaskClaim):
                     WHERE jt.status = 'queued'
                       AND j.task_type = ANY($2)
                       AND COALESCE((jt.task_payload->>'min_tier')::int, 1) <= $3
-                    ORDER BY j.priority DESC, COALESCE((jt.task_payload->>'min_tier')::int, 1) DESC, jt.created_at
+                    ORDER BY (COALESCE((jt.task_payload->>'min_tier')::int, 1) = $3) DESC,
+                             j.priority DESC,
+                             COALESCE((jt.task_payload->>'min_tier')::int, 1) DESC,
+                             jt.created_at
                     LIMIT 1
                     FOR UPDATE OF jt SKIP LOCKED
                 )
@@ -68,7 +74,10 @@ async def claim_task(body: TaskClaim):
                     JOIN jobs j ON j.id = jt.job_id
                     WHERE jt.status = 'queued'
                       AND COALESCE((jt.task_payload->>'min_tier')::int, 1) <= $2
-                    ORDER BY j.priority DESC, COALESCE((jt.task_payload->>'min_tier')::int, 1) DESC, jt.created_at
+                    ORDER BY (COALESCE((jt.task_payload->>'min_tier')::int, 1) = $2) DESC,
+                             j.priority DESC,
+                             COALESCE((jt.task_payload->>'min_tier')::int, 1) DESC,
+                             jt.created_at
                     LIMIT 1
                     FOR UPDATE OF jt SKIP LOCKED
                 )

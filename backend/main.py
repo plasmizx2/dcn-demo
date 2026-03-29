@@ -1,19 +1,24 @@
 import os
 import asyncio
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from contextlib import asynccontextmanager
 from database import get_pool, close_pool
 from apis.jobs import router as jobs_router
 from apis.monitor import router as monitor_router
 from apis.workers import router as workers_router
+from auth import (
+    verify_user, create_session, get_session, destroy_session,
+    SESSION_COOKIE, ADMIN_PAGES, ADMIN_API_PREFIXES, PUBLIC_PREFIXES,
+)
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "public_page")
 MONITOR_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "monitor")
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "results")
 LANDING_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "landing")
+LOGIN_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "login")
 
 
 async def _maintenance_loop():
@@ -87,6 +92,78 @@ app.include_router(monitor_router)
 app.include_router(workers_router)
 
 
+# ── Auth middleware ──────────────────────────────────────────────
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    path = request.url.path
+
+    # Let public routes, worker endpoints, and static assets through
+    if any(path.startswith(p) for p in PUBLIC_PREFIXES):
+        return await call_next(request)
+
+    # Admin-only pages → redirect to login if not admin
+    if path in ADMIN_PAGES:
+        user = get_session(request)
+        if not user:
+            return RedirectResponse("/login", status_code=302)
+        if user["role"] != "admin":
+            return RedirectResponse("/login", status_code=302)
+
+    # Admin-only API routes → 401 JSON if not admin
+    if any(path.startswith(p) for p in ADMIN_API_PREFIXES):
+        user = get_session(request)
+        if not user or user["role"] != "admin":
+            return JSONResponse({"detail": "Admin access required"}, status_code=401)
+
+    return await call_next(request)
+
+
+# ── Auth routes ─────────────────────────────────────────────────
+@app.get("/login")
+async def serve_login(request: Request):
+    # Already logged in? Redirect to appropriate page
+    user = get_session(request)
+    if user:
+        return RedirectResponse("/ops" if user["role"] == "admin" else "/")
+    return FileResponse(os.path.join(LOGIN_DIR, "index.html"))
+
+
+@app.post("/auth/login")
+async def do_login(request: Request):
+    body = await request.json()
+    username = body.get("username", "")
+    password = body.get("password", "")
+
+    user = verify_user(username, password)
+    if not user:
+        return JSONResponse({"detail": "Invalid username or password"}, status_code=401)
+
+    token = create_session(user)
+    redirect = "/ops" if user["role"] == "admin" else "/"
+    response = JSONResponse({"ok": True, "role": user["role"], "redirect": redirect})
+    response.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="lax", max_age=86400)
+    return response
+
+
+@app.get("/auth/me")
+async def auth_me(request: Request):
+    user = get_session(request)
+    if not user:
+        return JSONResponse({"detail": "Not logged in"}, status_code=401)
+    return {"username": user["username"], "role": user["role"]}
+
+
+@app.post("/auth/logout")
+async def do_logout(request: Request):
+    token = request.cookies.get(SESSION_COOKIE)
+    if token:
+        destroy_session(token)
+    response = RedirectResponse("/login", status_code=302)
+    response.delete_cookie(SESSION_COOKIE)
+    return response
+
+
+# ── Page routes ─────────────────────────────────────────────────
 @app.get("/")
 async def serve_frontend():
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))

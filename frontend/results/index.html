@@ -165,7 +165,15 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
     <a href="/landing">Home</a>
     <a href="/">Submit</a>
     <a href="/ops">Dashboard</a>
+    <a href="#" id="authLink" style="opacity:0.6">Login</a>
   </div>
+  <script>
+  fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
+    const a=document.getElementById('authLink');
+    if(u){a.textContent=u.username;a.href='/auth/logout'}
+    else{a.textContent='Login';a.href='/login'}
+  }).catch(()=>{});
+  </script>
 </div>
 
 <div class="layout">
