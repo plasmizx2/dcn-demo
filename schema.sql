@@ -85,3 +85,10 @@ CREATE INDEX IF NOT EXISTS idx_task_results_task_id ON task_results(task_id);
 CREATE INDEX IF NOT EXISTS idx_worker_nodes_status ON worker_nodes(status);
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 CREATE INDEX IF NOT EXISTS idx_jobs_priority ON jobs(priority DESC);
+
+-- ─── Caching ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS llm_cache (
+    prompt_hash         TEXT PRIMARY KEY,
+    response_text       TEXT NOT NULL,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

@@ -29,6 +29,9 @@ from config import RETRY_BACKOFF_SECONDS, RATE_LIMIT_BACKOFF_MULTIPLIER, WORKER_
 
 BASE_URL = "https://dcn-demo.onrender.com"
 
+# Tell Gemini client where to find the cache server
+os.environ["DCN_CACHE_URL"] = BASE_URL
+
 
 def detect_worker_tier():
     """

@@ -1,7 +1,7 @@
 import json
 from fastapi import APIRouter, HTTPException
 from database import get_pool
-from schemas import TaskClaim, TaskComplete, WorkerHeartbeat, WorkerRegister
+from schemas import TaskClaim, TaskComplete, WorkerHeartbeat, WorkerRegister, CacheLookup, CacheStore
 from aggregator import aggregate_job
 
 router = APIRouter()
@@ -336,3 +336,34 @@ async def worker_heartbeat(body: WorkerHeartbeat) -> dict:
             raise HTTPException(status_code=404, detail="Worker not found")
 
     return dict(result)
+
+
+@router.post("/tasks/cache/lookup")
+async def cache_lookup(body: CacheLookup) -> dict:
+    """Check if an LLM prompt response is already cached."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT response_text FROM llm_cache WHERE prompt_hash = $1",
+            body.prompt_hash,
+        )
+        if row:
+            return {"hit": True, "response_text": row["response_text"]}
+        return {"hit": False}
+
+
+@router.post("/tasks/cache/store")
+async def cache_store(body: CacheStore) -> dict:
+    """Store an LLM prompt response in the cache."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO llm_cache (prompt_hash, response_text)
+            VALUES ($1, $2)
+            ON CONFLICT (prompt_hash) DO NOTHING
+            """,
+            body.prompt_hash,
+            body.response_text,
+        )
+    return {"status": "stored"}

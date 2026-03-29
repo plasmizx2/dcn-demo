@@ -32,3 +32,12 @@ class TaskComplete(BaseModel):
 
 class WorkerHeartbeat(BaseModel):
     worker_node_id: str
+
+
+class CacheLookup(BaseModel):
+    prompt_hash: str
+
+
+class CacheStore(BaseModel):
+    prompt_hash: str
+    response_text: str

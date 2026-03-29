@@ -79,8 +79,18 @@ async def _maintenance_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start up: connect to DB + start maintenance. Shut down: clean up."""
-    await get_pool()
+    """Start up: connect to DB, create static cache table, + start maintenance. Shut down: clean up."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS llm_cache (
+                prompt_hash         TEXT PRIMARY KEY,
+                response_text       TEXT NOT NULL,
+                created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
     maintenance_task = asyncio.create_task(_maintenance_loop())
     yield
     maintenance_task.cancel()

@@ -991,7 +991,7 @@
         <div class="panel-body" style="max-height:220px;">
           <table>
             <thead>
-              <tr><th>Node</th><th>Status</th><th>Current Task</th><th>Heartbeat</th></tr>
+              <tr><th>Node</th><th>Status</th><th>Current Task</th><th>Heartbeat</th><th>Action</th></tr>
             </thead>
             <tbody id="workers-table"></tbody>
           </table>
@@ -1157,8 +1157,26 @@
           <td>${badge(w.status)}</td>
           <td>${taskDisplay}</td>
           <td style="color:rgba(255,255,255,0.25);font-size:0.73rem;">${timeAgo(w.last_heartbeat)}</td>
+          <td>
+            <button onclick="revokeWorker('${w.id}')" style="background:rgba(239,68,68,0.2);color:#ef4444;border:1px solid rgba(239,68,68,0.4);border-radius:4px;padding:2px 6px;font-size:0.65rem;cursor:pointer;font-weight:bold;">Revoke</button>
+          </td>
         </tr>`;
     }).join('');
+  }
+
+  // --- Revoke Worker ---
+  async function revokeWorker(id) {
+    if (!confirm('Revoke this worker? Active tasks will be requeued.')) return;
+    try {
+      const resp = await fetch(`/monitor/workers/${id}`, { method: 'DELETE' });
+      if (resp.status === 403) {
+        alert('Admin access required to revoke workers');
+        return;
+      }
+      if (resp.ok) pollAll(); // instant refresh
+    } catch (e) {
+      console.error("Failed to revoke worker", e);
+    }
   }
 
   // --- Render Queue ---

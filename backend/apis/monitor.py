@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from database import get_pool
 from config import HEARTBEAT_OFFLINE_SECONDS
 
@@ -95,6 +95,36 @@ async def monitor_workers() -> list[dict]:
             """.format(HEARTBEAT_OFFLINE_SECONDS)
         )
     return [dict(r) for r in rows]
+
+
+@router.delete("/workers/{worker_id}")
+async def delete_worker(worker_id: str, request: Request) -> dict:
+    """Admin-only: Remove a worker node entirely."""
+    from auth import get_session
+    from fastapi import HTTPException
+    
+    user = get_session(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+        
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            "DELETE FROM worker_nodes WHERE id = $1", worker_id
+        )
+        if result == "DELETE 0":
+            raise HTTPException(status_code=404, detail="Worker not found")
+            
+        # Optional: any running tasks assigned to this worker get requeued immediately
+        await conn.execute(
+            """
+            UPDATE job_tasks 
+            SET status = 'queued', worker_node_id = NULL, started_at = NULL 
+            WHERE worker_node_id = $1 AND status = 'running'
+            """, 
+            worker_id
+        )
+    return {"status": "deleted"}
 
 
 @router.get("/worker-history/{worker_id}")
