@@ -190,6 +190,43 @@ async def do_login(request: Request):
     return response
 
 
+@app.post("/auth/register")
+async def do_register(request: Request):
+    body = await request.json()
+    username = body.get("username", "")
+    password = body.get("password", "")
+
+    if not username or not password:
+        return JSONResponse({"detail": "Username and password required"}, status_code=400)
+    if len(password) < 6:
+        return JSONResponse({"detail": "Password must be at least 6 characters"}, status_code=400)
+
+    pool = await get_pool()
+    import hashlib
+    pwd_hash = hashlib.sha256(password.encode()).hexdigest()
+
+    async with pool.acquire() as conn:
+        try:
+            # Safely attempt to create user
+            new_id = await conn.fetchval(
+                "INSERT INTO dcn_users (username, password_hash, role) VALUES ($1, $2, 'customer') RETURNING id",
+                username, pwd_hash
+            )
+        except Exception as e:
+            # asyncpg UniqueViolationError or similar
+            logger.warning(f"Registration failed for {username}: {e}")
+            return JSONResponse({"detail": "Username is already taken"}, status_code=400)
+
+    # Immediately log them in
+    user = await verify_user(username, password)
+    token = await create_session(user)
+    
+    redirect = "/submit"
+    response = JSONResponse({"ok": True, "role": user["role"], "name": user["username"], "redirect": redirect})
+    response.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="lax", max_age=SESSION_MAX_AGE_SECONDS)
+    return response
+
+
 @app.get("/auth/me")
 async def auth_me(request: Request):
     user = await get_session(request)
