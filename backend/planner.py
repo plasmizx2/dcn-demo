@@ -147,42 +147,42 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
             {
                 "task_name": "experiment_linear_baseline",
                 "task_description": f"5-fold CV LinearRegression on {dataset_name} (75K rows, all features)",
-                "task_payload": {**base, "experiment_type": "linear_regression", "features": all_features, "cv_folds": 5, "params": {}},
+                "task_payload": {**base, "experiment_type": "linear_regression", "features": all_features, "cv_folds": 5, "params": {}, "min_tier": 2},
             },
             {
                 "task_name": "experiment_ridge_regression",
                 "task_description": f"5-fold CV Ridge (alpha=1.0) on {dataset_name}",
-                "task_payload": {**base, "experiment_type": "ridge_regression", "features": all_features, "cv_folds": 5, "params": {"alpha": 1.0}},
+                "task_payload": {**base, "experiment_type": "ridge_regression", "features": all_features, "cv_folds": 5, "params": {"alpha": 1.0}, "min_tier": 2},
             },
             {
                 "task_name": "experiment_decision_tree_deep",
                 "task_description": f"5-fold CV DecisionTree (max_depth=15) on {dataset_name}",
-                "task_payload": {**base, "experiment_type": "decision_tree_regressor", "features": all_features, "cv_folds": 5, "params": {"max_depth": 15}},
+                "task_payload": {**base, "experiment_type": "decision_tree_regressor", "features": all_features, "cv_folds": 5, "params": {"max_depth": 15}, "min_tier": 2},
             },
             {
                 "task_name": "experiment_random_forest_medium",
                 "task_description": f"5-fold CV RandomForest (200 trees, depth=10) on {dataset_name}",
-                "task_payload": {**base, "experiment_type": "random_forest_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 10}},
+                "task_payload": {**base, "experiment_type": "random_forest_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 10}, "min_tier": 3},
             },
             {
                 "task_name": "experiment_random_forest_heavy",
                 "task_description": f"5-fold CV RandomForest (500 trees, depth=20) on {dataset_name}",
-                "task_payload": {**base, "experiment_type": "random_forest_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 20}},
+                "task_payload": {**base, "experiment_type": "random_forest_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 20}, "min_tier": 4},
             },
             {
                 "task_name": "experiment_gradient_boosting",
                 "task_description": f"5-fold CV GradientBoosting (200 trees, depth=5, lr=0.1) on {dataset_name}",
-                "task_payload": {**base, "experiment_type": "gradient_boosting_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 5, "learning_rate": 0.1}},
+                "task_payload": {**base, "experiment_type": "gradient_boosting_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 5, "learning_rate": 0.1}, "min_tier": 3},
             },
             {
                 "task_name": "experiment_feature_reduced",
                 "task_description": f"5-fold CV RandomForest with reduced features ({', '.join(reduced_features)})",
-                "task_payload": {**base, "experiment_type": "random_forest_regressor", "features": reduced_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 10}},
+                "task_payload": {**base, "experiment_type": "random_forest_regressor", "features": reduced_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 10}, "min_tier": 2},
             },
             {
                 "task_name": "experiment_gb_tuned",
                 "task_description": f"5-fold CV GradientBoosting tuned (500 trees, depth=8, lr=0.05)",
-                "task_payload": {**base, "experiment_type": "gradient_boosting_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 8, "learning_rate": 0.05}},
+                "task_payload": {**base, "experiment_type": "gradient_boosting_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 8, "learning_rate": 0.05}, "min_tier": 4},
             },
         ]
     else:
@@ -191,42 +191,42 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
             {
                 "task_name": "experiment_logistic_baseline",
                 "task_description": f"5-fold CV LogisticRegression on {dataset_name} (75K rows, all features)",
-                "task_payload": {**base, "experiment_type": "logistic_regression", "features": all_features, "cv_folds": 5, "params": {"max_iter": 2000}},
+                "task_payload": {**base, "experiment_type": "logistic_regression", "features": all_features, "cv_folds": 5, "params": {"max_iter": 2000}, "min_tier": 2},
             },
             {
                 "task_name": "experiment_logistic_l1",
                 "task_description": f"5-fold CV LogisticRegression L1 (sparse feature selection)",
-                "task_payload": {**base, "experiment_type": "logistic_regression_l1", "features": all_features, "cv_folds": 5, "params": {"max_iter": 2000, "C": 0.5}},
+                "task_payload": {**base, "experiment_type": "logistic_regression_l1", "features": all_features, "cv_folds": 5, "params": {"max_iter": 2000, "C": 0.5}, "min_tier": 2},
             },
             {
                 "task_name": "experiment_decision_tree_deep",
                 "task_description": f"5-fold CV DecisionTree (max_depth=15) on {dataset_name}",
-                "task_payload": {**base, "experiment_type": "decision_tree_classifier", "features": all_features, "cv_folds": 5, "params": {"max_depth": 15}},
+                "task_payload": {**base, "experiment_type": "decision_tree_classifier", "features": all_features, "cv_folds": 5, "params": {"max_depth": 15}, "min_tier": 2},
             },
             {
                 "task_name": "experiment_random_forest_medium",
                 "task_description": f"5-fold CV RandomForest (200 trees, depth=10) on {dataset_name}",
-                "task_payload": {**base, "experiment_type": "random_forest_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 10}},
+                "task_payload": {**base, "experiment_type": "random_forest_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 10}, "min_tier": 3},
             },
             {
                 "task_name": "experiment_random_forest_heavy",
                 "task_description": f"5-fold CV RandomForest (500 trees, depth=20) on {dataset_name}",
-                "task_payload": {**base, "experiment_type": "random_forest_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 20}},
+                "task_payload": {**base, "experiment_type": "random_forest_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 20}, "min_tier": 4},
             },
             {
                 "task_name": "experiment_gradient_boosting",
                 "task_description": f"5-fold CV GradientBoosting (200 trees, depth=5, lr=0.1) on {dataset_name}",
-                "task_payload": {**base, "experiment_type": "gradient_boosting_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 5, "learning_rate": 0.1}},
+                "task_payload": {**base, "experiment_type": "gradient_boosting_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 5, "learning_rate": 0.1}, "min_tier": 3},
             },
             {
                 "task_name": "experiment_feature_reduced",
                 "task_description": f"5-fold CV RandomForest with reduced features ({', '.join(reduced_features)})",
-                "task_payload": {**base, "experiment_type": "random_forest_classifier", "features": reduced_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 10}},
+                "task_payload": {**base, "experiment_type": "random_forest_classifier", "features": reduced_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 10}, "min_tier": 2},
             },
             {
                 "task_name": "experiment_gb_tuned",
                 "task_description": f"5-fold CV GradientBoosting tuned (500 trees, depth=8, lr=0.05)",
-                "task_payload": {**base, "experiment_type": "gradient_boosting_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 8, "learning_rate": 0.05}},
+                "task_payload": {**base, "experiment_type": "gradient_boosting_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 8, "learning_rate": 0.05}, "min_tier": 4},
             },
         ]
 
