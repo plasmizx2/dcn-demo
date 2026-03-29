@@ -17,8 +17,11 @@ import os
 import json
 import secrets
 import hashlib
+import logging
 from fastapi import Request, HTTPException
 from fastapi.responses import RedirectResponse
+
+logger = logging.getLogger("dcn.auth")
 
 USERS_FILE = os.path.join(os.path.dirname(__file__), "users.json")
 SESSION_COOKIE = "dcn_session"
@@ -30,15 +33,21 @@ _sessions: dict[str, dict] = {}
 
 def load_users() -> dict:
     """Load users from JSON file. Replace with DB lookup later."""
-    with open(USERS_FILE, "r") as f:
-        return json.load(f)
+    try:
+        with open(USERS_FILE, "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logger.error("Failed to load users from %s: %s", USERS_FILE, e)
+        return {}
 
 
 def verify_user(username: str, password: str) -> dict | None:
     """Check credentials. Returns user dict or None. Replace with hashed passwords later."""
     users = load_users()
+    if not users:
+        return None
     user = users.get(username)
-    if user and user["password"] == password:
+    if user and user.get("password") == password:
         return {"username": username, "role": user["role"], "name": user.get("name", username)}
     return None
 

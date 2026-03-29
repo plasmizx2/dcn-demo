@@ -1,8 +1,10 @@
 import json
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from database import get_pool
 from schemas import JobCreate
 from planner import plan_tasks
+from config import VALID_TASK_TYPES, MIN_PRIORITY, MAX_PRIORITY, MIN_REWARD
+from auth import get_session
 
 router = APIRouter()
 
@@ -38,6 +40,21 @@ async def create_job(job: JobCreate) -> dict:
         raise HTTPException(status_code=400, detail="Job title is required")
     if not job.task_type or not job.task_type.strip():
         raise HTTPException(status_code=400, detail="Task type is required")
+    if job.task_type not in VALID_TASK_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown task type '{job.task_type}'. Valid types: {', '.join(sorted(VALID_TASK_TYPES))}",
+        )
+    if not MIN_PRIORITY <= job.priority <= MAX_PRIORITY:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Priority must be between {MIN_PRIORITY} and {MAX_PRIORITY}",
+        )
+    if job.reward_amount < MIN_REWARD:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Reward amount must be >= {MIN_REWARD}",
+        )
 
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -112,8 +129,11 @@ async def get_job_tasks(job_id: str) -> list[dict]:
 
 
 @router.delete("/jobs/all")
-async def clear_all_jobs() -> dict:
-    """Delete all jobs, tasks, events, and results. Demo reset."""
+async def clear_all_jobs(request: Request) -> dict:
+    """Delete all jobs, tasks, events, and results. Admin-only demo reset."""
+    user = get_session(request)
+    if not user or user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute("DELETE FROM task_results")
