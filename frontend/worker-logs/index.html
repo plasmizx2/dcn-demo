@@ -295,6 +295,12 @@ function escapeHtml(str) {
 
 loadWorkers();
 setInterval(loadWorkers, 5000);
+
+window.addEventListener('pageshow', function(event) {
+  if (event.persisted) {
+    fetch('/auth/me').then(r => { if (!r.ok) window.location.href = '/login'; });
+  }
+});
 </script>
 </body>
 </html>

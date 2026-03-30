@@ -249,7 +249,7 @@ async def do_logout(request: Request):
     if token:
         await destroy_session(token)
     response = RedirectResponse("/login", status_code=302)
-    response.delete_cookie(SESSION_COOKIE)
+    response.delete_cookie(SESSION_COOKIE, path="/", samesite="lax")
     return response
 
 
@@ -266,22 +266,34 @@ async def serve_frontend():
 
 @app.get("/ops")
 async def serve_monitor():
-    return FileResponse(os.path.join(MONITOR_DIR, "index.html"))
+    response = FileResponse(os.path.join(MONITOR_DIR, "index.html"))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    return response
 
 
 @app.get("/results")
 async def serve_results():
-    return FileResponse(os.path.join(RESULTS_DIR, "index.html"))
+    response = FileResponse(os.path.join(RESULTS_DIR, "index.html"))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    return response
 
 
 @app.get("/my-jobs")
 async def serve_my_jobs():
-    return FileResponse(os.path.join(MYJOBS_DIR, "index.html"))
+    response = FileResponse(os.path.join(MYJOBS_DIR, "index.html"))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    return response
 
 
 @app.get("/worker-logs")
 async def serve_worker_logs():
-    return FileResponse(os.path.join(WORKER_LOGS_DIR, "index.html"))
+    response = FileResponse(os.path.join(WORKER_LOGS_DIR, "index.html"))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    return response
 
 
 
