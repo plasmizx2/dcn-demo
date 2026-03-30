@@ -1,0 +1,38 @@
+[2026-03-30 10:34:15] Checking for open issues...
+[2026-03-30 10:34:35] Checking for open issues...
+[2026-03-30 10:35:54] Checking for open issues...
+[2026-03-30 10:35:55] Working on issue #2: Logout flow traps user on login page and browser Back button re-exposes admin session
+[2026-03-30 10:35:55] Running Claude Code on issue #2...
+You've hit your limit · resets 2pm (America/New_York)
+Your branch is up to date with 'origin/master'.
+Already up to date.
+[2026-03-30 14:03:29] Checking for open issues...
+[2026-03-30 14:03:29] Working on issue #2: Logout flow traps user on login page and browser Back button re-exposes admin session
+Switched to a new branch 'fix/issue-2'
+[2026-03-30 14:03:29] Running Claude Code on issue #2...
+All four fixes from the issue are implemented:
+
+**A. Login page homepage link** (`frontend/login/index.html`) — Added "← Back to homepage" link to `/` so users have a UI path out after logout.
+
+**B. Cache-Control headers** (`backend/main.py`) — Protected routes `/ops`, `/results`, `/my-jobs`, and `/worker-logs` now return `Cache-Control: no-store, no-cache, must-revalidate` + `Pragma: no-cache`, preventing browsers from storing these pages in bfcache.
+
+**C. bfcache pageshow handler** (`frontend/monitor/index.html`, `frontend/results/index.html`, `frontend/worker-logs/index.html`) — Each protected page now listens for `pageshow` with `event.persisted === true` and re-calls `/auth/me`, redirecting to `/login` if the session is gone.
+
+**D. Cookie attribute matching** (`backend/main.py`) — `delete_cookie` now passes `path="/"` and `samesite="lax"` to match the original `set_cookie` call, ensuring the cookie is reliably cleared.
+[2026-03-30 16:34:27] RESUME: Found interrupted work on issue #2 (branch fix/issue-2)
+M	.gitignore
+M	auto-worker.log
+Your branch is up to date with 'origin/fix/issue-2'.
+Already up to date.
+[2026-03-30 16:34:27] Running Claude Code on issue #2...
+The `auto-worker.log` is already gitignored, so no need to commit it.
+
+The implementation is complete. Here's a summary of what was done in the previous session:
+
+**`ee97250` — The actual fix for issue #2:**
+
+- **A. Login page homepage link** (`frontend/login/index.html`) — Added a "Back to homepage" link to `/` so users aren't trapped on `/login` after logout
+- **B. Cache-Control headers** (`backend/main.py`) — Added `Cache-Control: no-store, no-cache, must-revalidate` and `Pragma: no-cache` headers to all protected page routes (`/ops`, `/results`, `/my-jobs`, `/worker-logs`)
+- **C. bfcache pageshow handler** (`frontend/monitor/index.html`, `frontend/results/index.html`, `frontend/worker-logs/index.html`) — Each protected page now listens for `pageshow` with `event.persisted === true` and re-calls `/auth/me`, redirecting to `/login` if the session is gone
+- **D. Cookie attribute matching** (`backend/main.py`) — `delete_cookie` now passes `path="/"` and `samesite="lax"` to match the original `set_cookie` call, ensuring the cookie is reliably cleared
+Done. Added `pageshow` bfcache handlers to the three pages that were missing them (`my-jobs`, `landing`, `public_page`). When any of these pages are restored from the browser's back-forward cache, they now force a full reload so the auth state is always current — covering both the "signed in but navigating back to a pre-login page" and "signed out but navigating back to a post-login page" scenarios.

@@ -1134,6 +1134,12 @@
             card.style.setProperty('--my', ((e.clientY - rect.top)) + 'px');
         });
     });
+
+    window.addEventListener('pageshow', function(event) {
+      if (event.persisted) {
+        window.location.reload();
+      }
+    });
 </script>
 
 </body>

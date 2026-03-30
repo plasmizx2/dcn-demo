@@ -30,6 +30,9 @@
   .toggle-mode{margin-top:16px;text-align:center;font-size:0.8rem;color:var(--dim);cursor:pointer}
   .toggle-mode span{color:var(--accent3);font-weight:600;transition:color 0.2s}
   .toggle-mode:hover span{color:var(--accent)}
+  .back-home{margin-top:12px;text-align:center;font-size:0.8rem}
+  .back-home a{color:var(--dim);text-decoration:none;transition:color 0.2s}
+  .back-home a:hover{color:var(--text)}
 </style>
 </head>
 <body>
@@ -50,6 +53,7 @@
     <button class="btn" type="submit" id="submitBtn">Sign In</button>
     <div class="toggle-mode" onclick="toggleMode()">Don't have an account? <span>Sign Up</span></div>
     <div class="error" id="error"></div>
+    <div class="back-home"><a href="/">← Back to homepage</a></div>
   </form>
 </div>
 
