@@ -6,7 +6,7 @@ DCN is a distributed AI orchestration system that transforms high-level user tas
 
 The north star: a developer submits a task description and DCN handles decomposition, scheduling, execution, and aggregation automatically. The user never touches a workflow graph, never provisions workers, and never writes glue code between steps.
 
-**Current state (hackathon MVP):** A fully functional distributed system with 10 task types, priority-based scheduling, tiered worker assignment, distributed ML experimentation, multiple aggregation strategies, and real-time monitoring. All components are implemented and working.
+**Current state:** A fully functional distributed system focused on ML experimentation, with priority-based scheduling, tiered worker assignment, cross-validation pipelines, and real-time monitoring. All components are implemented and working.
 
 **Long-term vision (The Decentralized Compute Marketplace):** DCN evolves into a shared marketplace where supply-side participants—ranging from research labs with idle server racks to hobbyists with consumer-grade GPUs—can monetize their hardware by claiming DCN subtasks. This provides a censorship-resistant, cost-effective alternative to centralized cloud providers while enabling a 100x increase in global compute density for AI orchestration.
 
@@ -549,7 +549,7 @@ If running behind schedule:
 ## Risk Assessment
 
 ### Risk 1: Gemini API Failures / Rate Limits
-- **Probability:** High (hackathon = shared API keys, bursty traffic)
+- **Probability:** High (shared API keys, bursty traffic)
 - **Impact:** Workers fail tasks, jobs stall
 - **Mitigation:** Exponential backoff with rate-limit detection (doubles wait on 429). 4 total attempts per task. Stale reaper requeues stuck tasks for retry by another worker.
 - **Fallback:** System demonstrates distributed execution with mock handlers if all AI calls fail.
