@@ -96,10 +96,14 @@ CREATE TABLE IF NOT EXISTS llm_cache (
 -- ─── Auth ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS dcn_users (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    username            TEXT UNIQUE NOT NULL,
-    password_hash       TEXT NOT NULL,
-    role                TEXT NOT NULL,
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    email               TEXT UNIQUE NOT NULL,
+    name                TEXT,
+    avatar_url          TEXT,
+    provider            TEXT NOT NULL,
+    provider_id         TEXT NOT NULL,
+    role                TEXT NOT NULL DEFAULT 'customer',
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(provider, provider_id)
 );
 
 CREATE TABLE IF NOT EXISTS sessions (

@@ -3,6 +3,7 @@ uvicorn
 asyncpg
 python-dotenv
 requests
+httpx
 google-genai
 scikit-learn
 numpy
