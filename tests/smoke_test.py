@@ -68,8 +68,8 @@ test("List jobs", path="/jobs", check_body=lambda b: isinstance(json.loads(b), l
 print("\nAuthentication:")
 test("Login page", path="/login", check_body=lambda b: "DCN" in b)
 test("Auth me (unauthenticated)", path="/auth/me", expected_status=401)
-test("Login with bad creds", method="POST", path="/auth/login",
-     body={"username": "bad", "password": "bad"}, expected_status=401)
+test("Google OAuth redirect", path="/auth/google", expected_status=307)
+test("GitHub OAuth redirect", path="/auth/github", expected_status=307)
 
 # ── Page routes ──
 print("\nPage Routes:")

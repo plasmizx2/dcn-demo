@@ -887,7 +887,7 @@
   <!-- Admin Sidebar -->
   <aside class="admin-sidebar">
     <a href="/" class="sidebar-logo">DCN</a>
-    <div class="sidebar-role">Admin Panel</div>
+    <div class="sidebar-role" id="sidebarRole">Admin Panel</div>
     <nav class="sidebar-nav">
       <a href="/submit">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
@@ -915,7 +915,7 @@
         <div class="sidebar-user-avatar" id="userAvatar">A</div>
         <div>
           <div class="sidebar-user-name" id="userName">Admin</div>
-          <div class="sidebar-user-role">Admin</div>
+          <div class="sidebar-user-role" id="userRoleLabel">Admin</div>
         </div>
       </div>
       <a href="/auth/logout" class="sidebar-signout">
@@ -927,8 +927,11 @@
   <script>
   fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
     if(u){
-      document.getElementById('userName').textContent=u.name||u.username;
-      document.getElementById('userAvatar').textContent=(u.name||u.username).charAt(0).toUpperCase();
+      document.getElementById('userName').textContent=u.name||u.email;
+      const roleDisplay=u.role==='ceo'?'CEO':u.role.charAt(0).toUpperCase()+u.role.slice(1);
+      document.getElementById('userRoleLabel').textContent=roleDisplay;
+      document.getElementById('sidebarRole').textContent=u.role==='ceo'?'CEO Panel':'Admin Panel';
+      const av=document.getElementById('userAvatar');if(u.avatar_url){av.innerHTML='<img src="'+u.avatar_url+'" style="width:100%;height:100%;border-radius:50%;object-fit:cover">';}else{av.textContent=(u.name||u.email).charAt(0).toUpperCase();}
     }
   }).catch(()=>{});
   </script>
@@ -1450,6 +1453,53 @@
     }
   });
 </script>
+
+  <!-- CEO User Management Panel -->
+  <div id="ceoPanel" style="display:none;margin:24px 32px">
+    <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <h3 style="font-size:1rem;font-weight:700;background:linear-gradient(135deg,#7c3aed,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent">User Management</h3>
+        <span style="font-size:0.68rem;padding:4px 10px;border-radius:8px;background:rgba(124,58,237,0.15);color:#a78bfa;border:1px solid rgba(124,58,237,0.3)">CEO Only</span>
+      </div>
+      <div id="userList" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+  </div>
+  <script>
+  (async function loadCeoPanel(){
+    try {
+      const me = await fetch('/auth/me').then(r=>r.ok?r.json():null);
+      if(!me||me.role!=='ceo') return;
+      document.getElementById('ceoPanel').style.display='block';
+      await refreshUsers();
+    }catch(e){}
+  })();
+  async function refreshUsers(){
+    const users=await fetch('/auth/users').then(r=>r.ok?r.json():[]);
+    const el=document.getElementById('userList');
+    if(!users.length){el.innerHTML='<div style="color:#8a8a96;font-size:0.82rem">No users yet.</div>';return;}
+    el.innerHTML=users.map(u=>{
+      const roleColors={'ceo':'#a78bfa','admin':'#22c55e','customer':'#3b82f6'};
+      const c=roleColors[u.role]||'#8a8a96';
+      const providerIcon=u.provider==='google'?'G':'GH';
+      let actions='';
+      if(u.role!=='ceo'){
+        if(u.role==='customer') actions='<button onclick="setRole(\''+u.id+'\',\'admin\')" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(34,197,94,0.3);background:rgba(34,197,94,0.1);color:#22c55e;font-size:0.68rem;font-weight:600;cursor:pointer">Promote to Admin</button>';
+        else actions='<button onclick="setRole(\''+u.id+'\',\'customer\')" style="padding:4px 12px;border-radius:6px;border:1px solid rgba(239,68,68,0.3);background:rgba(239,68,68,0.1);color:#ef4444;font-size:0.68rem;font-weight:600;cursor:pointer">Demote to Customer</button>';
+      }
+      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04)">'
+        +(u.avatar_url?'<img src="'+u.avatar_url+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover">':'<div style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700">'+(u.name||u.email).charAt(0).toUpperCase()+'</div>')
+        +'<div style="flex:1;min-width:0"><div style="font-size:0.82rem;font-weight:600">'+(u.name||'—')+'</div><div style="font-size:0.7rem;color:#8a8a96">'+u.email+' · '+providerIcon+'</div></div>'
+        +'<span style="padding:2px 8px;border-radius:8px;font-size:0.62rem;font-weight:600;border:1px solid '+c+'33;color:'+c+';background:'+c+'15">'+u.role+'</span>'
+        +actions
+        +'</div>';
+    }).join('');
+  }
+  async function setRole(userId,role){
+    const r=await fetch('/auth/role',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId,role:role})});
+    if(r.ok) await refreshUsers();
+    else alert('Failed: '+(await r.json()).detail);
+  }
+  </script>
 
   </div><!-- /main-content -->
   </div><!-- /app-layout -->
