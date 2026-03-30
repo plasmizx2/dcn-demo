@@ -15,4 +15,5 @@ auto-worker.log
 auto-worker-stdout.log
 auto-worker-stderr.log
 .auto-worker-state.json
+.auto-worker-last-comment
 auto-worker-monitor/
