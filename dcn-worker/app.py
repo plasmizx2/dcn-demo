@@ -189,19 +189,6 @@ class WorkerEngine:
         except: pass
 
     def _get_handler(self, task_type):
-        from handlers import image_processing, web_scraping
-        if task_type == "image_processing": return image_processing.handle
-        if task_type == "web_scraping": return web_scraping.handle
-        if task_type == "audio_transcription":
-            if not self._audio_handler:
-                from handlers import audio_transcription
-                self._audio_handler = audio_transcription.handle
-            return self._audio_handler
-        if task_type == "sentiment_classification":
-            if not self._sentiment_handler:
-                from handlers import sentiment_classification
-                self._sentiment_handler = sentiment_classification.handle
-            return self._sentiment_handler
         if task_type == "ml_experiment":
             from handlers import ml_experiment
             return ml_experiment.handle
@@ -210,10 +197,6 @@ class WorkerEngine:
     # Earnings per second of execution time, by task type and tier
     TASK_RATES = {
         "ml_experiment":          0.0120,
-        "audio_transcription":    0.0090,
-        "image_processing":       0.0060,
-        "web_scraping":           0.0035,
-        "sentiment_classification": 0.0025,
     }
     TIER_MULT = {1: 1.0, 2: 1.6, 3: 2.5}
 

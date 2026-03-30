@@ -891,19 +891,7 @@
         <label for="title">Job Title</label>
         <input type="text" id="title" placeholder="e.g. Review my project">
 
-        <label for="taskType">Task Type</label>
-        <select id="taskType">
-            <option value="codebase_review">Codebase Review</option>
-            <option value="document_analysis">Document Analysis</option>
-            <option value="research_pipeline">Research Pipeline</option>
-            <option value="website_builder">Website Builder</option>
-            <option value="data_processing">Data Processing</option>
-            <option value="ml_experiment">ML Experiment</option>
-            <option value="image_processing">Image Processing</option>
-            <option value="web_scraping">Web Scraping</option>
-            <option value="audio_transcription">Audio Transcription</option>
-            <option value="sentiment_classification">Sentiment Classification</option>
-        </select>
+        <input type="hidden" id="taskType" value="ml_experiment">
 
         <div id="inputGroup">
           <label for="inputText" id="inputLabel">Input</label>
@@ -967,60 +955,15 @@
 
     // Task descriptions
     const taskDescriptions = {
-      codebase_review: {
-        desc: 'DCN breaks a codebase into smaller review tasks, such as groups of files, modules, or components, and sends them to workers in parallel. Each worker analyzes its assigned section for bugs, security risks, code quality issues, architectural concerns, and possible improvements. The system then combines those findings into one final report.',
-        why: 'Large codebases take a long time to review if one system or one agent does everything sequentially. With DCN, multiple workers can inspect different parts of the codebase at the same time, which speeds up analysis and makes it easier to handle enterprise-scale repositories. This is especially useful for security audits, large refactors, and ongoing code health monitoring.'
-      },
-      document_analysis: {
-        desc: 'DCN takes a large document set or a long document, splits it into manageable chunks, and assigns each chunk to workers for summarization, extraction, classification, or analysis. The results are then merged into a final overview, report, or structured output.',
-        why: 'Organizations often need to process thousands of pages of contracts, reports, research papers, or internal documentation. A single agent can become slow and expensive when handling long contexts. DCN allows document workloads to be processed in parallel, reducing turnaround time and making large-scale document intelligence practical.'
-      },
-      research_pipeline: {
-        desc: 'DCN takes a research prompt and breaks it into subtopics, questions, or workstreams. Different workers handle different areas, such as background context, comparison research, trend analysis, and findings collection. The system then combines everything into one structured research report.',
-        why: 'Research becomes expensive and slow when one system tries to do all the searching, synthesis, and comparison alone. DCN allows multiple research branches to run in parallel, which makes it much more effective for competitive analysis, market research, technical research, and large knowledge tasks where many angles need to be explored at once.'
-      },
-      website_builder: {
-        desc: 'DCN splits a website generation request into multiple parts, such as hero section, features section, styling, copy, layout, or even separate pages. Workers generate these parts independently, and the system merges them into a more complete final site or prototype.',
-        why: 'As websites become larger and more customized, generating everything in one pass becomes messy and harder to manage. DCN allows different site sections or page responsibilities to be handled in parallel, which speeds up generation and makes scaling to multi-page websites, landing page batches, or client-specific variations much more realistic.'
-      },
-      data_processing: {
-        desc: 'DCN takes structured or semi-structured data, such as rows from a CSV, records from a database, or batches of items, and distributes them across workers for classification, tagging, transformation, or summarization. The outputs are then recombined into one processed dataset.',
-        why: 'Data workloads naturally benefit from parallelism. Instead of processing thousands or millions of records one by one, DCN can divide them into batches and process them simultaneously. This makes it useful for business analytics, customer segmentation, enrichment pipelines, large dataset labeling, and other high-volume tasks.'
-      },
       ml_experiment: {
         desc: 'DCN distributes machine learning experiment workloads across workers, where each worker runs a different model configuration, hyperparameter set, or dataset split. Workers independently train, evaluate, and report metrics, and the system aggregates all experiment results into one unified comparison report.',
         why: 'ML experimentation involves testing many configurations — different architectures, learning rates, batch sizes, feature sets, and data augmentations. Running these sequentially is painfully slow. DCN makes it possible to parallelize experiment runs across distributed workers, dramatically reducing the time from hypothesis to insight. This is especially valuable for hyperparameter sweeps, AutoML pipelines, model selection, and large-scale benchmarking.'
-      },
-      image_processing: {
-        desc: 'DCN can distribute image workloads across workers, where each worker handles a subset of images for classification, detection, captioning, tagging, feature extraction, or quality analysis. The outputs are then merged into one final dataset or report.',
-        why: 'Image datasets are often huge. Processing them one by one is slow, especially for vision-heavy tasks. DCN makes image pipelines faster by spreading the work across many workers, which is valuable for content moderation, dataset labeling, visual search preparation, product image analysis, and large computer vision workflows.'
-      },
-      web_scraping: {
-        desc: 'DCN breaks scraping workloads into multiple targets, pages, or websites, assigns them to workers, and collects the scraped results into a unified structured output. Workers can independently gather content, metadata, or extracted fields in parallel.',
-        why: 'Scraping hundreds or thousands of pages sequentially is slow and fragile. DCN makes scraping faster and more resilient by spreading requests across workers and letting the system manage large collections of sources at once. This is especially useful for business intelligence, lead generation, pricing analysis, competitor monitoring, and large research pipelines.'
-      },
-      audio_transcription: {
-        desc: 'DCN splits long audio files or sets of audio files into smaller segments and distributes them to workers for transcription, summarization, speaker analysis, or content extraction. The results are then stitched back together into one transcript or report.',
-        why: 'Long recordings, large call archives, podcasts, meetings, and media libraries can be too slow to process sequentially. DCN makes transcription scalable by allowing segments or files to be processed simultaneously, which is useful for call center analytics, meeting intelligence, media indexing, and large voice archives.'
-      },
-      sentiment_classification: {
-        desc: 'DCN distributes text inputs such as reviews, comments, support messages, or survey responses across workers for sentiment analysis, opinion tagging, and emotional classification. The outputs are then recombined into one labeled dataset or summary.',
-        why: 'Sentiment classification often involves very large amounts of text. DCN makes it possible to process these inputs in parallel, which is valuable for social media monitoring, customer feedback analysis, brand tracking, and large-scale product review analysis. At scale, the advantage is not just speed but the ability to continuously analyze incoming streams of text.'
       },
     };
 
     // Swap input field based on task type
     const inputConfig = {
-      codebase_review:            { label: 'GitHub Repository URL', tag: 'input', type: 'url', placeholder: 'https://github.com/user/repo' },
-      document_analysis:          { label: 'Document Text', tag: 'textarea', placeholder: 'Paste the document text you want analyzed...' },
-      research_pipeline:          { label: 'Research Topic', tag: 'textarea', placeholder: 'Describe the topic you want researched...' },
-      website_builder:            { label: 'Website Description', tag: 'textarea', placeholder: 'Describe the website you want built (sections, style, purpose)...' },
-      data_processing:            { label: 'Data to Process', tag: 'textarea', placeholder: 'Paste the data you want classified or analyzed...' },
       ml_experiment:              { label: 'ML Experiment', tag: 'custom_ml', placeholder: '' },
-      image_processing:           { label: 'Image URLs (one per line)', tag: 'textarea', placeholder: 'https://example.com/photo1.jpg\nhttps://example.com/photo2.png' },
-      web_scraping:               { label: 'URLs to Scrape (one per line)', tag: 'textarea', placeholder: 'https://example.com/page1\nhttps://example.com/page2\nhttps://example.com/page3' },
-      audio_transcription:        { label: 'Audio File URLs (one per line)', tag: 'textarea', placeholder: 'https://example.com/meeting.mp3\nhttps://example.com/interview.wav' },
-      sentiment_classification:   { label: 'Text Items to Classify (one per line)', tag: 'textarea', placeholder: 'Great product, love it!\nTerrible customer service\nThe delivery was okay, nothing special' },
     };
 
     function updateTaskDescription() {
@@ -1044,7 +987,7 @@
 
     function updateInputField() {
       const type = taskTypeSelect.value;
-      const cfg = inputConfig[type] || inputConfig.document_analysis;
+      const cfg = inputConfig[type] || inputConfig.ml_experiment;
       const group = document.getElementById('inputGroup');
       if (cfg.tag === 'custom_ml') {
         group.innerHTML = `
@@ -1094,28 +1037,12 @@
       btn.querySelector('.btn-label').textContent = 'Submitting...';
 
       try {
-        // Build payload based on task type
-        let payload;
-        const lines = inputText.split('\n').map(l => l.trim()).filter(l => l);
-        if (taskType === 'codebase_review') {
-          payload = { github_url: inputText };
-        } else if (taskType === 'image_processing') {
-          payload = { image_urls: lines };
-        } else if (taskType === 'web_scraping') {
-          payload = { urls: lines };
-        } else if (taskType === 'audio_transcription') {
-          payload = { audio_urls: lines };
-        } else if (taskType === 'sentiment_classification') {
-          payload = { texts: lines };
-        } else if (taskType === 'ml_experiment') {
-          const datasetEl = document.getElementById('mlDataset');
-          payload = {
-            dataset_name: datasetEl ? datasetEl.value : 'weather_ri',
-            goal: inputText || 'Run distributed ML experiments'
-          };
-        } else {
-          payload = { text: inputText };
-        }
+        // Build payload
+        const datasetEl = document.getElementById('mlDataset');
+        const payload = {
+          dataset_name: datasetEl ? datasetEl.value : 'weather_ri',
+          goal: inputText || 'Run distributed ML experiments'
+        };
 
         const resp = await fetch(`${API}/jobs`, {
           method: 'POST',
@@ -1233,30 +1160,8 @@
     function renderOutput(raw, taskType) {
       const el = document.getElementById('outputBlock');
       const cleaned = cleanOutput(raw);
-      const isHtml = taskType === 'website_builder' || /<(?:section|div|html|head|body|style|!DOCTYPE)\b/i.test(cleaned);
-
-      if (isHtml) {
-        el.innerHTML = `
-          <div class="output-tabs">
-            <div class="output-tab active" onclick="togglePublicOutput('preview')">Preview</div>
-            <div class="output-tab" onclick="togglePublicOutput('source')">Source</div>
-          </div>
-          <iframe class="html-preview-public" id="pub-preview" sandbox="allow-same-origin"></iframe>
-          <pre id="pub-source" style="display:none;white-space:pre-wrap;font-size:0.82rem;color:#ccc;margin:0;">${escapeHtml(cleaned)}</pre>
-        `;
-        setTimeout(() => {
-          const iframe = document.getElementById('pub-preview');
-          if (iframe) {
-            const doc = iframe.contentDocument;
-            doc.open();
-            doc.write(cleaned);
-            doc.close();
-          }
-        }, 50);
-      } else {
-        const preview = cleaned.length > 6000 ? cleaned.substring(0, 6000) + '\n\n*... (truncated)*' : cleaned;
-        el.innerHTML = marked.parse(preview);
-      }
+      const preview = cleaned.length > 6000 ? cleaned.substring(0, 6000) + '\n\n*... (truncated)*' : cleaned;
+      el.innerHTML = marked.parse(preview);
     }
 
     function escapeHtml(str) {

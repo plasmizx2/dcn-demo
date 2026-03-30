@@ -24,7 +24,7 @@ logger = logging.getLogger("dcn.worker")
 # Add backend root to path so we can import handlers
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from handlers import document, codebase, website, research, data_processing, ml_experiment
+from handlers import ml_experiment
 from config import RETRY_BACKOFF_SECONDS, RATE_LIMIT_BACKOFF_MULTIPLIER, WORKER_POLL_INTERVAL_SECONDS
 
 BASE_URL = "https://dcn-demo.onrender.com"
@@ -104,11 +104,6 @@ WORKER_TIER = detect_worker_tier()
 
 # Map task_type -> handler
 HANDLERS = {
-    "document_analysis": document.handle,
-    "codebase_review": codebase.handle,
-    "website_builder": website.handle,
-    "research_pipeline": research.handle,
-    "data_processing": data_processing.handle,
     "ml_experiment": ml_experiment.handle,
 }
 
@@ -126,8 +121,7 @@ def heartbeat(worker_node_id):
 
 
 AI_TASK_TYPES = [
-    "codebase_review", "document_analysis", "research_pipeline",
-    "website_builder", "data_processing", "ml_experiment",
+    "ml_experiment",
 ]
 
 
