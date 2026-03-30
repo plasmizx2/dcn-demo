@@ -103,11 +103,10 @@ def _free_disk_gb():
 
 def _compute_tier(info):
     """
-    Tier 1: Any machine (image processing, web scraping, audio transcription)
-    Tier 2: 8GB+ RAM, 4+ cores (adds ml_experiment)
-    Tier 3: GPU or 16GB+ RAM, 8+ cores (adds sentiment_classification, LLM tasks)
-    Tier 4: NVIDIA CUDA GPU + 100GB+ RAM + 16+ cores — high-end workstation / datacenter
-             (adds large_scale_ml: massive distributed training, 500K+ row jobs)
+    Tier 1: Any machine (basic ml_experiment)
+    Tier 2: 8GB+ RAM, 4+ cores (standard ml_experiment)
+    Tier 3: GPU or 16GB+ RAM, 8+ cores (heavy ml_experiment)
+    Tier 4: NVIDIA CUDA GPU + 100GB+ RAM + 16+ cores — datacenter-class experiments
     """
     # Tier 4: real NVIDIA GPU + 100GB+ RAM + 16+ cores
     gpu = info.get("gpu_type") or ""
@@ -123,18 +122,7 @@ def _compute_tier(info):
 
 def _supported_types(tier):
     """Return list of task types this tier can handle."""
-    types = ["image_processing", "web_scraping", "ml_experiment"]
-
-    if tier >= 2:
-        types.append("audio_transcription")
-
-    if tier >= 3:
-        types.append("sentiment_classification")
-
-    if tier >= 4:
-        types.append("large_scale_ml")
-
-    return types
+    return ["ml_experiment"]
 
 
 def print_report(info):

@@ -1320,7 +1320,7 @@
       }
 
       const cleaned = cleanOutput(raw);
-      const isHtml = job.task_type === 'website_builder' || /<(?:section|div|html|head|body|style|!DOCTYPE)\b/i.test(cleaned);
+      const isHtml = /<(?:section|div|html|head|body|style|!DOCTYPE)\b/i.test(cleaned);
 
       html += `<div class="section-label" style="margin-top:16px;">Final Output</div>`;
 

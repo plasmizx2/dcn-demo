@@ -85,8 +85,8 @@ test("Monitor workers (no auth)", path="/monitor/workers", expected_status=401)
 # ── Job creation (requires auth — expect redirect/401) ──
 print("\nJob Submission:")
 test("Create job (no auth)", method="POST", path="/jobs",
-     body={"title": "smoke test", "task_type": "document_analysis",
-           "input_payload": {"text": "hello"}},
+     body={"title": "smoke test", "task_type": "ml_experiment",
+           "input_payload": {"dataset_name": "weather_ri"}},
      expected_status=200)  # jobs endpoint is public
 
 # ── 404 handler ──

@@ -21,16 +21,7 @@ SESSION_MAX_AGE_SECONDS: int = 86400  # 24 hours
 
 # ── Task Types ───────────────────────────────────────────────
 VALID_TASK_TYPES: set[str] = {
-    "document_analysis",
-    "codebase_review",
-    "website_builder",
-    "research_pipeline",
-    "data_processing",
     "ml_experiment",
-    "image_processing",
-    "web_scraping",
-    "audio_transcription",
-    "sentiment_classification",
 }
 
 # ── Job Constraints ──────────────────────────────────────────
@@ -38,13 +29,5 @@ MIN_PRIORITY: int = 1
 MAX_PRIORITY: int = 10
 MIN_REWARD: float = 0.0
 
-# ── External Integrations ───────────────────────────────────
-GITHUB_API_TIMEOUT_SECONDS: int = 15
-MAX_FILES_PER_CODEBASE_TASK: int = 5
-
 # ── Aggregation ─────────────────────────────────────────────
-CONCAT_TASK_TYPES: set[str] = {
-    "codebase_review", "website_builder", "data_processing",
-    "image_processing", "web_scraping", "audio_transcription",
-    "sentiment_classification",
-}
+CONCAT_TASK_TYPES: set[str] = set()

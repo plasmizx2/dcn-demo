@@ -75,16 +75,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 
 /* TYPE BADGES */
 .type-badge{padding:3px 10px;border-radius:20px;font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
-.type-codebase_review{background:rgba(59,130,246,0.12);color:#60a5fa}
-.type-document_analysis{background:rgba(192,132,252,0.12);color:#c084fc}
-.type-research_pipeline{background:rgba(74,222,128,0.12);color:#4ade80}
-.type-website_builder{background:rgba(251,146,60,0.12);color:#fb923c}
-.type-data_processing{background:rgba(244,114,182,0.12);color:#f472b6}
 .type-ml_experiment{background:rgba(124,58,237,0.12);color:#a78bfa}
-.type-image_processing{background:rgba(34,211,238,0.12);color:#22d3ee}
-.type-web_scraping{background:rgba(163,230,53,0.12);color:#a3e635}
-.type-audio_transcription{background:rgba(250,204,21,0.12);color:#facc15}
-.type-sentiment_classification{background:rgba(232,121,249,0.12);color:#e879f9}
 
 .status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .status-completed{background:var(--green)}
@@ -315,10 +306,7 @@ fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
     const job = allJobs.find(j => j.id === jobId);
     if (!job) return;
 
-    const isWebsite = job.task_type === 'website_builder';
-    if (isWebsite && job.final_output && currentTab === 'rendered') {
-      currentTab = 'preview';
-    } else if (!isWebsite && currentTab === 'preview') {
+    if (currentTab === 'preview') {
       currentTab = 'rendered';
     }
 

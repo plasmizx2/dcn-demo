@@ -17,19 +17,11 @@ import requests
 
 import hardware
 import installer
-from handlers import image_processing, web_scraping
-
-# These are lazy-loaded based on tier
-audio_handler = None
-sentiment_handler = None
+from handlers import ml_experiment
 
 # Earnings rates: $/second of execution time, by task type
 TASK_RATES = {
     "ml_experiment":            0.0120,
-    "audio_transcription":      0.0090,
-    "image_processing":         0.0060,
-    "web_scraping":             0.0035,
-    "sentiment_classification": 0.0025,
 }
 TIER_MULT = {1: 1.0, 2: 1.6, 3: 2.5}
 
@@ -144,24 +136,7 @@ def fail_task(server_url, task_id):
 
 def get_handler(task_type):
     """Return the handler function for a task type."""
-    global audio_handler, sentiment_handler
-
-    if task_type == "image_processing":
-        return image_processing.handle
-    elif task_type == "web_scraping":
-        return web_scraping.handle
-    elif task_type == "audio_transcription":
-        if audio_handler is None:
-            from handlers import audio_transcription
-            audio_handler = audio_transcription.handle
-        return audio_handler
-    elif task_type == "sentiment_classification":
-        if sentiment_handler is None:
-            from handlers import sentiment_classification
-            sentiment_handler = sentiment_classification.handle
-        return sentiment_handler
-    elif task_type == "ml_experiment":
-        from handlers import ml_experiment
+    if task_type == "ml_experiment":
         return ml_experiment.handle
     return None
 
