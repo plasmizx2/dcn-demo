@@ -10,7 +10,7 @@ Instead of manually defining workflows or running AI tasks sequentially, DCN:
 
 The long-term vision is a shared compute network where users submit tasks and distributed nodes execute work in exchange for incentives.
 
-The current hackathon implementation focuses on a working distributed execution engine with real-time visibility and measurable performance gains.
+The current implementation focuses on a working distributed execution engine with real-time visibility and measurable performance gains.
 
 ---
 
@@ -306,7 +306,7 @@ The strongest differentiator in the current build is the ML experiment pipeline 
 ---
 
 ## Scalability
-The current design is suitable for hackathon-scale distributed execution.
+The current design is suitable for current-scale distributed execution.
 
 Strengths:
 - parallel worker model
@@ -334,7 +334,7 @@ However, the architecture is designed so that future versions can support:
 - pluggable execution backends
 - shared compute participation
 
-For the hackathon, the important point is that the internal boundaries between planner, workers, and aggregator already make this evolution possible.
+For the current, the important point is that the internal boundaries between planner, workers, and aggregator already make this evolution possible.
 
 ---
 
