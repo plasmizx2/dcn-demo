@@ -19,3 +19,19 @@ All four fixes from the issue are implemented:
 **C. bfcache pageshow handler** (`frontend/monitor/index.html`, `frontend/results/index.html`, `frontend/worker-logs/index.html`) — Each protected page now listens for `pageshow` with `event.persisted === true` and re-calls `/auth/me`, redirecting to `/login` if the session is gone.
 
 **D. Cookie attribute matching** (`backend/main.py`) — `delete_cookie` now passes `path="/"` and `samesite="lax"` to match the original `set_cookie` call, ensuring the cookie is reliably cleared.
+[2026-03-30 16:34:27] RESUME: Found interrupted work on issue #2 (branch fix/issue-2)
+M	.gitignore
+M	auto-worker.log
+Your branch is up to date with 'origin/fix/issue-2'.
+Already up to date.
+[2026-03-30 16:34:27] Running Claude Code on issue #2...
+The `auto-worker.log` is already gitignored, so no need to commit it.
+
+The implementation is complete. Here's a summary of what was done in the previous session:
+
+**`ee97250` — The actual fix for issue #2:**
+
+- **A. Login page homepage link** (`frontend/login/index.html`) — Added a "Back to homepage" link to `/` so users aren't trapped on `/login` after logout
+- **B. Cache-Control headers** (`backend/main.py`) — Added `Cache-Control: no-store, no-cache, must-revalidate` and `Pragma: no-cache` headers to all protected page routes (`/ops`, `/results`, `/my-jobs`, `/worker-logs`)
+- **C. bfcache pageshow handler** (`frontend/monitor/index.html`, `frontend/results/index.html`, `frontend/worker-logs/index.html`) — Each protected page now listens for `pageshow` with `event.persisted === true` and re-calls `/auth/me`, redirecting to `/login` if the session is gone
+- **D. Cookie attribute matching** (`backend/main.py`) — `delete_cookie` now passes `path="/"` and `samesite="lax"` to match the original `set_cookie` call, ensuring the cookie is reliably cleared
