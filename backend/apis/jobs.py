@@ -91,7 +91,10 @@ async def create_job(job: JobCreate, request: Request) -> dict:
             )
 
             # Plan and insert subtasks
-            subtasks = plan_tasks(job.task_type, job.input_payload)
+            try:
+                subtasks = plan_tasks(job.task_type, job.input_payload)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e)) from e
             for i, task in enumerate(subtasks, start=1):
                 await conn.execute(
                     """
