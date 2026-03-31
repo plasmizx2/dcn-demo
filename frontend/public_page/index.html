@@ -1212,12 +1212,14 @@
         _datasetMeta = data;
 
         document.getElementById('dsPreviewTitle').textContent = data.display_name || 'Dataset';
+        const colCount = (data.columns && data.columns.length) || (data.target_columns && data.target_columns.length) || 0;
         document.getElementById('dsPreviewInfo').textContent =
-          `${data.row_count.toLocaleString()} rows · ${data.numeric_columns.length} numeric columns`;
+          `${data.row_count.toLocaleString()} rows · ${colCount} columns`;
 
+        const targetChoices = data.target_columns || data.columns || data.numeric_columns || [];
         const sel = document.getElementById('dsTarget');
         sel.innerHTML = '';
-        data.numeric_columns.forEach(c => {
+        targetChoices.forEach(c => {
           const opt = document.createElement('option');
           opt.value = c; opt.textContent = c;
           if (c === data.suggested_target) opt.selected = true;
