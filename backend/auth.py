@@ -150,5 +150,7 @@ async def list_users() -> list[dict]:
 ADMIN_PAGES = {"/ops", "/results", "/worker-logs"}
 # API routes that require admin (or ceo) role
 ADMIN_API_PREFIXES = ["/monitor/"]
+# Pages that require any authenticated user (non-admin)
+AUTH_REQUIRED_PAGES = {"/submit"}
 # Prefixes that don't need auth
-PUBLIC_PREFIXES = ["/login", "/health", "/submit", "/workers/", "/tasks/", "/jobs", "/auth/", "/stats", "/my-jobs"]
+PUBLIC_PREFIXES = ["/login", "/health", "/workers/", "/tasks/", "/jobs", "/auth/", "/stats", "/my-jobs"]

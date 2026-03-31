@@ -845,6 +845,7 @@
   </aside>
   <script>
   fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
+    if(!u){ window.location.href='/login'; return; }
     const nav=document.getElementById('sidebarNav');
     const role=document.getElementById('sidebarRole');
     if(u){

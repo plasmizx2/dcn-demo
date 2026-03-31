@@ -14,7 +14,7 @@ from apis.workers import router as workers_router
 from auth import (
     find_or_create_oauth_user, create_session, get_session, destroy_session,
     update_user_role, list_users,
-    SESSION_COOKIE, ADMIN_PAGES, ADMIN_API_PREFIXES, PUBLIC_PREFIXES, ELEVATED_ROLES,
+    SESSION_COOKIE, ADMIN_PAGES, ADMIN_API_PREFIXES, AUTH_REQUIRED_PAGES, PUBLIC_PREFIXES, ELEVATED_ROLES,
 )
 from config import (
     MAINTENANCE_INTERVAL_SECONDS, STALE_TASK_TIMEOUT_MINUTES,
@@ -153,6 +153,12 @@ async def auth_middleware(request: Request, call_next):
     # Let public routes, worker endpoints, and static assets through
     if any(path.startswith(p) for p in PUBLIC_PREFIXES):
         return await call_next(request)
+
+    # Auth-required pages → redirect to login if not signed in
+    if path in AUTH_REQUIRED_PAGES:
+        user = await get_session(request)
+        if not user:
+            return RedirectResponse("/login", status_code=302)
 
     # Admin-only pages → redirect to login if not admin/ceo
     if path in ADMIN_PAGES:

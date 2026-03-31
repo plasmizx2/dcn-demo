@@ -74,7 +74,7 @@ test("GitHub OAuth redirect", path="/auth/github", expected_status=307)
 # ── Page routes ──
 print("\nPage Routes:")
 test("Landing page", path="/", check_body=lambda b: "Distributed" in b or "DCN" in b)
-test("Submit page redirects to login", path="/submit", expected_status=200)
+test("Submit page redirects to login", path="/submit", expected_status=302)
 test("My Jobs page", path="/my-jobs", expected_status=200)
 
 # ── Monitor API (should reject non-admin) ──
@@ -87,7 +87,7 @@ print("\nJob Submission:")
 test("Create job (no auth)", method="POST", path="/jobs",
      body={"title": "smoke test", "task_type": "ml_experiment",
            "input_payload": {"dataset_name": "weather_ri"}},
-     expected_status=200)  # jobs endpoint is public
+     expected_status=401)
 
 # ── 404 handler ──
 print("\n404 Handling:")
