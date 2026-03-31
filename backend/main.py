@@ -5,7 +5,7 @@ import httpx
 from urllib.parse import urlencode
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse, Response
 from contextlib import asynccontextmanager
 from database import get_pool, close_pool
 from apis.jobs import router as jobs_router
@@ -375,6 +375,12 @@ async def change_role(request: Request):
 @app.get("/")
 async def serve_landing():
     return FileResponse(os.path.join(LANDING_DIR, "index.html"))
+
+
+@app.head("/")
+async def head_landing():
+    """Render (and other probes) use HEAD /; without this, Starlette returns 405."""
+    return Response(status_code=200)
 
 
 @app.get("/submit")
