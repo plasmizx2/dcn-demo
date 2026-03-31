@@ -20,7 +20,8 @@ No DAG authoring, no manual orchestration, no workflow boilerplate.
 Built with FastAPI, PostgreSQL, and Google Gemini.
 
 > **Live demo**: [dcn-demo.onrender.com](https://dcn-demo.onrender.com)  
-> **Source**: [github.com/plasmizx2/dcn-demo](https://github.com/plasmizx2/dcn-demo)
+> **Source**: [github.com/plasmizx2/dcn-demo](https://github.com/plasmizx2/dcn-demo)  
+> **Worker node (separate repo)**: [github.com/plasmizx2/dcn-worker](https://github.com/plasmizx2/dcn-worker) — clone this to run a machine that executes tasks against the API.
 
 ---
 

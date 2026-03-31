@@ -6,7 +6,6 @@ __pycache__/
 venv/
 node_modules/
 .worker_state.json
-dcn-worker/config.json
 
 # Auto-worker agent (local tooling, not part of the app)
 auto-worker.sh
