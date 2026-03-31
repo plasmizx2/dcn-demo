@@ -36,3 +36,32 @@ The implementation is complete. Here's a summary of what was done in the previou
 - **C. bfcache pageshow handler** (`frontend/monitor/index.html`, `frontend/results/index.html`, `frontend/worker-logs/index.html`) — Each protected page now listens for `pageshow` with `event.persisted === true` and re-calls `/auth/me`, redirecting to `/login` if the session is gone
 - **D. Cookie attribute matching** (`backend/main.py`) — `delete_cookie` now passes `path="/"` and `samesite="lax"` to match the original `set_cookie` call, ensuring the cookie is reliably cleared
 Done. Added `pageshow` bfcache handlers to the three pages that were missing them (`my-jobs`, `landing`, `public_page`). When any of these pages are restored from the browser's back-forward cache, they now force a full reload so the auth state is always current — covering both the "signed in but navigating back to a pre-login page" and "signed out but navigating back to a post-login page" scenarios.
+Your branch is up to date with 'origin/master'.
+Already up to date.
+[2026-03-30 20:06:22] Checking for open issues...
+[2026-03-30 20:06:23] Working on issue #3: Job submission should require authentication
+Switched to a new branch 'fix/issue-3'
+[2026-03-30 20:06:23] Running Claude Code on issue #3...
+Done. Here's a summary of what changed:
+
+### Changes made
+
+**`backend/auth.py`**
+- Added `AUTH_REQUIRED_PAGES = {"/submit"}` — a new middleware tier for pages requiring any login
+- Removed `/submit` from `PUBLIC_PREFIXES`
+
+**`backend/main.py`**
+- Imported `AUTH_REQUIRED_PAGES`
+- Added middleware check: if path is in `AUTH_REQUIRED_PAGES` and no session, redirect to `/login`
+
+**`backend/apis/jobs.py`**
+- Added `request: Request` param to `create_job`
+- Added `get_session` call at the top — returns 401 if unauthenticated
+- Changed `job.user_id` → `user["id"]` in the INSERT so ownership is always bound server-side
+
+**`frontend/public_page/index.html`**
+- Added `if(!u){ window.location.href='/login'; return; }` in the existing `/auth/me` callback, so the page redirects client-side if somehow reached unauthenticated (defense-in-depth)
+
+**`tests/smoke_test.py`**
+- `/submit` unauthenticated → now expects `302` (was `200`)
+- `POST /jobs` unauthenticated → now expects `401` (was `200`)
