@@ -864,6 +864,38 @@
       background: rgba(124,58,237,0.08);
     }
 
+    .export-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .export-bar-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: rgba(255,255,255,0.35);
+      margin-right: 4px;
+    }
+    .btn-export {
+      background: rgba(124,58,237,0.12);
+      border: 1px solid rgba(124,58,237,0.25);
+      color: #c4b5fd;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: 'Inter', inherit;
+      transition: all 0.15s ease;
+    }
+    .btn-export:hover {
+      background: rgba(124,58,237,0.22);
+      color: #fff;
+      border-color: rgba(124,58,237,0.45);
+    }
+
     /* Task description panel */
     .task-description-panel {
       position: sticky;
@@ -1068,9 +1100,17 @@
 
       <!-- Output -->
       <div class="card output-section" id="outputCard">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
           <h2 style="margin-bottom:0">Final Output</h2>
-          <button class="btn-secondary" onclick="resetForm()">New Job</button>
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <div class="export-bar" id="exportBar" style="display:none;" title="Requires signed-in session (same as submit)">
+              <span class="export-bar-label">Download</span>
+              <button type="button" class="btn-export" onclick="downloadJobExport('md')">Markdown</button>
+              <button type="button" class="btn-export" onclick="downloadJobExport('json')">JSON</button>
+              <button type="button" class="btn-export" onclick="downloadJobExport('csv')">CSV</button>
+            </div>
+            <button class="btn-secondary" onclick="resetForm()">New Job</button>
+          </div>
         </div>
         <div class="output-block" id="outputBlock"></div>
       </div>
@@ -1327,8 +1367,8 @@
 
       try {
         const [jobResp, tasksResp] = await Promise.all([
-          fetch(`${API}/jobs/${currentJobId}`),
-          fetch(`${API}/jobs/${currentJobId}/tasks`),
+          fetch(`${API}/jobs/${currentJobId}`, { credentials: 'include' }),
+          fetch(`${API}/jobs/${currentJobId}/tasks`, { credentials: 'include' }),
         ]);
 
         const job = await jobResp.json();
@@ -1364,6 +1404,8 @@
         if (job.status === 'completed' && job.final_output) {
           clearInterval(pollInterval);
           document.getElementById('outputCard').style.display = 'block';
+          const eb = document.getElementById('exportBar');
+          if (eb) eb.style.display = 'flex';
           renderOutput(job.final_output, job.task_type);
           loadTimingComparison();
         }
@@ -1429,7 +1471,7 @@
     async function loadTimingComparison() {
       if (!currentJobId) return;
       try {
-        const resp = await fetch(`${API}/jobs/${currentJobId}/timing`);
+        const resp = await fetch(`${API}/jobs/${currentJobId}/timing`, { credentials: 'include' });
         if (!resp.ok) return;
         const timing = await resp.json();
 
@@ -1488,9 +1530,48 @@
       }
     }
 
+    async function downloadJobExport(fmt) {
+      if (!currentJobId) return;
+      try {
+        const r = await fetch(`${API}/jobs/${currentJobId}/export?format=${fmt}`, { credentials: 'include' });
+        if (r.status === 401) {
+          alert('Sign in to download exports (same account as job submit).');
+          return;
+        }
+        if (!r.ok) {
+          let msg = await r.text();
+          try {
+            const j = JSON.parse(msg);
+            if (j.detail) msg = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail);
+          } catch (_) {}
+          alert('Download failed: ' + msg.slice(0, 300));
+          return;
+        }
+        const blob = await r.blob();
+        let name = 'dcn-export.' + (fmt === 'md' ? 'md' : fmt === 'json' ? 'json' : 'csv');
+        const cd = r.headers.get('Content-Disposition');
+        if (cd) {
+          const m = cd.match(/filename="([^"]+)"/);
+          if (m) name = m[1];
+        }
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(a.href);
+      } catch (e) {
+        alert('Download failed.');
+      }
+    }
+
     function resetForm() {
       currentJobId = null;
       if (pollInterval) clearInterval(pollInterval);
+
+      const eb = document.getElementById('exportBar');
+      if (eb) eb.style.display = 'none';
 
       document.getElementById('formCard').style.display = 'block';
       document.getElementById('taskDescriptionPanel').style.display = '';

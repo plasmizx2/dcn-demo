@@ -3,7 +3,11 @@ from fastapi import APIRouter, HTTPException
 from database import get_pool
 from schemas import TaskClaim, TaskComplete, TaskFail, WorkerHeartbeat, WorkerRegister, CacheLookup, CacheStore
 from aggregator import aggregate_job
-from config import MAX_TASK_FAILURE_RETRIES, TASK_FAILURE_RETRY_DELAY_SECONDS
+from config import (
+    MAX_TASK_FAILURE_RETRIES,
+    TASK_FAILURE_RETRY_DELAY_SECONDS,
+    TIER_FALLBACK_AFTER_MINUTES,
+)
 
 router = APIRouter()
 
@@ -41,6 +45,9 @@ async def claim_task(body: TaskClaim) -> dict:
         # and prioritize: tasks matching the worker's own tier first (so T4
         # workers grab T4 work before falling back to easier tasks), then by
         # job priority, then FIFO.
+        #
+        # Tier fallback: if a task has been queued longer than TIER_FALLBACK_AFTER_MINUTES,
+        # effective min_tier drops by 1 (min 1) so e.g. Tier 3 workers can claim Tier 4 tasks.
         if body.task_types:
             task = await conn.fetchrow(
                 """
@@ -52,7 +59,13 @@ async def claim_task(body: TaskClaim) -> dict:
                     WHERE jt.status = 'queued'
                       AND (jt.claim_after IS NULL OR jt.claim_after <= NOW())
                       AND j.task_type = ANY($2)
-                      AND COALESCE((jt.task_payload->>'min_tier')::int, 1) <= $3
+                      AND (
+                        CASE
+                          WHEN jt.created_at < NOW() - ($4 * INTERVAL '1 minute')
+                          THEN GREATEST(1, COALESCE((jt.task_payload->>'min_tier')::int, 1) - 1)
+                          ELSE COALESCE((jt.task_payload->>'min_tier')::int, 1)
+                        END
+                      ) <= $3
                     ORDER BY (COALESCE((jt.task_payload->>'min_tier')::int, 1) = $3) DESC,
                              j.priority DESC,
                              COALESCE((jt.task_payload->>'min_tier')::int, 1) DESC,
@@ -65,6 +78,7 @@ async def claim_task(body: TaskClaim) -> dict:
                 body.worker_node_id,
                 body.task_types,
                 body.worker_tier,
+                TIER_FALLBACK_AFTER_MINUTES,
             )
         else:
             task = await conn.fetchrow(
@@ -76,7 +90,13 @@ async def claim_task(body: TaskClaim) -> dict:
                     JOIN jobs j ON j.id = jt.job_id
                     WHERE jt.status = 'queued'
                       AND (jt.claim_after IS NULL OR jt.claim_after <= NOW())
-                      AND COALESCE((jt.task_payload->>'min_tier')::int, 1) <= $2
+                      AND (
+                        CASE
+                          WHEN jt.created_at < NOW() - ($3 * INTERVAL '1 minute')
+                          THEN GREATEST(1, COALESCE((jt.task_payload->>'min_tier')::int, 1) - 1)
+                          ELSE COALESCE((jt.task_payload->>'min_tier')::int, 1)
+                        END
+                      ) <= $2
                     ORDER BY (COALESCE((jt.task_payload->>'min_tier')::int, 1) = $2) DESC,
                              j.priority DESC,
                              COALESCE((jt.task_payload->>'min_tier')::int, 1) DESC,
@@ -88,6 +108,7 @@ async def claim_task(body: TaskClaim) -> dict:
                 """,
                 body.worker_node_id,
                 body.worker_tier,
+                TIER_FALLBACK_AFTER_MINUTES,
             )
 
         if not task:

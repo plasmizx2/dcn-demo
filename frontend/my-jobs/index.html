@@ -70,6 +70,11 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 }
 .job-delete-btn:hover{background:rgba(239,68,68,0.18);color:#f87171}
 
+.job-export-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.job-export-actions span{font-size:0.65rem;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;color:var(--dim)}
+.job-export-btn{background:rgba(124,58,237,0.12);border:1px solid rgba(124,58,237,0.25);color:#c4b5fd;padding:5px 10px;border-radius:8px;font-size:0.72rem;font-weight:600;cursor:pointer;font-family:inherit}
+.job-export-btn:hover{background:rgba(124,58,237,0.22);color:#fff;border-color:rgba(124,58,237,0.45)}
+
 .type-badge{padding:3px 10px;border-radius:20px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
 .type-ml_experiment{background:rgba(124,58,237,0.12);color:#a78bfa}
 
@@ -380,7 +385,15 @@ function showJobDetails(job) {
   if (outputEl && job.final_output) {
     const cleaned = job.final_output.replace(/^=== \S+ ===\s*\n?/gm, '');
     const preview = cleaned.length > 4000 ? cleaned.substring(0, 4000) + '\n\n*... (truncated — view full output in Results)*' : cleaned;
+    const exports = job.status === 'completed' ? `
+      <div class="job-export-actions">
+        <span>Download</span>
+        <button type="button" class="job-export-btn" onclick="event.stopPropagation();downloadJobExport('${job.id}','md')">Markdown</button>
+        <button type="button" class="job-export-btn" onclick="event.stopPropagation();downloadJobExport('${job.id}','json')">JSON</button>
+        <button type="button" class="job-export-btn" onclick="event.stopPropagation();downloadJobExport('${job.id}','csv')">CSV</button>
+      </div>` : '';
     outputEl.innerHTML = `
+      ${exports}
       <div class="output-label">Final Output</div>
       <div class="output-block">${marked.parse(preview)}</div>
     `;
@@ -400,6 +413,41 @@ function escapeHtml(str) {
   const d = document.createElement('div');
   d.textContent = str;
   return d.innerHTML;
+}
+
+async function downloadJobExport(jobId, fmt) {
+  try {
+    const r = await fetch(`${API}/jobs/${jobId}/export?format=${fmt}`, { credentials: 'include' });
+    if (r.status === 401) {
+      alert('Sign in to download exports.');
+      return;
+    }
+    if (!r.ok) {
+      let msg = await r.text();
+      try {
+        const j = JSON.parse(msg);
+        if (j.detail) msg = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail);
+      } catch (_) {}
+      alert('Download failed: ' + msg.slice(0, 300));
+      return;
+    }
+    const blob = await r.blob();
+    let name = 'dcn-export.' + (fmt === 'md' ? 'md' : fmt === 'json' ? 'json' : 'csv');
+    const cd = r.headers.get('Content-Disposition');
+    if (cd) {
+      const m = cd.match(/filename="([^"]+)"/);
+      if (m) name = m[1];
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  } catch (e) {
+    alert('Download failed.');
+  }
 }
 
 async function boot() {

@@ -20,6 +20,10 @@ WORKER_POLL_INTERVAL_SECONDS: int = 5
 TASK_FAILURE_RETRY_DELAY_SECONDS: int = 60
 MAX_TASK_FAILURE_RETRIES: int = 5
 
+# ── Tier fallback (issue #4) ──
+# If a task sat queued this long, effective min_tier drops by 1 so e.g. Tier 3 can claim Tier 4 work.
+TIER_FALLBACK_AFTER_MINUTES: int = 2
+
 # ── Auth ─────────────────────────────────────────────────────
 SESSION_MAX_AGE_SECONDS: int = 86400  # 24 hours
 
