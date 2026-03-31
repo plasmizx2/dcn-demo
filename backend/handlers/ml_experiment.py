@@ -63,14 +63,31 @@ def handle(task: dict, job: dict) -> str:
     if not features:
         features = meta["all_features"]
 
+    # Planner/JSON may use string keys; OpenML columns are normalized to str in datasets.load_openml
+    features = [str(f) for f in features]
+    target = str(target)
+
+    sample = rows[0] if rows else {}
+    missing = [f for f in features if f not in sample]
+    if missing:
+        return (
+            f"Dataset column mismatch: features not in rows — {missing[:5]}"
+            f"{'…' if len(missing) > 5 else ''}. Available keys: {list(sample.keys())[:20]}"
+        )
+    if target not in sample:
+        return f"Target column '{target}' not found in dataset rows. Keys: {list(sample.keys())[:30]}"
+
     max_rows = safe_dataset_size(len(rows))
     if max_rows < len(rows):
         import random
         rows = random.sample(rows, max_rows)
 
+    def _cell(row, key):
+        return row[key] if key in row else row[str(key)]
+
     # Build X and y as numpy arrays for speed
-    X = np.array([[row[f] for f in features] for row in rows])
-    y = np.array([row[target] for row in rows])
+    X = np.array([[_cell(row, f) for f in features] for row in rows])
+    y = np.array([_cell(row, target) for row in rows])
 
     # Train/test split (hold out 20% for final eval after CV)
     X_train, X_test, y_train, y_test = train_test_split(

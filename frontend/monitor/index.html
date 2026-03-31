@@ -1084,6 +1084,10 @@
 
   function badge(status) {
     const s = (status || 'unknown').toLowerCase();
+    // Worker finished but job still requires_validation — show as done, not "running"
+    if (s === 'pending_validation') {
+      return '<span class="badge badge-submitted" title="Awaiting admin validation">pending validation</span>';
+    }
     return `<span class="badge badge-${s}">${s}</span>`;
   }
 
@@ -1249,8 +1253,10 @@
     if (hash === lastDetailHash) return;  // nothing changed, skip re-render
     lastDetailHash = hash;
 
-    // Compute progress
-    const submitted = (tasks || []).filter(t => t.status === 'submitted').length;
+    // Compute progress (pending_validation = worker done, same as submitted for UI)
+    const submitted = (tasks || []).filter(t =>
+      t.status === 'submitted' || t.status === 'pending_validation'
+    ).length;
     const running = (tasks || []).filter(t => t.status === 'running').length;
     const total = (tasks || []).length;
     const pct = total > 0 ? Math.round((submitted / total) * 100) : 0;

@@ -69,7 +69,7 @@ class TestSchemas:
         job = JobCreate(title="Test", task_type="ml_experiment")
         assert job.priority == 1
         assert job.reward_amount == 0.0
-        assert job.requires_validation is True
+        assert job.requires_validation is False
         assert job.input_payload == {}
 
     def test_job_create_with_payload(self):

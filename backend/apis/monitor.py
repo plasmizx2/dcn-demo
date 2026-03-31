@@ -66,12 +66,18 @@ async def monitor_stats() -> dict:
         )
         worker_counts = {r["effective_status"]: r["count"] for r in worker_rows}
 
+    # Count worker-finished tasks (submitted + awaiting admin validation)
+    finished_tasks = task_counts.get("submitted", 0) + task_counts.get(
+        "pending_validation", 0
+    )
+
     return {
         "total_jobs": sum(job_counts.values()),
         "completed_jobs": job_counts.get("completed", 0),
         "queued_tasks": task_counts.get("queued", 0),
         "running_tasks": task_counts.get("running", 0),
-        "submitted_tasks": task_counts.get("submitted", 0),
+        "submitted_tasks": finished_tasks,
+        "pending_validation_tasks": task_counts.get("pending_validation", 0),
         "online_workers": worker_counts.get("online", 0),
         "busy_workers": worker_counts.get("busy", 0),
     }
