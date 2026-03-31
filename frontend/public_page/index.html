@@ -1282,11 +1282,13 @@
 
         const resp = await fetch(`${API}/jobs`, {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             title: title,
             task_type: taskType,
             input_payload: payload,
+            requires_validation: false,
           }),
         });
 

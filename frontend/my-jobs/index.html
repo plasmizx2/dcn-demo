@@ -312,7 +312,9 @@ async function loadTasksForCard(job) {
   try {
     const resp = await fetch(`${API}/jobs/${job.id}/tasks`, { credentials: 'include' });
     const tasks = await resp.json();
-    const done = tasks.filter(t => t.status === 'submitted').length;
+    const done = tasks.filter(t =>
+      t.status === 'submitted' || t.status === 'pending_validation'
+    ).length;
     const pct = tasks.length > 0 ? (done / tasks.length) * 100 : 0;
     const bar = document.getElementById(`pbar-${job.id}`);
     if (bar) {

@@ -10,7 +10,7 @@ class JobCreate(BaseModel):
     user_id: Optional[str] = None
     priority: int = 1
     reward_amount: float = 0.00
-    requires_validation: bool = True
+    requires_validation: bool = False
 
 
 class TaskClaim(BaseModel):

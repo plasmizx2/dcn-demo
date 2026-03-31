@@ -288,12 +288,16 @@ def load_openml(dataset_id: str | int, target: str | None = None) -> tuple[list[
         df = X.copy()
         df[resolved_target] = y
 
+    # JSONB task payloads and sklearn need stable string column names (avoid attr1 KeyErrors)
+    df = df.rename(columns={c: str(c) for c in df.columns})
+    resolved_target = str(resolved_target)
+
     if resolved_target not in df.columns:
         raise ValueError(
             f"Target column '{resolved_target}' not found in OpenML dataset {dataset_id}"
         )
 
-    feature_cols = [c for c in df.columns if c != resolved_target]
+    feature_cols = [str(c) for c in df.columns if str(c) != resolved_target]
     if not feature_cols:
         raise ValueError(f"OpenML dataset {dataset_id} has no feature columns")
 
