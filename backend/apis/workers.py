@@ -1,7 +1,7 @@
 import json
 from fastapi import APIRouter, HTTPException
 from database import get_pool
-from schemas import TaskClaim, TaskComplete, WorkerHeartbeat, WorkerRegister, CacheLookup, CacheStore
+from schemas import TaskClaim, TaskComplete, TaskFail, WorkerHeartbeat, WorkerRegister, CacheLookup, CacheStore
 from aggregator import aggregate_job
 
 router = APIRouter()
@@ -252,8 +252,8 @@ async def validate_task(task_id: str) -> dict:
 
 
 @router.post("/tasks/{task_id}/fail")
-async def fail_task(task_id: str) -> dict:
-    """Mark a task as failed when processing errors out."""
+async def fail_task(task_id: str, body: TaskFail = TaskFail()) -> dict:
+    """Mark a task as failed when processing errors out. Optional worker error text is logged."""
     pool = await get_pool()
     async with pool.acquire() as conn:
         task = await conn.fetchrow(
@@ -274,14 +274,23 @@ async def fail_task(task_id: str) -> dict:
                 task["worker_node_id"],
             )
 
-        # Log failure event
+        err = (body.error or "").strip()
+        if len(err) > 4000:
+            err = err[:4000] + "…"
+        msg = (
+            f"Task {task_id} failed: {err}"
+            if err
+            else f"Task {task_id} failed during processing"
+        )
+
+        # Log failure event (visible in /ops event feed)
         await conn.execute(
             """
             INSERT INTO job_events (job_id, event_type, message)
             VALUES ($1, 'task_failed', $2)
             """,
             task["job_id"],
-            f"Task {task_id} failed during processing",
+            msg,
         )
 
         # If all tasks are terminal (submitted or failed), mark job as failed
