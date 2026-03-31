@@ -12,6 +12,7 @@ import os
 import time
 import json
 import logging
+import traceback
 import requests
 
 logging.basicConfig(
@@ -27,7 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from handlers import ml_experiment
 from config import RETRY_BACKOFF_SECONDS, RATE_LIMIT_BACKOFF_MULTIPLIER, WORKER_POLL_INTERVAL_SECONDS
 
-BASE_URL = "https://dcn-demo.onrender.com"
+BASE_URL = os.getenv("DCN_BASE_URL", "https://dcn-demo.onrender.com")
 
 # Tell Gemini client where to find the cache server
 os.environ["DCN_CACHE_URL"] = BASE_URL
@@ -164,15 +165,20 @@ def complete_task(task_id, result_text, execution_time):
     )
     if resp.status_code == 200:
         return resp.json()
-    else:
-        logger.error("Failed to submit task %s: %s", task_id, resp.text)
-        return None
+    logger.error("Failed to submit task %s: %s", task_id, resp.text)
+    raise RuntimeError(
+        f"POST /complete failed HTTP {resp.status_code}: {resp.text[:800]}"
+    )
 
 
-def fail_task(task_id):
-    """Mark a task as failed via the API."""
+def fail_task(task_id, error=None):
+    """Mark a task as failed via the API; optional error text is stored for /ops event feed."""
+    payload = {}
+    if error and str(error).strip():
+        payload["error"] = str(error).strip()[:8000]
     resp = requests.post(
         f"{BASE_URL}/tasks/{task_id}/fail",
+        json=payload,
     )
     if resp.status_code == 200:
         return resp.json()
@@ -216,7 +222,10 @@ def run_worker(worker_node_id):
             job = fetch_job(job_id)
             if not job:
                 logger.error("Could not fetch job %s, skipping", job_id)
-                fail_task(task_id)
+                fail_task(
+                    task_id,
+                    error=f"fetch_job failed for job_id={job_id} (check BASE_URL / network)",
+                )
                 continue
 
             task_type = job.get("task_type", "unknown")
@@ -233,6 +242,7 @@ def run_worker(worker_node_id):
             start_time = time.time()
             retries = RETRY_BACKOFF_SECONDS
             succeeded = False
+            last_tb = None
 
             for attempt in range(len(retries) + 1):
                 try:
@@ -245,16 +255,15 @@ def run_worker(worker_node_id):
                         logger.info("Task %s submitted", task_id)
                         if complete_result.get("job_aggregated"):
                             logger.info("Job %s aggregated — final output ready!", job_id)
-                    else:
-                        logger.error("Failed to submit task %s", task_id)
-
-                    succeeded = True
-                    break
+                        succeeded = True
+                        break
+                    logger.error("Unexpected complete response for task %s: %s", task_id, complete_result)
+                    raise RuntimeError("complete_task did not return completed=true")
 
                 except Exception as e:
+                    last_tb = traceback.format_exc()
                     error_str = str(e).lower()
                     is_rate_limit = "429" in str(e) or "rate" in error_str or "quota" in error_str
-                    execution_time = round(time.time() - start_time, 2)
 
                     if attempt < len(retries):
                         wait = retries[attempt]
@@ -268,7 +277,7 @@ def run_worker(worker_node_id):
                         logger.error("All retries exhausted: %s", e)
 
             if not succeeded:
-                fail_task(task_id)
+                fail_task(task_id, error=last_tb or "Task failed with no exception traceback")
 
             logger.debug("")
         else:

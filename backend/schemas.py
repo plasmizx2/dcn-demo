@@ -30,6 +30,12 @@ class TaskComplete(BaseModel):
     execution_time_seconds: Optional[float] = None
 
 
+class TaskFail(BaseModel):
+    """Optional error detail from worker (stored on job_events for ops debugging)."""
+
+    error: Optional[str] = None
+
+
 class WorkerHeartbeat(BaseModel):
     worker_node_id: str
 
