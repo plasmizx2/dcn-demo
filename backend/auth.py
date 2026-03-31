@@ -146,13 +146,94 @@ async def list_users() -> list[dict]:
         ]
 
 
+async def fetch_user_jobs_summary(user_id: str, limit: int = 100) -> list[dict]:
+    """Recent jobs for a user (admin/CEO)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT id, title, task_type, status, created_at, updated_at
+            FROM jobs
+            WHERE user_id = $1::uuid
+            ORDER BY created_at DESC
+            LIMIT $2
+            """,
+            user_id,
+            limit,
+        )
+    return [
+        {
+            "id": str(r["id"]),
+            "title": r["title"],
+            "task_type": r["task_type"],
+            "status": r["status"],
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
+        }
+        for r in rows
+    ]
+
+
+async def fetch_user_job_stats(user_id: str) -> dict:
+    """Aggregate job counts by status for a user."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT status, COUNT(*)::int AS n
+            FROM jobs
+            WHERE user_id = $1::uuid
+            GROUP BY status
+            """,
+            user_id,
+        )
+    counts = {r["status"]: r["n"] for r in rows}
+    total = sum(counts.values())
+    return {"total_jobs": total, "by_status": counts}
+
+
+async def fetch_user_session_audit(user_id: str) -> dict:
+    """OAuth sessions are created at login — use as sign-in audit trail (no tokens returned)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        n = await conn.fetchval(
+            "SELECT COUNT(*) FROM sessions WHERE user_id = $1::uuid",
+            user_id,
+        )
+        recent = await conn.fetch(
+            """
+            SELECT created_at
+            FROM sessions
+            WHERE user_id = $1::uuid
+            ORDER BY created_at DESC
+            LIMIT 25
+            """,
+            user_id,
+        )
+    return {
+        "active_session_count": int(n or 0),
+        "recent_logins": [r["created_at"].isoformat() for r in recent],
+    }
+
+
 # Pages that require admin (or ceo) role
-ADMIN_PAGES = {"/ops", "/results", "/worker-logs"}
+ADMIN_PAGES = {"/ops", "/results", "/worker-logs", "/admin/users"}
 # API routes that require admin (or ceo) role
 ADMIN_API_PREFIXES = ["/monitor/"]
 # Pages that require any authenticated user (non-admin)
 AUTH_REQUIRED_PAGES = {"/submit"}
 # Prefixes that don't need auth
+# OAuth callbacks must be reachable without a session; do not use blanket "/auth/" or /auth/users would be public.
 PUBLIC_PREFIXES = [
-    "/login", "/health", "/workers/", "/tasks/", "/jobs", "/auth/", "/stats", "/my-jobs", "/datasets",
+    "/login",
+    "/health",
+    "/workers/",
+    "/tasks/",
+    "/jobs",
+    "/auth/google",
+    "/auth/github",
+    "/auth/logout",
+    "/stats",
+    "/my-jobs",
+    "/datasets",
 ]
