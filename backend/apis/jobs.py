@@ -1,6 +1,9 @@
 import json
+import logging
 from fastapi import APIRouter, HTTPException, Request
 from database import get_pool
+
+logger = logging.getLogger("dcn.jobs")
 from schemas import JobCreate
 from planner import plan_tasks
 from config import VALID_TASK_TYPES, MIN_PRIORITY, MAX_PRIORITY, MIN_REWARD
@@ -90,11 +93,17 @@ async def create_job(job: JobCreate, request: Request) -> dict:
                 row["id"],
             )
 
-            # Plan and insert subtasks
+            # Plan and insert subtasks (OpenML/network errors must not become bare 500s)
             try:
                 subtasks = plan_tasks(job.task_type, job.input_payload)
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e)) from e
+            except Exception as e:
+                logger.exception("plan_tasks failed")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Could not plan tasks for this job: {e!s}",
+                ) from e
             for i, task in enumerate(subtasks, start=1):
                 await conn.execute(
                     """

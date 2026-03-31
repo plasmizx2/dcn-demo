@@ -966,7 +966,7 @@
   (function(){
     const h = window.location.hostname;
     const isLocalPreview = h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === '';
-  fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
+  fetch('/auth/me', { credentials: 'include' }).then(r=>r.ok?r.json():null).then(u=>{
     if(!u){
       if (isLocalPreview) return;
       window.location.href='/login';
@@ -1081,6 +1081,20 @@
     const API = window.location.origin;
     let currentJobId = null;
     let pollInterval = null;
+
+    /** FastAPI often returns { detail: string | array }; normalize for display */
+    function errorDetailFromBody(text) {
+      try {
+        const j = JSON.parse(text);
+        const d = j.detail;
+        if (d === undefined) return null;
+        if (typeof d === 'string') return d;
+        if (Array.isArray(d)) return d.map((x) => (x && x.msg) ? x.msg : JSON.stringify(x)).join('; ');
+        return String(d);
+      } catch (_) {
+        return null;
+      }
+    }
 
 
     // Task descriptions
@@ -1201,14 +1215,16 @@
       try {
         const resp = await fetch(`${API}/datasets/load`, {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ source, dataset_id: datasetId }),
         });
+        const loadText = await resp.text();
         if (!resp.ok) {
-          const err = await resp.json();
-          throw new Error(err.detail || 'Failed to load dataset');
+          const msg = errorDetailFromBody(loadText) || loadText.slice(0, 400) || 'Failed to load dataset';
+          throw new Error(msg);
         }
-        const data = await resp.json();
+        const data = JSON.parse(loadText);
         _datasetMeta = data;
 
         document.getElementById('dsPreviewTitle').textContent = data.display_name || 'Dataset';
@@ -1323,8 +1339,8 @@
 
       try {
         const [jobResp, tasksResp] = await Promise.all([
-          fetch(`${API}/jobs/${currentJobId}`),
-          fetch(`${API}/jobs/${currentJobId}/tasks`),
+          fetch(`${API}/jobs/${currentJobId}`, { credentials: 'include' }),
+          fetch(`${API}/jobs/${currentJobId}/tasks`, { credentials: 'include' }),
         ]);
 
         const job = await jobResp.json();
@@ -1425,7 +1441,7 @@
     async function loadTimingComparison() {
       if (!currentJobId) return;
       try {
-        const resp = await fetch(`${API}/jobs/${currentJobId}/timing`);
+        const resp = await fetch(`${API}/jobs/${currentJobId}/timing`, { credentials: 'include' });
         if (!resp.ok) return;
         const timing = await resp.json();
 
