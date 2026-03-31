@@ -127,11 +127,23 @@ async def create_job(job: JobCreate, request: Request) -> dict:
 
 @router.get("/jobs/{job_id}/tasks")
 async def get_job_tasks(job_id: str) -> list[dict]:
-    """Return all tasks for a job, ordered by task_order."""
+    """Return all tasks for a job, ordered by task_order, with optional failure_detail from task_results."""
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT * FROM job_tasks WHERE job_id = $1 ORDER BY task_order",
+            """
+            SELECT jt.*, sub.result_text AS failure_detail
+            FROM job_tasks jt
+            LEFT JOIN LATERAL (
+                SELECT result_text
+                FROM task_results
+                WHERE task_id = jt.id
+                ORDER BY submitted_at DESC
+                LIMIT 1
+            ) sub ON TRUE
+            WHERE jt.job_id = $1
+            ORDER BY jt.task_order
+            """,
             job_id,
         )
     return [dict(r) for r in rows]

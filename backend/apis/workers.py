@@ -293,6 +293,18 @@ async def fail_task(task_id: str, body: TaskFail = TaskFail()) -> dict:
             msg,
         )
 
+        # Store on task_results so job detail table can show the reason (not just "failed")
+        await conn.execute("DELETE FROM task_results WHERE task_id = $1", task_id)
+        await conn.execute(
+            """
+            INSERT INTO task_results (task_id, worker_node_id, result_text, result_payload, status)
+            VALUES ($1, $2, $3, '{}'::jsonb, 'failed')
+            """,
+            task_id,
+            task["worker_node_id"],
+            msg,
+        )
+
         # If all tasks are terminal (submitted or failed), mark job as failed
         counts = await conn.fetchrow(
             """
