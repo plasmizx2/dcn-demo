@@ -434,6 +434,29 @@ async def not_found_handler(request: Request, exc):
     return FileResponse(os.path.join(ERROR_DIR, "404.html"), status_code=404)
 
 
+# ── Dataset preview endpoint ─────────────────────────────────
+@app.post("/datasets/load")
+async def load_dataset_preview(request: Request):
+    """Preview a dataset before job submission. Returns columns, sample rows, suggested target."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"detail": "Invalid JSON"}, status_code=400)
+
+    source = body.get("source", "built_in")
+    dataset_id = body.get("dataset_id", "")
+    if not dataset_id:
+        return JSONResponse({"detail": "dataset_id is required"}, status_code=400)
+
+    try:
+        from datasets import preview_dataset
+        result = preview_dataset(source, dataset_id)
+        return result
+    except Exception as e:
+        logger.error("Dataset preview failed: %s", e)
+        return JSONResponse({"detail": str(e)}, status_code=400)
+
+
 @app.get("/stats")
 async def platform_stats():
     """Cumulative platform stats for the landing page — all-time counts."""

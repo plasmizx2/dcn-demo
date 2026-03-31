@@ -7,3 +7,4 @@ httpx
 google-genai
 scikit-learn
 numpy
+openml
