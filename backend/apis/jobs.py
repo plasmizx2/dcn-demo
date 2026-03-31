@@ -1,10 +1,12 @@
 import json
+from uuid import UUID
+
 from fastapi import APIRouter, HTTPException, Request
 from database import get_pool
 from schemas import JobCreate
 from planner import plan_tasks
 from config import VALID_TASK_TYPES, MIN_PRIORITY, MAX_PRIORITY, MIN_REWARD
-from auth import get_session
+from auth import get_session, ELEVATED_ROLES
 
 router = APIRouter()
 
@@ -148,6 +150,43 @@ async def clear_all_jobs(request: Request) -> dict:
         await conn.execute("DELETE FROM job_tasks")
         await conn.execute("DELETE FROM jobs")
     return {"cleared": True}
+
+
+@router.delete("/jobs/{job_id}")
+async def delete_job(job_id: str, request: Request) -> dict:
+    """Delete one job and related tasks, events, and results. Owner or admin/CEO only."""
+    try:
+        UUID(job_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Job not found") from None
+
+    user = await get_session(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, user_id FROM jobs WHERE id = $1::uuid", job_id
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Job not found")
+
+        owner_id = str(row["user_id"]) if row["user_id"] is not None else None
+        is_owner = owner_id == user["id"]
+        is_elevated = user.get("role") in ELEVATED_ROLES
+        if not is_owner and not is_elevated:
+            raise HTTPException(
+                status_code=403, detail="You can only delete your own jobs"
+            )
+
+        async with conn.transaction():
+            await conn.execute(
+                "DELETE FROM job_events WHERE job_id = $1::uuid", job_id
+            )
+            await conn.execute("DELETE FROM jobs WHERE id = $1::uuid", job_id)
+
+    return {"deleted": True, "id": job_id}
 
 
 @router.get("/jobs/{job_id}/timing")
