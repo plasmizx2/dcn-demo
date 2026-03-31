@@ -37,7 +37,9 @@ CREATE TABLE IF NOT EXISTS job_tasks (
     started_at          TIMESTAMPTZ,
     completed_at        TIMESTAMPTZ,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    worker_node_id      UUID
+    worker_node_id      UUID,
+    claim_after         TIMESTAMPTZ,
+    failure_count       INTEGER NOT NULL DEFAULT 0
 );
 
 -- ─── Job Events (event log) ─────────────────────────────

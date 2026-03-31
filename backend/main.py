@@ -51,7 +51,10 @@ async def _maintenance_loop():
                 reaped = await conn.fetch(
                     """
                     UPDATE job_tasks
-                    SET status = 'queued', worker_node_id = NULL, started_at = NULL
+                    SET status = 'queued',
+                        worker_node_id = NULL,
+                        started_at = NULL,
+                        claim_after = NULL
                     WHERE status = 'running'
                       AND started_at IS NOT NULL
                       AND started_at < NOW() - INTERVAL '{} minutes'
@@ -154,6 +157,30 @@ async def _migrate_jobs_user_fk_to_dcn_users(conn) -> None:
     logger.info("Added jobs.user_id foreign key to dcn_users")
 
 
+async def _migrate_job_tasks_retry_columns(conn) -> None:
+    """Add claim_after + failure_count for requeue-on-fail with cooldown."""
+    exists = await conn.fetchval(
+        """
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = 'job_tasks'
+        )
+        """
+    )
+    if not exists:
+        return
+    await conn.execute(
+        "ALTER TABLE job_tasks ADD COLUMN IF NOT EXISTS claim_after TIMESTAMPTZ"
+    )
+    await conn.execute(
+        """
+        ALTER TABLE job_tasks
+        ADD COLUMN IF NOT EXISTS failure_count INTEGER NOT NULL DEFAULT 0
+        """
+    )
+    logger.info("Ensured job_tasks.claim_after and job_tasks.failure_count exist")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start up: connect to DB, create static cache table, + start maintenance. Shut down: clean up."""
@@ -197,6 +224,11 @@ async def lifespan(app: FastAPI):
             await _migrate_jobs_user_fk_to_dcn_users(conn)
         except Exception as e:
             logger.error("jobs.user_id FK migration failed: %s", e, exc_info=True)
+            raise
+        try:
+            await _migrate_job_tasks_retry_columns(conn)
+        except Exception as e:
+            logger.error("job_tasks retry columns migration failed: %s", e, exc_info=True)
             raise
     maintenance_task = asyncio.create_task(_maintenance_loop())
     yield
