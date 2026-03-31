@@ -139,10 +139,12 @@ async def get_job_tasks(job_id: str) -> list[dict]:
 
 @router.delete("/jobs/all")
 async def clear_all_jobs(request: Request) -> dict:
-    """Delete all jobs, tasks, events, and results. Admin-only demo reset."""
+    """Delete all jobs, tasks, events, and results. CEO or admin demo reset."""
     user = await get_session(request)
-    if not user or user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if not user or user.get("role") not in ELEVATED_ROLES:
+        raise HTTPException(
+            status_code=403, detail="CEO or admin access required"
+        )
     pool = await get_pool()
     async with pool.acquire() as conn:
         await conn.execute("DELETE FROM task_results")

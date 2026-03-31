@@ -1050,15 +1050,28 @@
   async function clearAllJobs() {
     if (!confirm('Clear all jobs, tasks, and results? This cannot be undone.')) return;
     try {
-      const resp = await fetch('/jobs/all', { method: 'DELETE' });
-      if (resp.ok) {
-        selectedJobId = null;
-        allJobs = [];
-        lastDetailHash = null;
-        lastEventHash = null;
-        hasAutoSelected = false;
-        pollAll();
+      const resp = await fetch('/jobs/all', {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const text = await resp.text();
+      if (!resp.ok) {
+        let msg = text.slice(0, 400);
+        try {
+          const j = JSON.parse(text);
+          if (j.detail !== undefined) {
+            msg = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail);
+          }
+        } catch (_) {}
+        alert(msg || 'Clear failed');
+        return;
       }
+      selectedJobId = null;
+      allJobs = [];
+      lastDetailHash = null;
+      lastEventHash = null;
+      hasAutoSelected = false;
+      pollAll();
     } catch (e) {
       alert('Failed to clear: ' + e.message);
     }
