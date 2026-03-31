@@ -243,7 +243,35 @@
       font-weight: 500;
       letter-spacing: 0.2px;
     }
-    input, select, textarea {
+    .ds-source-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+      align-items: center;
+    }
+    .ds-source-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.88);
+      white-space: nowrap;
+      margin-bottom: 0;
+      font-weight: 500;
+    }
+    .ds-source-pill:has(input:checked) {
+      background: rgba(124,58,237,0.12);
+      color: #c4b5fd;
+      border-color: rgba(124,58,237,0.25);
+    }
+    input:not([type="radio"]):not([type="checkbox"]):not([type="hidden"]),
+    select, textarea {
       width: 100%;
       padding: 13px 18px;
       background: rgba(18,20,28,0.9);
@@ -255,7 +283,22 @@
       margin-bottom: 22px;
       transition: all 0.2s ease;
     }
-    input:focus, select:focus, textarea:focus {
+    /* Radios/checkboxes must not inherit full-width text-input styles */
+    input[type="radio"], input[type="checkbox"] {
+      width: auto;
+      min-width: 1rem;
+      max-width: none;
+      padding: 0;
+      margin: 0 8px 0 0;
+      margin-bottom: 0;
+      border: none;
+      background: transparent;
+      flex-shrink: 0;
+      vertical-align: middle;
+      accent-color: #7c3aed;
+    }
+    input:not([type="radio"]):not([type="checkbox"]):focus,
+    select:focus, textarea:focus {
       outline: none;
       border-color: rgba(124,58,237,0.45);
       box-shadow: 0 0 0 3px rgba(124,58,237,0.08), 0 0 24px rgba(124,58,237,0.04);
@@ -996,15 +1039,15 @@
       if (cfg.tag === 'custom_ml') {
         group.innerHTML = `
           <label>Dataset Source</label>
-          <div style="display:flex;gap:8px;margin-bottom:14px;">
-            <label style="display:flex;align-items:center;gap:5px;font-size:0.85rem;cursor:pointer;padding:7px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.10);background:rgba(124,58,237,0.12);color:#c4b5fd;">
-              <input type="radio" name="dsSource" value="built_in" checked style="accent-color:#7c3aed;"> Built-in
+          <div class="ds-source-row">
+            <label class="ds-source-pill">
+              <input type="radio" name="dsSource" value="built_in" checked> Built-in
             </label>
-            <label style="display:flex;align-items:center;gap:5px;font-size:0.85rem;cursor:pointer;padding:7px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);">
-              <input type="radio" name="dsSource" value="openml" style="accent-color:#7c3aed;"> OpenML
+            <label class="ds-source-pill">
+              <input type="radio" name="dsSource" value="openml"> OpenML
             </label>
-            <label style="display:flex;align-items:center;gap:5px;font-size:0.85rem;cursor:pointer;padding:7px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);">
-              <input type="radio" name="dsSource" value="csv_url" style="accent-color:#7c3aed;"> CSV URL
+            <label class="ds-source-pill">
+              <input type="radio" name="dsSource" value="csv_url"> CSV URL
             </label>
           </div>
 
@@ -1044,10 +1087,6 @@
             document.getElementById('dsExternal').style.display = v !== 'built_in' ? '' : 'none';
             document.getElementById('dsPreview').style.display = 'none';
             _datasetMeta = null;
-            document.querySelectorAll('input[name="dsSource"]').forEach(rb => {
-              rb.closest('label').style.background = rb.checked ? 'rgba(124,58,237,0.12)' : 'rgba(255,255,255,0.04)';
-              rb.closest('label').style.color = rb.checked ? '#c4b5fd' : '';
-            });
             if (v === 'openml') {
               document.getElementById('dsIdLabel').textContent = 'OpenML Dataset ID';
               document.getElementById('dsIdInput').placeholder = 'e.g. 41146';
