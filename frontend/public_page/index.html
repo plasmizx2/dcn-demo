@@ -845,6 +845,7 @@
   </aside>
   <script>
   fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
+    if(!u){ window.location.href='/login'; return; }
     const nav=document.getElementById('sidebarNav');
     const role=document.getElementById('sidebarRole');
     if(u){
@@ -985,26 +986,127 @@
       }
     }
 
+    let _datasetMeta = null;
+
     function updateInputField() {
       const type = taskTypeSelect.value;
       const cfg = inputConfig[type] || inputConfig.ml_experiment;
       const group = document.getElementById('inputGroup');
+      _datasetMeta = null;
       if (cfg.tag === 'custom_ml') {
         group.innerHTML = `
-          <label for="mlDataset">Dataset</label>
-          <select id="mlDataset">
-            <option value="weather_ri">Rhode Island Weather (Regression — predict temperature)</option>
-            <option value="customer_churn">Customer Churn (Classification — predict churn)</option>
-          </select>
-          <label for="inputText">Modeling Goal (optional)</label>
+          <label>Dataset Source</label>
+          <div style="display:flex;gap:8px;margin-bottom:14px;">
+            <label style="display:flex;align-items:center;gap:5px;font-size:0.85rem;cursor:pointer;padding:7px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.10);background:rgba(124,58,237,0.12);color:#c4b5fd;">
+              <input type="radio" name="dsSource" value="built_in" checked style="accent-color:#7c3aed;"> Built-in
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:0.85rem;cursor:pointer;padding:7px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);">
+              <input type="radio" name="dsSource" value="openml" style="accent-color:#7c3aed;"> OpenML
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:0.85rem;cursor:pointer;padding:7px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.04);">
+              <input type="radio" name="dsSource" value="csv_url" style="accent-color:#7c3aed;"> CSV URL
+            </label>
+          </div>
+
+          <div id="dsBuiltIn">
+            <label for="mlDataset">Dataset</label>
+            <select id="mlDataset">
+              <option value="weather_ri">Rhode Island Weather (Regression — predict temperature)</option>
+              <option value="customer_churn">Customer Churn (Classification — predict churn)</option>
+            </select>
+          </div>
+
+          <div id="dsExternal" style="display:none;">
+            <label id="dsIdLabel">OpenML Dataset ID</label>
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="dsIdInput" placeholder="e.g. 41146" style="flex:1;">
+              <button type="button" class="btn" onclick="loadDatasetPreview()" id="dsLoadBtn"
+                style="padding:10px 18px;font-size:0.82rem;min-width:auto;white-space:nowrap;">Load</button>
+            </div>
+            <div id="dsHint" style="font-size:0.72rem;color:rgba(255,255,255,0.35);margin-top:4px;"></div>
+          </div>
+
+          <div id="dsPreview" style="display:none;margin-top:14px;padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.03);">
+            <div style="font-size:0.82rem;font-weight:600;margin-bottom:8px;" id="dsPreviewTitle"></div>
+            <div style="font-size:0.78rem;color:rgba(255,255,255,0.5);margin-bottom:8px;" id="dsPreviewInfo"></div>
+            <label for="dsTarget" style="font-size:0.82rem;">Target Column</label>
+            <select id="dsTarget" style="margin-bottom:0;"></select>
+          </div>
+
+          <label for="inputText" style="margin-top:14px;">Modeling Goal (optional)</label>
           <textarea id="inputText" placeholder="e.g. Predict next-day temperature from weather features..."></textarea>
         `;
+
+        document.querySelectorAll('input[name="dsSource"]').forEach(r => {
+          r.addEventListener('change', () => {
+            const v = r.value;
+            document.getElementById('dsBuiltIn').style.display = v === 'built_in' ? '' : 'none';
+            document.getElementById('dsExternal').style.display = v !== 'built_in' ? '' : 'none';
+            document.getElementById('dsPreview').style.display = 'none';
+            _datasetMeta = null;
+            document.querySelectorAll('input[name="dsSource"]').forEach(rb => {
+              rb.closest('label').style.background = rb.checked ? 'rgba(124,58,237,0.12)' : 'rgba(255,255,255,0.04)';
+              rb.closest('label').style.color = rb.checked ? '#c4b5fd' : '';
+            });
+            if (v === 'openml') {
+              document.getElementById('dsIdLabel').textContent = 'OpenML Dataset ID';
+              document.getElementById('dsIdInput').placeholder = 'e.g. 41146';
+              document.getElementById('dsHint').innerHTML = 'Browse datasets at <a href="https://openml.org/search?type=data" target="_blank" style="color:#818cf8;">openml.org</a>';
+            } else if (v === 'csv_url') {
+              document.getElementById('dsIdLabel').textContent = 'CSV URL';
+              document.getElementById('dsIdInput').placeholder = 'https://raw.githubusercontent.com/.../data.csv';
+              document.getElementById('dsHint').textContent = 'Paste a direct link to any public CSV file';
+            }
+          });
+        });
       } else if (cfg.tag === 'input') {
         group.innerHTML = `<label for="inputText">${cfg.label}</label>
           <input type="${cfg.type || 'text'}" id="inputText" placeholder="${cfg.placeholder}">`;
       } else {
         group.innerHTML = `<label for="inputText">${cfg.label}</label>
           <textarea id="inputText" placeholder="${cfg.placeholder}"></textarea>`;
+      }
+    }
+
+    async function loadDatasetPreview() {
+      const source = document.querySelector('input[name="dsSource"]:checked')?.value;
+      const datasetId = document.getElementById('dsIdInput')?.value.trim();
+      if (!datasetId) { showError('Enter a dataset ID or URL first.'); return; }
+
+      const btn = document.getElementById('dsLoadBtn');
+      btn.disabled = true; btn.textContent = 'Loading...';
+
+      try {
+        const resp = await fetch(`${API}/datasets/load`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source, dataset_id: datasetId }),
+        });
+        if (!resp.ok) {
+          const err = await resp.json();
+          throw new Error(err.detail || 'Failed to load dataset');
+        }
+        const data = await resp.json();
+        _datasetMeta = data;
+
+        document.getElementById('dsPreviewTitle').textContent = data.display_name || 'Dataset';
+        document.getElementById('dsPreviewInfo').textContent =
+          `${data.row_count.toLocaleString()} rows · ${data.numeric_columns.length} numeric columns`;
+
+        const sel = document.getElementById('dsTarget');
+        sel.innerHTML = '';
+        data.numeric_columns.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c; opt.textContent = c;
+          if (c === data.suggested_target) opt.selected = true;
+          sel.appendChild(opt);
+        });
+
+        document.getElementById('dsPreview').style.display = '';
+      } catch (e) {
+        showError(e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Load';
       }
     }
 
@@ -1037,12 +1139,24 @@
       btn.querySelector('.btn-label').textContent = 'Submitting...';
 
       try {
-        // Build payload
-        const datasetEl = document.getElementById('mlDataset');
-        const payload = {
-          dataset_name: datasetEl ? datasetEl.value : 'weather_ri',
-          goal: inputText || 'Run distributed ML experiments'
-        };
+        // Build payload based on selected source
+        const sourceEl = document.querySelector('input[name="dsSource"]:checked');
+        const source = sourceEl ? sourceEl.value : 'built_in';
+        const payload = { goal: inputText || 'Run distributed ML experiments' };
+
+        if (source === 'built_in') {
+          const datasetEl = document.getElementById('mlDataset');
+          payload.dataset_name = datasetEl ? datasetEl.value : 'weather_ri';
+          payload.source = 'built_in';
+        } else {
+          const dsId = document.getElementById('dsIdInput')?.value.trim();
+          if (!dsId) { showError('Load a dataset first.'); btn.disabled = false; btn.classList.remove('loading'); btn.querySelector('.btn-label').textContent = 'Submit Job'; return; }
+          if (!_datasetMeta) { showError('Click "Load" to preview the dataset before submitting.'); btn.disabled = false; btn.classList.remove('loading'); btn.querySelector('.btn-label').textContent = 'Submit Job'; return; }
+          payload.source = source;
+          payload.dataset_id = dsId;
+          const targetEl = document.getElementById('dsTarget');
+          if (targetEl) payload.target = targetEl.value;
+        }
 
         const resp = await fetch(`${API}/jobs`, {
           method: 'POST',

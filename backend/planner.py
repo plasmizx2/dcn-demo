@@ -25,21 +25,36 @@ def plan_tasks(task_type: str, input_payload: dict) -> list[dict]:
 
 def _plan_ml_experiment(input_payload: dict) -> list[dict]:
     """
-    Generate 8 heavy ML experiment subtasks — each trains a different model/config
-    with cross-validation on 75K rows. Actually makes the CPU sweat.
+    Generate heavy ML experiment subtasks — each trains a different model/config
+    with cross-validation. Supports built-in, OpenML, and CSV URL datasets.
     """
-    from datasets import DATASETS
-
+    source = input_payload.get("source", "built_in")
+    dataset_id = input_payload.get("dataset_id", "")
     dataset_name = input_payload.get("dataset_name", "weather_ri")
-    ds_info = DATASETS.get(dataset_name, DATASETS["weather_ri"])
 
-    target = ds_info["target"]
-    task_category = ds_info["task_category"]
-    all_features = ds_info["all_features"]
-    reduced_features = all_features[:5]  # first 5 features for reduced experiments
-    mid_features = all_features[:len(all_features) // 2]  # half the features
+    if source in ("openml", "csv_url") and dataset_id:
+        from datasets import load_external_dataset
+        target_override = input_payload.get("target")
+        _, meta = load_external_dataset(source, dataset_id, target=target_override)
+        target = meta["target"]
+        task_category = meta["task_category"]
+        all_features = meta["all_features"]
+    else:
+        source = "built_in"
+        from datasets import DATASETS
+        ds_info = DATASETS.get(dataset_name, DATASETS["weather_ri"])
+        target = ds_info["target"]
+        task_category = ds_info["task_category"]
+        all_features = ds_info["all_features"]
+
+    reduced_features = all_features[:5]
+    mid_features = all_features[:len(all_features) // 2]
+
+    display_name = dataset_name if source == "built_in" else dataset_id
 
     base = {
+        "source": source,
+        "dataset_id": dataset_id,
         "dataset_name": dataset_name,
         "target": target,
         "task_category": task_category,
@@ -49,32 +64,32 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
         return [
             {
                 "task_name": "experiment_linear_baseline",
-                "task_description": f"5-fold CV LinearRegression on {dataset_name} (75K rows, all features)",
+                "task_description": f"5-fold CV LinearRegression on {display_name} (all features)",
                 "task_payload": {**base, "experiment_type": "linear_regression", "features": all_features, "cv_folds": 5, "params": {}, "min_tier": 2},
             },
             {
                 "task_name": "experiment_ridge_regression",
-                "task_description": f"5-fold CV Ridge (alpha=1.0) on {dataset_name}",
+                "task_description": f"5-fold CV Ridge (alpha=1.0) on {display_name}",
                 "task_payload": {**base, "experiment_type": "ridge_regression", "features": all_features, "cv_folds": 5, "params": {"alpha": 1.0}, "min_tier": 2},
             },
             {
                 "task_name": "experiment_decision_tree_deep",
-                "task_description": f"5-fold CV DecisionTree (max_depth=15) on {dataset_name}",
+                "task_description": f"5-fold CV DecisionTree (max_depth=15) on {display_name}",
                 "task_payload": {**base, "experiment_type": "decision_tree_regressor", "features": all_features, "cv_folds": 5, "params": {"max_depth": 15}, "min_tier": 2},
             },
             {
                 "task_name": "experiment_random_forest_medium",
-                "task_description": f"5-fold CV RandomForest (200 trees, depth=10) on {dataset_name}",
+                "task_description": f"5-fold CV RandomForest (200 trees, depth=10) on {display_name}",
                 "task_payload": {**base, "experiment_type": "random_forest_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 10}, "min_tier": 3},
             },
             {
                 "task_name": "experiment_random_forest_heavy",
-                "task_description": f"5-fold CV RandomForest (500 trees, depth=20) on {dataset_name}",
+                "task_description": f"5-fold CV RandomForest (500 trees, depth=20) on {display_name}",
                 "task_payload": {**base, "experiment_type": "random_forest_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 20}, "min_tier": 3},
             },
             {
                 "task_name": "experiment_gradient_boosting",
-                "task_description": f"5-fold CV GradientBoosting (200 trees, depth=5, lr=0.1) on {dataset_name}",
+                "task_description": f"5-fold CV GradientBoosting (200 trees, depth=5, lr=0.1) on {display_name}",
                 "task_payload": {**base, "experiment_type": "gradient_boosting_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 5, "learning_rate": 0.1}, "min_tier": 3},
             },
             {
@@ -90,12 +105,12 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
             # ── Tier 4: datacenter-class heavy experiments ──
             {
                 "task_name": "experiment_rf_massive",
-                "task_description": f"10-fold CV RandomForest (1000 trees, depth=30, all features) on {dataset_name} — Tier 4 only",
+                "task_description": f"10-fold CV RandomForest (1000 trees, depth=30, all features) on {display_name} — Tier 4 only",
                 "task_payload": {**base, "experiment_type": "random_forest_regressor", "features": all_features, "cv_folds": 10, "params": {"n_estimators": 1000, "max_depth": 30}, "min_tier": 4},
             },
             {
                 "task_name": "experiment_gb_extreme",
-                "task_description": f"10-fold CV GradientBoosting (1000 trees, depth=12, lr=0.01) on {dataset_name} — Tier 4 only",
+                "task_description": f"10-fold CV GradientBoosting (1000 trees, depth=12, lr=0.01) on {display_name} — Tier 4 only",
                 "task_payload": {**base, "experiment_type": "gradient_boosting_regressor", "features": all_features, "cv_folds": 10, "params": {"n_estimators": 1000, "max_depth": 12, "learning_rate": 0.01}, "min_tier": 4},
             },
             {
@@ -124,22 +139,22 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
             },
             {
                 "task_name": "experiment_decision_tree_deep",
-                "task_description": f"5-fold CV DecisionTree (max_depth=15) on {dataset_name}",
+                "task_description": f"5-fold CV DecisionTree (max_depth=15) on {display_name}",
                 "task_payload": {**base, "experiment_type": "decision_tree_classifier", "features": all_features, "cv_folds": 5, "params": {"max_depth": 15}, "min_tier": 2},
             },
             {
                 "task_name": "experiment_random_forest_medium",
-                "task_description": f"5-fold CV RandomForest (200 trees, depth=10) on {dataset_name}",
+                "task_description": f"5-fold CV RandomForest (200 trees, depth=10) on {display_name}",
                 "task_payload": {**base, "experiment_type": "random_forest_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 10}, "min_tier": 3},
             },
             {
                 "task_name": "experiment_random_forest_heavy",
-                "task_description": f"5-fold CV RandomForest (500 trees, depth=20) on {dataset_name}",
+                "task_description": f"5-fold CV RandomForest (500 trees, depth=20) on {display_name}",
                 "task_payload": {**base, "experiment_type": "random_forest_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 20}, "min_tier": 3},
             },
             {
                 "task_name": "experiment_gradient_boosting",
-                "task_description": f"5-fold CV GradientBoosting (200 trees, depth=5, lr=0.1) on {dataset_name}",
+                "task_description": f"5-fold CV GradientBoosting (200 trees, depth=5, lr=0.1) on {display_name}",
                 "task_payload": {**base, "experiment_type": "gradient_boosting_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 5, "learning_rate": 0.1}, "min_tier": 3},
             },
             {
@@ -155,12 +170,12 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
             # ── Tier 4: datacenter-class heavy experiments ──
             {
                 "task_name": "experiment_rf_massive",
-                "task_description": f"10-fold CV RandomForest (1000 trees, depth=30, all features) on {dataset_name} — Tier 4 only",
+                "task_description": f"10-fold CV RandomForest (1000 trees, depth=30, all features) on {display_name} — Tier 4 only",
                 "task_payload": {**base, "experiment_type": "random_forest_classifier", "features": all_features, "cv_folds": 10, "params": {"n_estimators": 1000, "max_depth": 30}, "min_tier": 4},
             },
             {
                 "task_name": "experiment_gb_extreme",
-                "task_description": f"10-fold CV GradientBoosting (1000 trees, depth=12, lr=0.01) on {dataset_name} — Tier 4 only",
+                "task_description": f"10-fold CV GradientBoosting (1000 trees, depth=12, lr=0.01) on {display_name} — Tier 4 only",
                 "task_payload": {**base, "experiment_type": "gradient_boosting_classifier", "features": all_features, "cv_folds": 10, "params": {"n_estimators": 1000, "max_depth": 12, "learning_rate": 0.01}, "min_tier": 4},
             },
             {

@@ -32,7 +32,7 @@ def handle(task: dict, job: dict) -> str:
     )
     import numpy as np
 
-    from datasets import get_dataset
+    from datasets import get_dataset, load_external_dataset
 
     # Parse task payload
     payload = task.get("task_payload", {})
@@ -50,8 +50,15 @@ def handle(task: dict, job: dict) -> str:
     cv_folds = payload.get("cv_folds", 5)
     params = payload.get("params", {})
 
-    # Load dataset — then downsample if machine is low on RAM
-    rows, meta = get_dataset(dataset_name)
+    source = payload.get("source", "built_in")
+    dataset_id = payload.get("dataset_id", "")
+
+    if source in ("openml", "csv_url") and dataset_id:
+        rows, meta = load_external_dataset(source, dataset_id, target=target)
+        target = meta["target"]
+        task_category = meta["task_category"]
+    else:
+        rows, meta = get_dataset(dataset_name)
 
     if not features:
         features = meta["all_features"]

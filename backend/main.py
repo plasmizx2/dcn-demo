@@ -14,7 +14,7 @@ from apis.workers import router as workers_router
 from auth import (
     find_or_create_oauth_user, create_session, get_session, destroy_session,
     update_user_role, list_users,
-    SESSION_COOKIE, ADMIN_PAGES, ADMIN_API_PREFIXES, PUBLIC_PREFIXES, ELEVATED_ROLES,
+    SESSION_COOKIE, ADMIN_PAGES, ADMIN_API_PREFIXES, AUTH_REQUIRED_PAGES, PUBLIC_PREFIXES, ELEVATED_ROLES,
 )
 from config import (
     MAINTENANCE_INTERVAL_SECONDS, STALE_TASK_TIMEOUT_MINUTES,
@@ -153,6 +153,12 @@ async def auth_middleware(request: Request, call_next):
     # Let public routes, worker endpoints, and static assets through
     if any(path.startswith(p) for p in PUBLIC_PREFIXES):
         return await call_next(request)
+
+    # Auth-required pages → redirect to login if not signed in
+    if path in AUTH_REQUIRED_PAGES:
+        user = await get_session(request)
+        if not user:
+            return RedirectResponse("/login", status_code=302)
 
     # Admin-only pages → redirect to login if not admin/ceo
     if path in ADMIN_PAGES:
@@ -426,6 +432,29 @@ async def not_found_handler(request: Request, exc):
     if request.url.path.startswith("/api/") or request.url.path.startswith("/monitor/"):
         return JSONResponse({"detail": "Not found"}, status_code=404)
     return FileResponse(os.path.join(ERROR_DIR, "404.html"), status_code=404)
+
+
+# ── Dataset preview endpoint ─────────────────────────────────
+@app.post("/datasets/load")
+async def load_dataset_preview(request: Request):
+    """Preview a dataset before job submission. Returns columns, sample rows, suggested target."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"detail": "Invalid JSON"}, status_code=400)
+
+    source = body.get("source", "built_in")
+    dataset_id = body.get("dataset_id", "")
+    if not dataset_id:
+        return JSONResponse({"detail": "dataset_id is required"}, status_code=400)
+
+    try:
+        from datasets import preview_dataset
+        result = preview_dataset(source, dataset_id)
+        return result
+    except Exception as e:
+        logger.error("Dataset preview failed: %s", e)
+        return JSONResponse({"detail": str(e)}, status_code=400)
 
 
 @app.get("/stats")

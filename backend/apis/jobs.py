@@ -34,8 +34,12 @@ async def get_job(job_id: str) -> dict:
 
 
 @router.post("/jobs")
-async def create_job(job: JobCreate) -> dict:
+async def create_job(job: JobCreate, request: Request) -> dict:
     """Create a new job, plan subtasks, and log events (transactional)."""
+    user = await get_session(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
     if not job.title or not job.title.strip():
         raise HTTPException(status_code=400, detail="Job title is required")
     if not job.task_type or not job.task_type.strip():
@@ -71,7 +75,7 @@ async def create_job(job: JobCreate) -> dict:
                 job.description,
                 job.task_type,
                 json.dumps(job.input_payload),
-                job.user_id,
+                user["id"],
                 job.priority,
                 job.reward_amount,
                 job.requires_validation,

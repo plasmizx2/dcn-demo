@@ -18,7 +18,7 @@ def handle(task: dict, job: dict) -> str:
         GradientBoostingRegressor, GradientBoostingClassifier,
     )
     import numpy as np
-    from datasets import get_dataset
+    from datasets import get_dataset, load_external_dataset
 
     payload = task.get("task_payload", {})
     if isinstance(payload, str):
@@ -35,7 +35,15 @@ def handle(task: dict, job: dict) -> str:
     cv_folds = payload.get("cv_folds", 5)
     params = payload.get("params", {})
 
-    rows, meta = get_dataset(dataset_name)
+    source = payload.get("source", "built_in")
+    dataset_id = payload.get("dataset_id", "")
+
+    if source in ("openml", "csv_url") and dataset_id:
+        rows, meta = load_external_dataset(source, dataset_id, target=target)
+        target = meta["target"]
+        task_category = meta["task_category"]
+    else:
+        rows, meta = get_dataset(dataset_name)
 
     if not features:
         features = meta["all_features"]
