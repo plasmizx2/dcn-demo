@@ -62,6 +62,14 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .badge-failed{background:rgba(239,68,68,0.12);color:#f87171}.badge-failed::before{background:#ef4444}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 
+.job-card-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.job-delete-btn{
+  font:inherit;font-size:0.72rem;font-weight:600;color:rgba(239,68,68,0.85);
+  background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;
+  padding:6px 12px;cursor:pointer;transition:background .15s,color .15s
+}
+.job-delete-btn:hover{background:rgba(239,68,68,0.18);color:#f87171}
+
 .type-badge{padding:3px 10px;border-radius:20px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}
 .type-ml_experiment{background:rgba(124,58,237,0.12);color:#a78bfa}
 
@@ -155,7 +163,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 </aside>
 
 <script>
-fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
+fetch('/auth/me',{credentials:'include'}).then(r=>r.ok?r.json():null).then(u=>{
   const nav=document.getElementById('sidebarNav');
   const role=document.getElementById('sidebarRole');
   if(u){
@@ -198,13 +206,26 @@ fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
 <script>
 const API = window.location.origin;
 let expandedJobId = null;
+let currentUser = null;
+
+function jobsVisibleForUser(jobs) {
+  if (!currentUser) return jobs;
+  if (currentUser.role === 'admin' || currentUser.role === 'ceo') return jobs;
+  return jobs.filter(j => j.user_id && String(j.user_id) === String(currentUser.id));
+}
+
+function canDeleteJob(j) {
+  if (!currentUser) return false;
+  if (currentUser.role === 'admin' || currentUser.role === 'ceo') return true;
+  return j.user_id && String(j.user_id) === String(currentUser.id);
+}
 
 async function loadJobs() {
   try {
-    const resp = await fetch(`${API}/jobs`);
+    const resp = await fetch(`${API}/jobs`, { credentials: 'include' });
     const jobs = await resp.json();
     jobs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    renderJobs(jobs);
+    renderJobs(jobsVisibleForUser(jobs));
   } catch(e) {
     document.getElementById('jobsGrid').innerHTML = `
       <div class="empty-state">
@@ -231,6 +252,9 @@ function renderJobs(jobs) {
     const typeLabel = j.task_type.replace(/_/g, ' ');
     const date = new Date(j.created_at).toLocaleString('en-US', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
     const isExpanded = expandedJobId === j.id;
+    const del = canDeleteJob(j)
+      ? `<button type="button" class="job-delete-btn" onclick="event.stopPropagation();deleteJob('${j.id}')">Delete</button>`
+      : '';
     return `
       <div class="job-card ${isExpanded ? 'expanded' : ''}" onclick="toggleJob('${j.id}')">
         <div class="job-card-top">
@@ -242,7 +266,10 @@ function renderJobs(jobs) {
               <span style="color:var(--dark)">${j.id.substring(0,8)}</span>
             </div>
           </div>
-          <span class="badge badge-${j.status}">${j.status}</span>
+          <div class="job-card-actions">
+            ${del}
+            <span class="badge badge-${j.status}">${j.status}</span>
+          </div>
         </div>
         <div class="progress-bar"><div class="progress-fill" id="pbar-${j.id}" style="width:0%"></div></div>
         <div class="job-tasks" id="tasks-${j.id}"></div>
@@ -260,9 +287,30 @@ function renderJobs(jobs) {
   }
 }
 
+async function deleteJob(jobId) {
+  if (!confirm('Delete this job? This cannot be undone.')) return;
+  try {
+    const resp = await fetch(`${API}/jobs/${jobId}`, { method: 'DELETE', credentials: 'include' });
+    const text = await resp.text();
+    if (!resp.ok) {
+      let msg = text.slice(0, 400);
+      try {
+        const j = JSON.parse(text);
+        if (j.detail !== undefined) msg = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail);
+      } catch (_) {}
+      alert(msg);
+      return;
+    }
+    if (expandedJobId === jobId) expandedJobId = null;
+    loadJobs();
+  } catch (e) {
+    alert('Could not delete job.');
+  }
+}
+
 async function loadTasksForCard(job) {
   try {
-    const resp = await fetch(`${API}/jobs/${job.id}/tasks`);
+    const resp = await fetch(`${API}/jobs/${job.id}/tasks`, { credentials: 'include' });
     const tasks = await resp.json();
     const done = tasks.filter(t => t.status === 'submitted').length;
     const pct = tasks.length > 0 ? (done / tasks.length) * 100 : 0;
@@ -296,8 +344,8 @@ async function toggleJob(jobId) {
   // Fetch fresh data
   try {
     const [jobResp, tasksResp] = await Promise.all([
-      fetch(`${API}/jobs/${jobId}`),
-      fetch(`${API}/jobs/${jobId}/tasks`)
+      fetch(`${API}/jobs/${jobId}`, { credentials: 'include' }),
+      fetch(`${API}/jobs/${jobId}/tasks`, { credentials: 'include' })
     ]);
     const job = await jobResp.json();
     const tasks = await tasksResp.json();
@@ -351,8 +399,14 @@ function escapeHtml(str) {
   return d.innerHTML;
 }
 
-// Load and auto-refresh
-loadJobs();
+async function boot() {
+  try {
+    const r = await fetch('/auth/me', { credentials: 'include' });
+    if (r.ok) currentUser = await r.json();
+  } catch (_) {}
+  await loadJobs();
+}
+boot();
 setInterval(loadJobs, 5000);
 
 window.addEventListener('pageshow', function(event) {
