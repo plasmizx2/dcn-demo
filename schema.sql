@@ -5,6 +5,8 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ─── Jobs ───────────────────────────────────────────────
+-- user_id must reference dcn_users(id) when using OAuth (see backend/main.py migration).
+-- Legacy DBs may still point at public.users; startup migrates that FK.
 CREATE TABLE IF NOT EXISTS jobs (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id             UUID,

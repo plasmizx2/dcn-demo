@@ -85,6 +85,75 @@ async def _maintenance_loop():
             logger.error("Maintenance loop error: %s", e, exc_info=True)
 
 
+async def _migrate_jobs_user_fk_to_dcn_users(conn) -> None:
+    """
+    Legacy Supabase schemas often have jobs.user_id → users(id).
+    OAuth uses dcn_users; session user IDs are not in users, causing FK violations on INSERT.
+    Drop FK to users and attach jobs.user_id → dcn_users(id).
+    """
+    jobs_exists = await conn.fetchval(
+        """
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_name = 'jobs'
+        )
+        """
+    )
+    if not jobs_exists:
+        return
+
+    legacy_fks = await conn.fetch(
+        """
+        SELECT con.conname::text AS name
+        FROM pg_constraint con
+        JOIN pg_class rel ON rel.oid = con.conrelid
+        JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+        JOIN pg_class ref ON ref.oid = con.confrelid
+        WHERE nsp.nspname = 'public'
+          AND rel.relname = 'jobs'
+          AND con.contype = 'f'
+          AND ref.relname = 'users'
+        """
+    )
+    for row in legacy_fks:
+        await conn.execute(f'ALTER TABLE jobs DROP CONSTRAINT "{row["name"]}"')
+        logger.info("Dropped legacy jobs.user_id FK to public.users: %s", row["name"])
+
+    has_dcn_fk = await conn.fetchval(
+        """
+        SELECT EXISTS (
+            SELECT 1
+            FROM pg_constraint con
+            JOIN pg_class rel ON rel.oid = con.conrelid
+            JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+            JOIN pg_class ref ON ref.oid = con.confrelid
+            WHERE nsp.nspname = 'public'
+              AND rel.relname = 'jobs'
+              AND con.contype = 'f'
+              AND ref.relname = 'dcn_users'
+        )
+        """
+    )
+    if has_dcn_fk:
+        return
+
+    await conn.execute(
+        """
+        UPDATE jobs SET user_id = NULL
+        WHERE user_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM dcn_users u WHERE u.id = jobs.user_id)
+        """
+    )
+    await conn.execute(
+        """
+        ALTER TABLE jobs
+        ADD CONSTRAINT jobs_user_id_fkey
+        FOREIGN KEY (user_id) REFERENCES dcn_users(id) ON DELETE SET NULL
+        """
+    )
+    logger.info("Added jobs.user_id foreign key to dcn_users")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start up: connect to DB, create static cache table, + start maintenance. Shut down: clean up."""
@@ -124,6 +193,11 @@ async def lifespan(app: FastAPI):
             );
             """
         )
+        try:
+            await _migrate_jobs_user_fk_to_dcn_users(conn)
+        except Exception as e:
+            logger.error("jobs.user_id FK migration failed: %s", e, exc_info=True)
+            raise
     maintenance_task = asyncio.create_task(_maintenance_loop())
     yield
     maintenance_task.cancel()
