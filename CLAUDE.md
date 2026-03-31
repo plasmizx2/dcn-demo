@@ -338,6 +338,35 @@ For the current, the important point is that the internal boundaries between pla
 
 ---
 
+## Worker repository (must mirror ML code)
+
+The distributed **worker** is a **separate Git repo**: [github.com/plasmizx2/dcn-worker](https://github.com/plasmizx2/dcn-worker). It is not inside this repo. A typical local layout is two sibling folders, e.g. `~/Desktop/dcn-demo` (this project) and `~/Desktop/dcn-worker` (worker only).
+
+### When Claude Code (or any agent) must update **both** repos
+
+Apply the **same logical change** in **both** places whenever you touch:
+
+| Area | In **this repo** (`dcn-demo`) | In **worker repo** (`dcn-worker`) |
+|------|-------------------------------|-----------------------------------|
+| Dataset loading, OpenML/CSV, caching, `get_dataset`, `load_external_dataset`, `preview_dataset` | `backend/datasets.py` | `datasets.py` (repo root) |
+| ML training, metrics, sklearn models for `ml_experiment` | `backend/handlers/ml_experiment.py` | `handlers/ml_experiment.py` |
+
+If only one side is edited, production workers will **drift** from the coordinator and jobs can behave differently or fail.
+
+### When **only** `dcn-demo` needs changes
+
+Everything that does **not** run on the worker machine: planner, API routes, auth, database, frontend, aggregator, `backend/main.py`, `backend/planner.py` (unless it only changes non-ML metadata you also document for workers), etc.
+
+### Agent workflow (required)
+
+1. After editing `backend/datasets.py` or `backend/handlers/ml_experiment.py`, **open the `dcn-worker` checkout** (or add it to the workspace) and **repeat the equivalent edit** in the worker paths above.
+2. Commit and push **both** repositories.
+3. If you cannot access the worker repo, **tell the user** explicitly: “Mirror this change in `dcn-worker` at …” with a short diff summary.
+
+There is **no** automatic sync between repos; mirroring is intentional until a shared package exists.
+
+---
+
 ## Team Execution Plan
 Team size: 1
 
