@@ -3,7 +3,9 @@ import os
 import asyncio
 import httpx
 from urllib.parse import urlencode
-from fastapi import FastAPI, Request
+from uuid import UUID
+
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from contextlib import asynccontextmanager
@@ -14,6 +16,7 @@ from apis.workers import router as workers_router
 from auth import (
     find_or_create_oauth_user, create_session, get_session, destroy_session,
     update_user_role, list_users,
+    fetch_user_jobs_summary, fetch_user_job_stats, fetch_user_session_audit,
     SESSION_COOKIE, ADMIN_PAGES, ADMIN_API_PREFIXES, AUTH_REQUIRED_PAGES, PUBLIC_PREFIXES, ELEVATED_ROLES,
 )
 from config import (
@@ -37,6 +40,7 @@ LOGIN_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "login")
 MYJOBS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "my-jobs")
 ERROR_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "error")
 WORKER_LOGS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "worker-logs")
+ADMIN_USERS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "admin-users")
 
 
 async def _maintenance_loop():
@@ -280,6 +284,12 @@ async def auth_middleware(request: Request, call_next):
         if not user or user["role"] not in ELEVATED_ROLES:
             return JSONResponse({"detail": "Admin access required"}, status_code=401)
 
+    # User directory & audit APIs (not /auth/me, /auth/logout, OAuth callbacks)
+    if path.startswith("/auth/users"):
+        user = await get_session(request)
+        if not user or user["role"] not in ELEVATED_ROLES:
+            return JSONResponse({"detail": "Admin or CEO access required"}, status_code=401)
+
     return await call_next(request)
 
 
@@ -446,21 +456,37 @@ async def do_logout(request: Request):
     return response
 
 
-# ── CEO user management ──────────────────────────────────────
+# ── User management (admin + CEO) / role changes (CEO only) ──
 @app.get("/auth/users")
 async def get_users(request: Request):
     user = await get_session(request)
-    if not user or user["role"] != "ceo":
-        return JSONResponse({"detail": "CEO access required"}, status_code=403)
+    if not user or user["role"] not in ELEVATED_ROLES:
+        return JSONResponse({"detail": "Admin or CEO access required"}, status_code=403)
     users = await list_users()
     return users
+
+
+@app.get("/auth/users/{user_id}/audit")
+async def get_user_audit(request: Request, user_id: str):
+    """Jobs summary, recent jobs, and session/login timestamps for a user."""
+    user = await get_session(request)
+    if not user or user["role"] not in ELEVATED_ROLES:
+        return JSONResponse({"detail": "Admin or CEO access required"}, status_code=403)
+    try:
+        UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Invalid user id")
+    job_stats = await fetch_user_job_stats(user_id)
+    jobs = await fetch_user_jobs_summary(user_id, limit=80)
+    sessions = await fetch_user_session_audit(user_id)
+    return {"job_stats": job_stats, "jobs": jobs, "sessions": sessions}
 
 
 @app.post("/auth/role")
 async def change_role(request: Request):
     user = await get_session(request)
     if not user or user["role"] != "ceo":
-        return JSONResponse({"detail": "CEO access required"}, status_code=403)
+        return JSONResponse({"detail": "CEO access required — only CEO can change roles"}, status_code=403)
     try:
         body = await request.json()
     except Exception:
@@ -515,6 +541,14 @@ async def serve_my_jobs():
 @app.get("/worker-logs")
 async def serve_worker_logs():
     response = FileResponse(os.path.join(WORKER_LOGS_DIR, "index.html"))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
+@app.get("/admin/users")
+async def serve_admin_users():
+    response = FileResponse(os.path.join(ADMIN_USERS_DIR, "index.html"))
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     return response
