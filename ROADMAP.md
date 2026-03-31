@@ -10,7 +10,7 @@ You run the coordinator. Your friends run workers on their PCs. Jobs get distrib
 
 - Job submission → planner → subtasks → workers → aggregation pipeline
 - `ml_experiment` handler with sklearn models, cross-validation, ranked output
-- `dcn-worker/` desktop app that connects to a remote coordinator over HTTP
+- [`dcn-worker` repo](https://github.com/plasmizx2/dcn-worker) — desktop/CLI worker that connects to the coordinator over HTTP
 - PostgreSQL row-locking for race-condition-free task claiming
 - Worker registration, heartbeat, tier detection
 
@@ -25,19 +25,19 @@ Remove everything that isn't `ml_experiment`. This reduces scope, sharpens the p
 ### What to remove
 - [ ] Task types from `backend/config.py`: `document_analysis`, `codebase_review`, `website_builder`, `research_pipeline`, `data_processing`, `image_processing`, `web_scraping`, `audio_transcription`, `sentiment_classification`
 - [ ] Handler files: `backend/handlers/document.py`, `codebase.py`, `website.py`, `research.py`, `data_processing.py`
-- [ ] Desktop worker handlers: `dcn-worker/handlers/audio_transcription.py`, `image_processing.py`, `sentiment_classification.py`, `web_scraping.py`
+- [ ] Desktop worker handlers (in [dcn-worker](https://github.com/plasmizx2/dcn-worker)): `audio_transcription.py`, `image_processing.py`, etc.
 - [ ] Planner branches for removed task types (`backend/planner.py`)
 - [ ] Aggregator branches for removed task types (`backend/aggregator.py`)
 - [ ] Frontend task type selectors (document, codebase, website, research, data options)
 - [ ] Gemini client (used only for non-ML task synthesis — ML handler uses sklearn directly)
 
 ### What stays
-- `ml_experiment` handler (backend + dcn-worker)
+- `ml_experiment` handler (backend + [dcn-worker](https://github.com/plasmizx2/dcn-worker))
 - Full planner → worker → aggregator pipeline
 - Coordinator server, job API, worker API
 - Operator dashboard (`/ops`)
 - Results page (`/results`)
-- `dcn-worker/` desktop app
+- [dcn-worker](https://github.com/plasmizx2/dcn-worker) desktop app
 
 ---
 
@@ -53,7 +53,8 @@ dcn-worker --host http://your-server.com --name "mikes-pc"
 ```
 
 ### Tasks
-- [ ] Extract `dcn-worker/` into a standalone pip-installable package
+- [x] Standalone worker repo ([dcn-worker](https://github.com/plasmizx2/dcn-worker))
+- [ ] Publish as a pip-installable package (`pip install dcn-worker`)
 - [ ] Create `dcn_worker/__main__.py` so `python -m dcn_worker` works
 - [ ] `--host`, `--name`, `--task-types` CLI flags
 - [ ] Auto-detect hardware tier on startup (already exists in `hardware.py`)

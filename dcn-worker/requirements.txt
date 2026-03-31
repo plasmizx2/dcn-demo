@@ -1,8 +1,0 @@
-requests
-psutil
-Pillow
-beautifulsoup4
-openai-whisper
-scikit-learn
-numpy
-openml
