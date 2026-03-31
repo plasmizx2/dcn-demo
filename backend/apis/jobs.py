@@ -1,12 +1,21 @@
 import json
+from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import Response
 from database import get_pool
 from schemas import JobCreate
 from planner import plan_tasks
 from config import VALID_TASK_TYPES, MIN_PRIORITY, MAX_PRIORITY, MIN_REWARD
 from auth import get_session, ELEVATED_ROLES
+from aggregator import parse_ml_experiments_from_task_rows, sort_ml_experiments_by_metric
+from job_export import (
+    build_json_export,
+    experiments_to_csv,
+    json_dumps_export,
+    safe_export_filename,
+)
 
 router = APIRouter()
 
@@ -295,3 +304,83 @@ async def get_job_events(job_id: str) -> list[dict]:
             job_id,
         )
     return [dict(r) for r in rows]
+
+
+@router.get("/jobs/{job_id}/export")
+async def export_job_download(
+    job_id: str,
+    request: Request,
+    export_format: Literal["md", "json", "csv"] = Query("md", alias="format"),
+):
+    """Download completed job output: Markdown report, JSON (ranked metrics + report), or CSV table."""
+    try:
+        UUID(job_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Job not found") from None
+
+    user = await get_session(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        job = await conn.fetchrow("SELECT * FROM jobs WHERE id = $1::uuid", job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+
+        owner_id = str(job["user_id"]) if job["user_id"] is not None else None
+        is_owner = owner_id == user["id"]
+        is_elevated = user.get("role") in ELEVATED_ROLES
+        if not is_owner and not is_elevated:
+            raise HTTPException(
+                status_code=403, detail="You can only export your own jobs"
+            )
+
+        if job["status"] != "completed" or not job.get("final_output"):
+            raise HTTPException(
+                status_code=400,
+                detail="Job has no completed output to export yet",
+            )
+
+        rows = await conn.fetch(
+            """
+            SELECT jt.task_order, jt.task_name, tr.result_text
+            FROM job_tasks jt
+            JOIN task_results tr ON tr.task_id = jt.id
+            WHERE jt.job_id = $1::uuid AND jt.status = 'submitted'
+            ORDER BY jt.task_order
+            """,
+            job_id,
+        )
+
+    job_dict = dict(job)
+    results_list = [dict(r) for r in rows]
+    experiments = parse_ml_experiments_from_task_rows(results_list)
+    ranked = sort_ml_experiments_by_metric(experiments)
+
+    title = job_dict.get("title") or "job"
+    if export_format == "md":
+        body = job_dict.get("final_output") or ""
+        fn = safe_export_filename(title, job_id, "md")
+        return Response(
+            content=body.encode("utf-8"),
+            media_type="text/markdown; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{fn}"'},
+        )
+    if export_format == "json":
+        payload = build_json_export(job_dict, experiments, ranked)
+        fn = safe_export_filename(title, job_id, "json")
+        raw = json_dumps_export(payload)
+        return Response(
+            content=raw.encode("utf-8"),
+            media_type="application/json; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{fn}"'},
+        )
+
+    csv_body = experiments_to_csv(ranked)
+    fn = safe_export_filename(title, job_id, "csv")
+    return Response(
+        content=csv_body.encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{fn}"'},
+    )

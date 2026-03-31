@@ -94,39 +94,59 @@ def _concatenate_results(results: list) -> str:
     return "\n\n---\n\n".join(sections)
 
 
-def _aggregate_ml_experiment(results: list, job: dict) -> str:
+def parse_ml_experiments_from_task_rows(results: list) -> list[dict]:
     """
-    Custom aggregation for ml_experiment: parse JSON metrics from each
-    experiment result, rank them, and produce a structured comparison report.
-    Now includes CV scores, compute time breakdown, and more metrics.
+    Extract embedded ```json``` metrics dicts from each task result (same logic as aggregation).
+    Used by export and by _aggregate_ml_experiment.
     """
     import re
     import json as json_mod
 
     experiments = []
-
     for r in results:
         text = r["result_text"] or ""
-
-        # Extract the JSON block embedded in each result
-        json_match = re.search(r'```json\s*\n(\{.*?\})\s*\n```', text, re.DOTALL)
+        json_match = re.search(r"```json\s*\n(\{.*?\})\s*\n```", text, re.DOTALL)
         if json_match:
             try:
                 data = json_mod.loads(json_match.group(1))
                 experiments.append(data)
             except json_mod.JSONDecodeError:
                 pass
+    return experiments
+
+
+def sort_ml_experiments_by_metric(experiments: list) -> list[dict]:
+    """Return a new list sorted best-first (same ordering as the markdown report)."""
+    if not experiments:
+        return []
+    exp = list(experiments)
+    task_category = exp[0].get("task_category", "regression")
+    if task_category == "regression":
+        exp.sort(key=lambda x: x.get("r2", 0), reverse=True)
+    else:
+        exp.sort(key=lambda x: x.get("f1", 0), reverse=True)
+    return exp
+
+
+def _aggregate_ml_experiment(results: list, job: dict) -> str:
+    """
+    Custom aggregation for ml_experiment: parse JSON metrics from each
+    experiment result, rank them, and produce a structured comparison report.
+    Now includes CV scores, compute time breakdown, and more metrics.
+    """
+    import json as json_mod
+
+    experiments = parse_ml_experiments_from_task_rows(results)
 
     if not experiments:
         return _concatenate_results(results)
 
+    experiments = sort_ml_experiments_by_metric(experiments)
     task_category = experiments[0].get("task_category", "regression")
 
     if task_category == "regression":
-        experiments.sort(key=lambda x: x.get("r2", 0), reverse=True)
         primary_metric = "R²"
     else:
-        experiments.sort(key=lambda x: x.get("f1", 0), reverse=True)
         primary_metric = "F1"
 
     best = experiments[0]
