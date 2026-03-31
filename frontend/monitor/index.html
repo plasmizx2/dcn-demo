@@ -520,6 +520,16 @@
     .event-item[data-type="task_started"]::before { background: #eab308; }
     .event-item[data-type="task_submitted"]::before { background: #22c55e; }
     .event-item[data-type="task_failed"]::before { background: #ef4444; }
+    .task-fail-detail {
+      font-size: 0.68rem;
+      color: rgba(248, 180, 180, 0.95);
+      max-width: min(420px, 36vw);
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin-top: 6px;
+      line-height: 1.35;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    }
     .event-item[data-type="job_completed"]::before { background: #22c55e; }
 
     /* Mono IDs */
@@ -1229,6 +1239,14 @@
   }
 
   // --- Load Job Detail ---
+  function taskFailureHtml(t) {
+    const st = (t.status || '').toLowerCase();
+    if (st !== 'failed' || !t.failure_detail) return '';
+    const raw = String(t.failure_detail);
+    const preview = raw.length > 600 ? raw.slice(0, 600) + '…' : raw;
+    return `<div class="task-fail-detail">${escapeHtml(preview)}</div>`;
+  }
+
   async function loadJobDetail() {
     const el = document.getElementById('job-detail');
     if (!selectedJobId) {
@@ -1289,7 +1307,7 @@
           <td>${t.task_order != null ? t.task_order : '-'}</td>
           <td>${t.task_name || '-'}</td>
           <td>${tierBadge(t)}</td>
-          <td>${badge(t.status)}</td>
+          <td>${badge(t.status)}${taskFailureHtml(t)}</td>
           <td class="mono">${t.worker_node_id ? shortId(t.worker_node_id) : '-'}</td>
         </tr>`;
       });
@@ -1397,7 +1415,7 @@
     el.innerHTML = '<div class="event-feed-container">' + events.map(e => `
       <div class="event-item" data-type="${e.event_type || ''}">
         <div class="event-type">${e.event_type || '-'}</div>
-        <div class="event-msg">${e.message || ''}</div>
+        <div class="event-msg">${escapeHtml(e.message || '')}</div>
         <div class="event-time">${formatTime(e.created_at)}</div>
       </div>
     `).join('') + '</div>';
