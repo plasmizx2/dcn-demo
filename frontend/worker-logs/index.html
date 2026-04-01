@@ -180,8 +180,18 @@ let allWorkers = [];
 
 async function loadWorkers() {
   try {
-    const resp = await fetch(`${API}/monitor/workers`);
-    allWorkers = await resp.json();
+    const resp = await fetch(`${API}/monitor/workers`, { credentials: 'include' });
+    const data = await resp.json();
+    if (!resp.ok) {
+      const msg = (data && data.detail) ? (typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)) : resp.statusText;
+      document.getElementById('workersGrid').innerHTML = `<div style="color:var(--dim)">Failed to load workers (${resp.status}): ${escapeHtml(msg)}</div>`;
+      return;
+    }
+    if (!Array.isArray(data)) {
+      document.getElementById('workersGrid').innerHTML = '<div style="color:var(--dim)">Failed to load workers: unexpected response</div>';
+      return;
+    }
+    allWorkers = data;
     renderWorkers();
   } catch(e) {
     document.getElementById('workersGrid').innerHTML = '<div style="color:var(--dim)">Failed to load workers</div>';
@@ -226,10 +236,20 @@ async function selectWorker(workerId) {
   section.innerHTML = '<div style="color:var(--dim);font-size:0.85rem;padding:20px 0">Loading task history...</div>';
 
   try {
-    const resp = await fetch(`${API}/monitor/worker-history/${workerId}`);
+    const resp = await fetch(`${API}/monitor/worker-history/${encodeURIComponent(workerId)}`, { credentials: 'include' });
     const history = await resp.json();
 
     const workerName = worker ? escapeHtml(worker.node_name) : workerId.substring(0,8);
+
+    if (!resp.ok) {
+      const msg = (history && history.detail) ? (typeof history.detail === 'string' ? history.detail : JSON.stringify(history.detail)) : resp.statusText;
+      section.innerHTML = `<div style="color:var(--dim)">Could not load history (${resp.status}): ${escapeHtml(msg)}</div>`;
+      return;
+    }
+    if (!Array.isArray(history)) {
+      section.innerHTML = `<div style="color:var(--dim)">Could not load history: server returned non-list response.</div>`;
+      return;
+    }
 
     if (!history.length) {
       section.innerHTML = `
