@@ -1,6 +1,12 @@
-from fastapi import APIRouter, Request
+import logging
+
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
+
 from database import get_pool
 from config import HEARTBEAT_OFFLINE_SECONDS
+
+logger = logging.getLogger("dcn")
 
 router = APIRouter(prefix="/monitor")
 
@@ -137,26 +143,31 @@ async def delete_worker(worker_id: str, request: Request) -> dict:
 async def worker_history(worker_id: str) -> list[dict]:
     """Return task history for a specific worker node."""
     pool = await get_pool()
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
-            SELECT
-                tr.id,
-                tr.task_id,
-                tr.result_text,
-                tr.execution_time_seconds,
-                tr.status,
-                tr.submitted_at as created_at,
-                jt.task_name,
-                jt.job_id,
-                j.title as job_title
-            FROM task_results tr
-            JOIN job_tasks jt ON jt.id = tr.task_id
-            JOIN jobs j ON j.id = jt.job_id
-            WHERE tr.worker_node_id = $1::uuid
-            ORDER BY tr.submitted_at DESC
-            LIMIT 100
-            """,
-            worker_id,
-        )
-    return [dict(r) for r in rows]
+    try:
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT
+                    tr.id,
+                    tr.task_id,
+                    tr.result_text,
+                    tr.execution_time_seconds,
+                    tr.status,
+                    tr.submitted_at AS created_at,
+                    jt.task_name,
+                    jt.job_id,
+                    j.title AS job_title
+                FROM task_results tr
+                JOIN job_tasks jt ON jt.id = tr.task_id
+                JOIN jobs j ON j.id = jt.job_id
+                WHERE tr.worker_node_id = $1::uuid
+                ORDER BY tr.submitted_at DESC NULLS LAST
+                LIMIT 100
+                """,
+                worker_id,
+            )
+    except Exception as e:
+        logger.exception("worker_history query failed for worker_id=%s", worker_id)
+        raise HTTPException(status_code=500, detail="Failed to load worker history") from e
+
+    return jsonable_encoder([dict(r) for r in rows])
