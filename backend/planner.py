@@ -102,6 +102,58 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
                 "task_description": f"5-fold CV GradientBoosting tuned (500 trees, depth=8, lr=0.05)",
                 "task_payload": {**base, "experiment_type": "gradient_boosting_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 8, "learning_rate": 0.05}, "min_tier": 3},
             },
+            # ── New model families ──
+            {
+                "task_name": "experiment_lasso",
+                "task_description": f"5-fold CV Lasso (alpha=1.0) on {display_name}",
+                "task_payload": {**base, "experiment_type": "lasso_regression", "features": all_features, "cv_folds": 5, "params": {"alpha": 1.0}, "min_tier": 2},
+            },
+            {
+                "task_name": "experiment_elasticnet",
+                "task_description": f"5-fold CV ElasticNet (alpha=0.5, l1_ratio=0.5) on {display_name}",
+                "task_payload": {**base, "experiment_type": "elasticnet_regression", "features": all_features, "cv_folds": 5, "params": {"alpha": 0.5, "l1_ratio": 0.5}, "min_tier": 2},
+            },
+            {
+                "task_name": "experiment_knn_regressor",
+                "task_description": f"5-fold CV KNeighbors (k=5) on {display_name}",
+                "task_payload": {**base, "experiment_type": "knn_regressor", "features": all_features, "cv_folds": 5, "params": {"n_neighbors": 5}, "min_tier": 2},
+            },
+            {
+                "task_name": "experiment_extra_trees",
+                "task_description": f"5-fold CV ExtraTrees (300 trees, depth=15) on {display_name}",
+                "task_payload": {**base, "experiment_type": "extra_trees_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 300, "max_depth": 15}, "min_tier": 3},
+            },
+            {
+                "task_name": "experiment_adaboost",
+                "task_description": f"5-fold CV AdaBoost (200 estimators, lr=0.1) on {display_name}",
+                "task_payload": {**base, "experiment_type": "adaboost_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "learning_rate": 0.1}, "min_tier": 3},
+            },
+            # ── Hyperparameter variants ──
+            {
+                "task_name": "experiment_ridge_low_alpha",
+                "task_description": f"5-fold CV Ridge (alpha=0.1) on {display_name}",
+                "task_payload": {**base, "experiment_type": "ridge_regression", "features": all_features, "cv_folds": 5, "params": {"alpha": 0.1}, "min_tier": 2},
+            },
+            {
+                "task_name": "experiment_ridge_high_alpha",
+                "task_description": f"5-fold CV Ridge (alpha=10.0) on {display_name}",
+                "task_payload": {**base, "experiment_type": "ridge_regression", "features": all_features, "cv_folds": 5, "params": {"alpha": 10.0}, "min_tier": 2},
+            },
+            {
+                "task_name": "experiment_decision_tree_shallow",
+                "task_description": f"5-fold CV DecisionTree (max_depth=5) on {display_name}",
+                "task_payload": {**base, "experiment_type": "decision_tree_regressor", "features": all_features, "cv_folds": 5, "params": {"max_depth": 5}, "min_tier": 2},
+            },
+            {
+                "task_name": "experiment_gb_stochastic",
+                "task_description": f"5-fold CV GradientBoosting stochastic (subsample=0.8) on {display_name}",
+                "task_payload": {**base, "experiment_type": "gradient_boosting_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 5, "learning_rate": 0.1, "subsample": 0.8}, "min_tier": 3},
+            },
+            {
+                "task_name": "experiment_rf_sqrt_features",
+                "task_description": f"5-fold CV RandomForest (200 trees, max_features=sqrt) on {display_name}",
+                "task_payload": {**base, "experiment_type": "random_forest_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 10, "max_features": "sqrt"}, "min_tier": 3},
+            },
             # ── Tier 4: heavy experiments (params halved vs original — feasible on strong workstations) ──
             {
                 "task_name": "experiment_rf_massive",
@@ -122,6 +174,11 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
                 "task_name": "experiment_gb_fine_tuned",
                 "task_description": f"5-fold CV GradientBoosting (400 trees, depth=8, lr=0.02) — Tier 4 (Tier 3 after queue wait)",
                 "task_payload": {**base, "experiment_type": "gradient_boosting_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 400, "max_depth": 8, "learning_rate": 0.02}, "min_tier": 4},
+            },
+            {
+                "task_name": "experiment_extra_trees_heavy",
+                "task_description": f"5-fold CV ExtraTrees (500 trees, depth=20) on {display_name} — Tier 4 (Tier 3 after queue wait)",
+                "task_payload": {**base, "experiment_type": "extra_trees_regressor", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 20}, "min_tier": 4},
             },
         ]
     else:
@@ -167,6 +224,53 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
                 "task_description": f"5-fold CV GradientBoosting tuned (500 trees, depth=8, lr=0.05)",
                 "task_payload": {**base, "experiment_type": "gradient_boosting_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 8, "learning_rate": 0.05}, "min_tier": 3},
             },
+            # ── New model families ──
+            {
+                "task_name": "experiment_knn_classifier",
+                "task_description": f"5-fold CV KNeighbors (k=5) on {display_name}",
+                "task_payload": {**base, "experiment_type": "knn_classifier", "features": all_features, "cv_folds": 5, "params": {"n_neighbors": 5}, "min_tier": 2},
+            },
+            {
+                "task_name": "experiment_gaussian_nb",
+                "task_description": f"5-fold CV GaussianNB on {display_name}",
+                "task_payload": {**base, "experiment_type": "gaussian_nb", "features": all_features, "cv_folds": 5, "params": {}, "min_tier": 2},
+            },
+            {
+                "task_name": "experiment_extra_trees",
+                "task_description": f"5-fold CV ExtraTrees (300 trees, depth=15) on {display_name}",
+                "task_payload": {**base, "experiment_type": "extra_trees_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 300, "max_depth": 15}, "min_tier": 3},
+            },
+            {
+                "task_name": "experiment_adaboost",
+                "task_description": f"5-fold CV AdaBoost (200 estimators, lr=0.1) on {display_name}",
+                "task_payload": {**base, "experiment_type": "adaboost_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "learning_rate": 0.1}, "min_tier": 3},
+            },
+            {
+                "task_name": "experiment_mlp",
+                "task_description": f"5-fold CV MLPClassifier (100x50, max_iter=500) on {display_name}",
+                "task_payload": {**base, "experiment_type": "mlp_classifier", "features": all_features, "cv_folds": 5, "params": {"hidden_layer_sizes": [100, 50], "max_iter": 500}, "min_tier": 3},
+            },
+            # ── Hyperparameter variants ──
+            {
+                "task_name": "experiment_decision_tree_shallow",
+                "task_description": f"5-fold CV DecisionTree (max_depth=5) on {display_name}",
+                "task_payload": {**base, "experiment_type": "decision_tree_classifier", "features": all_features, "cv_folds": 5, "params": {"max_depth": 5}, "min_tier": 2},
+            },
+            {
+                "task_name": "experiment_gb_stochastic",
+                "task_description": f"5-fold CV GradientBoosting stochastic (subsample=0.8) on {display_name}",
+                "task_payload": {**base, "experiment_type": "gradient_boosting_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 5, "learning_rate": 0.1, "subsample": 0.8}, "min_tier": 3},
+            },
+            {
+                "task_name": "experiment_rf_sqrt_features",
+                "task_description": f"5-fold CV RandomForest (200 trees, max_features=sqrt) on {display_name}",
+                "task_payload": {**base, "experiment_type": "random_forest_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 200, "max_depth": 10, "max_features": "sqrt"}, "min_tier": 3},
+            },
+            {
+                "task_name": "experiment_logistic_high_c",
+                "task_description": f"5-fold CV LogisticRegression (C=10.0) on {display_name}",
+                "task_payload": {**base, "experiment_type": "logistic_regression", "features": all_features, "cv_folds": 5, "params": {"max_iter": 2000, "C": 10.0}, "min_tier": 2},
+            },
             # ── Tier 4: heavy experiments (params halved — feasible on strong workstations) ──
             {
                 "task_name": "experiment_rf_massive",
@@ -187,5 +291,10 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
                 "task_name": "experiment_gb_fine_tuned",
                 "task_description": f"5-fold CV GradientBoosting (400 trees, depth=8, lr=0.02) — Tier 4 (Tier 3 after queue wait)",
                 "task_payload": {**base, "experiment_type": "gradient_boosting_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 400, "max_depth": 8, "learning_rate": 0.02}, "min_tier": 4},
+            },
+            {
+                "task_name": "experiment_extra_trees_heavy",
+                "task_description": f"5-fold CV ExtraTrees (500 trees, depth=20) on {display_name} — Tier 4 (Tier 3 after queue wait)",
+                "task_payload": {**base, "experiment_type": "extra_trees_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 20}, "min_tier": 4},
             },
         ]

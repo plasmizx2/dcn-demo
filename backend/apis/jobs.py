@@ -31,6 +31,21 @@ async def list_jobs() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+@router.get("/jobs/mine")
+async def list_my_jobs(request: Request) -> list[dict]:
+    """Return jobs belonging to the authenticated user, newest first."""
+    user = await get_session(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not logged in")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT * FROM jobs WHERE user_id = $1::uuid ORDER BY created_at DESC",
+            user["id"],
+        )
+    return [dict(r) for r in rows]
+
+
 @router.get("/jobs/{job_id}")
 async def get_job(job_id: str) -> dict:
     """Return a single job by ID."""

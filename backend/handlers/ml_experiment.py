@@ -24,12 +24,17 @@ def handle(task: dict, job: dict) -> str:
         r2_score, mean_squared_error, mean_absolute_error,
         accuracy_score, f1_score, precision_score, recall_score,
     )
-    from sklearn.linear_model import LinearRegression, Ridge, LogisticRegression
+    from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet, LogisticRegression
     from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
     from sklearn.ensemble import (
         RandomForestRegressor, RandomForestClassifier,
         GradientBoostingRegressor, GradientBoostingClassifier,
+        ExtraTreesRegressor, ExtraTreesClassifier,
+        AdaBoostRegressor, AdaBoostClassifier,
     )
+    from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
+    from sklearn.naive_bayes import GaussianNB
+    from sklearn.neural_network import MLPClassifier
     import numpy as np
 
     from datasets import get_dataset, load_external_dataset
@@ -114,7 +119,30 @@ def handle(task: dict, job: dict) -> str:
             n_estimators=p.get("n_estimators", 200),
             max_depth=p.get("max_depth", 5),
             learning_rate=p.get("learning_rate", 0.1),
+            subsample=p.get("subsample", 1.0),
             random_state=42,
+        ),
+        "lasso_regression": lambda p: Lasso(
+            alpha=p.get("alpha", 1.0),
+        ),
+        "elasticnet_regression": lambda p: ElasticNet(
+            alpha=p.get("alpha", 0.5),
+            l1_ratio=p.get("l1_ratio", 0.5),
+        ),
+        "extra_trees_regressor": lambda p: ExtraTreesRegressor(
+            n_estimators=p.get("n_estimators", 300),
+            max_depth=p.get("max_depth", 15),
+            random_state=42,
+            n_jobs=safe_n_jobs(),
+        ),
+        "adaboost_regressor": lambda p: AdaBoostRegressor(
+            n_estimators=p.get("n_estimators", 200),
+            learning_rate=p.get("learning_rate", 0.1),
+            random_state=42,
+        ),
+        "knn_regressor": lambda p: KNeighborsRegressor(
+            n_neighbors=p.get("n_neighbors", 5),
+            n_jobs=safe_n_jobs(),
         ),
         # Classification
         "logistic_regression": lambda p: LogisticRegression(
@@ -139,6 +167,28 @@ def handle(task: dict, job: dict) -> str:
             n_estimators=p.get("n_estimators", 200),
             max_depth=p.get("max_depth", 5),
             learning_rate=p.get("learning_rate", 0.1),
+            subsample=p.get("subsample", 1.0),
+            random_state=42,
+        ),
+        "knn_classifier": lambda p: KNeighborsClassifier(
+            n_neighbors=p.get("n_neighbors", 5),
+            n_jobs=safe_n_jobs(),
+        ),
+        "gaussian_nb": lambda p: GaussianNB(),
+        "extra_trees_classifier": lambda p: ExtraTreesClassifier(
+            n_estimators=p.get("n_estimators", 300),
+            max_depth=p.get("max_depth", 15),
+            random_state=42,
+            n_jobs=safe_n_jobs(),
+        ),
+        "adaboost_classifier": lambda p: AdaBoostClassifier(
+            n_estimators=p.get("n_estimators", 200),
+            learning_rate=p.get("learning_rate", 0.1),
+            random_state=42,
+        ),
+        "mlp_classifier": lambda p: MLPClassifier(
+            hidden_layer_sizes=tuple(p.get("hidden_layer_sizes", [100, 50])),
+            max_iter=p.get("max_iter", 500),
             random_state=42,
         ),
     }

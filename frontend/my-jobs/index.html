@@ -214,12 +214,6 @@ const API = window.location.origin;
 let expandedJobId = null;
 let currentUser = null;
 
-function jobsVisibleForUser(jobs) {
-  if (!currentUser) return jobs;
-  if (currentUser.role === 'admin' || currentUser.role === 'ceo') return jobs;
-  return jobs.filter(j => j.user_id && String(j.user_id) === String(currentUser.id));
-}
-
 function canDeleteJob(j) {
   if (!currentUser) return false;
   if (currentUser.role === 'admin' || currentUser.role === 'ceo') return true;
@@ -228,10 +222,17 @@ function canDeleteJob(j) {
 
 async function loadJobs() {
   try {
-    const resp = await fetch(`${API}/jobs`, { credentials: 'include' });
+    const endpoint = (currentUser && (currentUser.role === 'admin' || currentUser.role === 'ceo'))
+      ? `${API}/jobs`
+      : `${API}/jobs/mine`;
+    const resp = await fetch(endpoint, { credentials: 'include' });
+    if (resp.status === 401) {
+      window.location.href = '/login';
+      return;
+    }
     const jobs = await resp.json();
     jobs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    renderJobs(jobsVisibleForUser(jobs));
+    renderJobs(jobs);
   } catch(e) {
     document.getElementById('jobsGrid').innerHTML = `
       <div class="empty-state">
@@ -453,8 +454,16 @@ async function downloadJobExport(jobId, fmt) {
 async function boot() {
   try {
     const r = await fetch('/auth/me', { credentials: 'include' });
-    if (r.ok) currentUser = await r.json();
-  } catch (_) {}
+    if (r.ok) {
+      currentUser = await r.json();
+    } else {
+      window.location.href = '/login';
+      return;
+    }
+  } catch (_) {
+    window.location.href = '/login';
+    return;
+  }
   await loadJobs();
 }
 boot();
