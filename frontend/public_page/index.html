@@ -1058,7 +1058,21 @@
 
         <div id="inputGroup"></div>
 
-        <div class="form-actions">
+        <div id="costEstimate" style="display:none;margin-bottom:16px;padding:16px 20px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.2);border-radius:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:0.78rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:rgba(255,255,255,0.5)">Cost Estimate</span>
+            <span id="costTotal" style="font-size:1.1rem;font-weight:700;color:#a78bfa">--</span>
+          </div>
+          <div style="display:flex;gap:16px;font-size:0.78rem;color:rgba(255,255,255,0.45)">
+            <span><span id="costTasks">0</span> tasks</span>
+            <span>Compute: $<span id="costCompute">0.00</span></span>
+            <span>Fee (<span id="costFeePercent">15</span>%): $<span id="costFee">0.00</span></span>
+          </div>
+        </div>
+        <div class="form-actions" style="display:flex;gap:10px">
+          <button class="btn" id="estimateBtn" onclick="estimateCost()" type="button" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12)">
+            <span class="btn-label">Estimate Cost</span>
+          </button>
           <button class="btn" id="submitBtn" onclick="submitJob()" type="button">
             <span class="btn-spinner"></span>
             <span class="btn-label">Submit job</span>
@@ -1289,6 +1303,55 @@
       setTimeout(() => { el.style.display = 'none'; }, 5000);
     }
 
+    function buildPayload() {
+      const inputText = document.getElementById('inputText').value.trim();
+      const sourceEl = document.querySelector('input[name="dsSource"]:checked');
+      const source = sourceEl ? sourceEl.value : 'built_in';
+      const payload = { goal: inputText || 'Run distributed ML experiments' };
+      if (source === 'built_in') {
+        const datasetEl = document.getElementById('mlDataset');
+        payload.dataset_name = datasetEl ? datasetEl.value : 'weather_ri';
+        payload.source = 'built_in';
+      } else {
+        const dsId = document.getElementById('dsIdInput')?.value.trim();
+        if (!dsId || !_datasetMeta) return null;
+        payload.source = source;
+        payload.dataset_id = dsId;
+        const targetEl = document.getElementById('dsTarget');
+        if (targetEl) payload.target = targetEl.value;
+      }
+      return payload;
+    }
+
+    async function estimateCost() {
+      const taskType = document.getElementById('taskType').value;
+      const payload = buildPayload();
+      if (!payload) { showError('Load a dataset first.'); return; }
+      const btn = document.getElementById('estimateBtn');
+      btn.disabled = true;
+      btn.querySelector('.btn-label').textContent = 'Estimating...';
+      try {
+        const resp = await fetch(`${API}/jobs/estimate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: 'estimate', task_type: taskType, input_payload: payload }),
+        });
+        if (!resp.ok) throw new Error(await resp.text());
+        const est = await resp.json();
+        document.getElementById('costTotal').textContent = '$' + est.estimated_total.toFixed(2);
+        document.getElementById('costTasks').textContent = est.subtask_count;
+        document.getElementById('costCompute').textContent = est.compute_cost.toFixed(2);
+        document.getElementById('costFee').textContent = est.platform_fee.toFixed(2);
+        document.getElementById('costFeePercent').textContent = est.platform_fee_percent;
+        document.getElementById('costEstimate').style.display = 'block';
+      } catch (e) {
+        showError('Could not estimate cost: ' + e.message.slice(0, 200));
+      } finally {
+        btn.disabled = false;
+        btn.querySelector('.btn-label').textContent = 'Estimate Cost';
+      }
+    }
+
     async function submitJob() {
       const title = document.getElementById('title').value.trim();
       const taskType = document.getElementById('taskType').value;
@@ -1303,23 +1366,11 @@
       btn.querySelector('.btn-label').textContent = 'Submitting...';
 
       try {
-        // Build payload based on selected source
-        const sourceEl = document.querySelector('input[name="dsSource"]:checked');
-        const source = sourceEl ? sourceEl.value : 'built_in';
-        const payload = { goal: inputText || 'Run distributed ML experiments' };
-
-        if (source === 'built_in') {
-          const datasetEl = document.getElementById('mlDataset');
-          payload.dataset_name = datasetEl ? datasetEl.value : 'weather_ri';
-          payload.source = 'built_in';
-        } else {
-          const dsId = document.getElementById('dsIdInput')?.value.trim();
-          if (!dsId) { showError('Load a dataset first.'); btn.disabled = false; btn.classList.remove('loading'); btn.querySelector('.btn-label').textContent = 'Submit Job'; return; }
-          if (!_datasetMeta) { showError('Click "Load" to preview the dataset before submitting.'); btn.disabled = false; btn.classList.remove('loading'); btn.querySelector('.btn-label').textContent = 'Submit Job'; return; }
-          payload.source = source;
-          payload.dataset_id = dsId;
-          const targetEl = document.getElementById('dsTarget');
-          if (targetEl) payload.target = targetEl.value;
+        const payload = buildPayload();
+        if (!payload) {
+          showError('Load a dataset first.');
+          btn.disabled = false; btn.classList.remove('loading'); btn.querySelector('.btn-label').textContent = 'Submit Job';
+          return;
         }
 
         const resp = await fetch(`${API}/jobs`, {

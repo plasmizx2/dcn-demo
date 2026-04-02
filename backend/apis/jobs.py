@@ -9,6 +9,7 @@ from schemas import JobCreate
 from planner import plan_tasks
 from config import VALID_TASK_TYPES, MIN_PRIORITY, MAX_PRIORITY, MIN_REWARD
 from auth import get_session, ELEVATED_ROLES
+from pricing import estimate_job_cost, calculate_actual_cost
 from aggregator import parse_ml_experiments_from_task_rows, sort_ml_experiments_by_metric
 from job_export import (
     build_json_export,
@@ -29,6 +30,21 @@ async def list_jobs() -> list[dict]:
             "SELECT * FROM jobs ORDER BY created_at DESC"
         )
     return [dict(r) for r in rows]
+
+
+@router.post("/jobs/estimate")
+async def estimate_cost(job: JobCreate) -> dict:
+    """Return a cost estimate for a job without creating it."""
+    if job.task_type not in VALID_TASK_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown task type '{job.task_type}'.",
+        )
+    try:
+        subtasks = plan_tasks(job.task_type, job.input_payload)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return estimate_job_cost(subtasks)
 
 
 @router.get("/jobs/mine")
@@ -80,16 +96,20 @@ async def create_job(job: JobCreate, request: Request) -> dict:
             status_code=400,
             detail=f"Priority must be between {MIN_PRIORITY} and {MAX_PRIORITY}",
         )
-    if job.reward_amount < MIN_REWARD:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Reward amount must be >= {MIN_REWARD}",
-        )
-
     pool = await get_pool()
     async with pool.acquire() as conn:
         async with conn.transaction():
-            # Insert the job
+            # Plan subtasks first so we can price the job
+            try:
+                subtasks = plan_tasks(job.task_type, job.input_payload)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e)) from e
+
+            # Calculate estimated cost from planned subtasks
+            estimate = estimate_job_cost(subtasks)
+            reward_amount = estimate["estimated_total"]
+
+            # Insert the job with computed reward_amount
             row = await conn.fetchrow(
                 """
                 INSERT INTO jobs (title, description, task_type, input_payload,
@@ -103,7 +123,7 @@ async def create_job(job: JobCreate, request: Request) -> dict:
                 json.dumps(job.input_payload),
                 user["id"],
                 job.priority,
-                job.reward_amount,
+                reward_amount,
                 job.requires_validation,
             )
 
@@ -116,11 +136,7 @@ async def create_job(job: JobCreate, request: Request) -> dict:
                 row["id"],
             )
 
-            # Plan and insert subtasks
-            try:
-                subtasks = plan_tasks(job.task_type, job.input_payload)
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail=str(e)) from e
+            # Insert subtasks
             for i, task in enumerate(subtasks, start=1):
                 await conn.execute(
                     """
@@ -146,6 +162,7 @@ async def create_job(job: JobCreate, request: Request) -> dict:
 
     result = dict(row)
     result["task_count"] = len(subtasks)
+    result["estimated_cost"] = estimate
     return result
 
 
@@ -236,10 +253,11 @@ async def get_job_timing(job_id: str) -> dict:
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
 
-        # Get task timing data
+        # Get task timing data (include payload + worker for pricing)
         tasks = await conn.fetch(
             """
             SELECT jt.id, jt.task_name, jt.status, jt.started_at, jt.completed_at,
+                   jt.task_payload, jt.worker_node_id,
                    tr.execution_time_seconds
             FROM job_tasks jt
             LEFT JOIN task_results tr ON tr.task_id = jt.id
@@ -296,6 +314,18 @@ async def get_job_timing(job_id: str) -> dict:
                 "execution_time": float(t["execution_time_seconds"]) if t["execution_time_seconds"] else None,
             })
 
+    # Calculate actual cost from real execution data
+    cost_rows = [
+        {
+            "execution_time_seconds": t["execution_time_seconds"],
+            "task_payload": t["task_payload"],
+            "worker_node_id": t["worker_node_id"],
+        }
+        for t in tasks
+        if t["execution_time_seconds"]
+    ]
+    actual_cost = calculate_actual_cost(cost_rows) if cost_rows else None
+
     return {
         "job_id": job_id,
         "status": job["status"],
@@ -305,6 +335,8 @@ async def get_job_timing(job_id: str) -> dict:
         "parallel_time_seconds": round(parallel_time, 2),
         "speedup": speedup,
         "num_workers": len(worker_ids),
+        "estimated_cost": float(job["reward_amount"]),
+        "actual_cost": actual_cost,
         "tasks": task_details,
     }
 
