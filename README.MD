@@ -178,4 +178,4 @@ docker run --rm -p 8000:8000 \
   dcn-demo
 ```
 
-Open `http://localhost:8000` — you should see the new UI, not the legacy HTML folders under `frontend/landing`, etc.
+Open `http://localhost:8000` — you should see the React UI served from `frontend/web/dist` (built by Docker or `npm run build`).

@@ -326,15 +326,23 @@ async def get_job_timing(job_id: str) -> dict:
     ]
     actual_cost = calculate_actual_cost(cost_rows) if cost_rows else None
 
+    seq_s = round(sequential_time, 2)
+    par_s = round(parallel_time, 2)
+    n_workers = len(worker_ids)
     return {
         "job_id": job_id,
         "status": job["status"],
         "task_type": job["task_type"],
         "total_tasks": len(tasks),
-        "sequential_time_seconds": round(sequential_time, 2),
-        "parallel_time_seconds": round(parallel_time, 2),
+        "sequential_time_seconds": seq_s,
+        "parallel_time_seconds": par_s,
         "speedup": speedup,
-        "num_workers": len(worker_ids),
+        "num_workers": n_workers,
+        # Aliases for clients that expect shorter names
+        "sequential_time": seq_s,
+        "parallel_time": par_s,
+        "worker_count": n_workers,
+        "time_saved": round(max(0.0, sequential_time - parallel_time), 2),
         "estimated_cost": float(job["reward_amount"]),
         "actual_cost": actual_cost,
         "tasks": task_details,

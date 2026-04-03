@@ -61,7 +61,7 @@ async def list_bug_reports(request: Request) -> list[dict]:
             """
             SELECT b.*, u.email AS reporter_email, u.name AS reporter_name
             FROM bug_reports b
-            LEFT JOIN users u ON u.id = b.user_id
+            LEFT JOIN dcn_users u ON u.id = b.user_id
             ORDER BY b.created_at DESC
             """
         )

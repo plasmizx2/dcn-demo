@@ -28,7 +28,8 @@ export function SubmitJobPage() {
         body: JSON.stringify({
           title,
           description,
-          task_type: taskType
+          task_type: taskType,
+          input_payload: {},
         })
       });
 
@@ -113,10 +114,10 @@ export function SubmitJobPage() {
                       disabled={loading}
                     >
                       <option value="ml_experiment">ML Experiment</option>
-                      <option value="data_processing">Data Processing</option>
-                      <option value="web_scraping">Web Scraping</option>
-                      <option value="batch_inference">Batch Inference</option>
                     </select>
+                    <p className="mt-2 text-xs text-slate-500">
+                      More task types ship when planners are enabled server-side.
+                    </p>
                   </div>
 
                   {/* Description */}
