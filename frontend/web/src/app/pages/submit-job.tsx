@@ -1,6 +1,11 @@
 import { AdminLayout } from '../components/admin-layout';
+import {
+  DatasetSourceSection,
+  buildJobInputPayload,
+  type DatasetMode,
+} from '../components/dataset-source-section';
 import { motion } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Sparkles, Loader2, CheckCircle2, AlertCircle, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -25,6 +30,19 @@ export function SubmitJobPage() {
   const [estLoading, setEstLoading] = useState(true);
   const [estError, setEstError] = useState<string | null>(null);
 
+  const [datasetMode, setDatasetMode] = useState<DatasetMode>('built_in');
+  const [builtInName, setBuiltInName] = useState('weather_ri');
+  const [openmlId, setOpenmlId] = useState('');
+  const [csvUrl, setCsvUrl] = useState('');
+  const [uploadToken, setUploadToken] = useState<string | null>(null);
+  const [targetOverride, setTargetOverride] = useState('');
+
+  const inputPayload = useMemo(
+    () =>
+      buildJobInputPayload(datasetMode, builtInName, openmlId, csvUrl, uploadToken, targetOverride),
+    [datasetMode, builtInName, openmlId, csvUrl, uploadToken, targetOverride],
+  );
+
   useEffect(() => {
     let cancelled = false;
     setEstLoading(true);
@@ -40,7 +58,7 @@ export function SubmitJobPage() {
               title: title.trim() || 'Preview',
               description: description || '',
               task_type: taskType,
-              input_payload: {},
+              input_payload: inputPayload,
             }),
           });
           if (!res.ok) {
@@ -70,13 +88,25 @@ export function SubmitJobPage() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [title, description, taskType]);
+  }, [title, description, taskType, inputPayload]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!title.trim() || !description.trim()) {
       toast.error('Please fill in all fields');
+      return;
+    }
+    if (datasetMode === 'openml' && !openmlId.trim()) {
+      toast.error('Enter an OpenML dataset ID');
+      return;
+    }
+    if (datasetMode === 'csv_url' && !csvUrl.trim()) {
+      toast.error('Enter a CSV URL');
+      return;
+    }
+    if (datasetMode === 'csv_upload' && !uploadToken) {
+      toast.error('Upload a CSV file');
       return;
     }
 
@@ -90,7 +120,7 @@ export function SubmitJobPage() {
           title,
           description,
           task_type: taskType,
-          input_payload: {},
+          input_payload: inputPayload,
         })
       });
 
@@ -180,6 +210,25 @@ export function SubmitJobPage() {
                       More task types ship when planners are enabled server-side.
                     </p>
                   </div>
+
+                  <DatasetSourceSection
+                    disabled={loading}
+                    mode={datasetMode}
+                    onModeChange={(m) => {
+                      setDatasetMode(m);
+                      if (m !== 'csv_upload') setUploadToken(null);
+                    }}
+                    builtInName={builtInName}
+                    onBuiltInNameChange={setBuiltInName}
+                    openmlId={openmlId}
+                    onOpenmlIdChange={setOpenmlId}
+                    csvUrl={csvUrl}
+                    onCsvUrlChange={setCsvUrl}
+                    uploadToken={uploadToken}
+                    onUploadTokenChange={setUploadToken}
+                    targetOverride={targetOverride}
+                    onTargetOverrideChange={setTargetOverride}
+                  />
 
                   {/* Description */}
                   <div>

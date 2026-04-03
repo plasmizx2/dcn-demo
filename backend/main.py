@@ -5,7 +5,7 @@ import httpx
 from urllib.parse import urlencode
 from uuid import UUID
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -619,7 +619,28 @@ async def not_found_handler(request: Request, exc):
     return FileResponse(os.path.join(ERROR_DIR, "404.html"), status_code=404)
 
 
-# ── Dataset preview endpoint ─────────────────────────────────
+# ── Dataset APIs ─────────────────────────────────────────────
+@app.get("/datasets/built-in")
+async def list_builtin_datasets():
+    """Names and metadata for built-in synthetic datasets."""
+    from datasets import list_datasets
+
+    return list_datasets()
+
+
+@app.post("/datasets/csv-upload")
+async def upload_csv_dataset(file: UploadFile = File(...)):
+    """Store a CSV for preview + job submission (same server process)."""
+    data = await file.read()
+    try:
+        from datasets import store_csv_upload
+
+        token = store_csv_upload(data)
+    except ValueError as e:
+        return JSONResponse({"detail": str(e)}, status_code=400)
+    return {"token": token}
+
+
 @app.post("/datasets/load")
 async def load_dataset_preview(request: Request):
     """Preview a dataset before job submission. Returns columns, sample rows, suggested target."""
