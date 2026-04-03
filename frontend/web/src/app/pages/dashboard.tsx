@@ -26,8 +26,12 @@ interface MonitorStats {
   running_tasks: number;
   submitted_tasks: number;
   pending_validation_tasks: number;
+  /** Workers with fresh heartbeat and status idle (waiting for tasks) */
   online_workers: number;
+  /** Workers with fresh heartbeat and status busy */
   busy_workers: number;
+  /** Heartbeat-OK workers: idle + busy (total connected) */
+  connected_workers: number;
 }
 
 interface JobListRow {
@@ -51,6 +55,7 @@ export function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [recentJobs, setRecentJobs] = useState<JobListRow[]>([]);
   const [queue, setQueue] = useState<QueueRow[]>([]);
+  const [queueError, setQueueError] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
 
   useEffect(() => {
@@ -94,6 +99,27 @@ export function DashboardPage() {
     return () => clearInterval(interval);
   }, [ready]);
 
+  useEffect(() => {
+    if (!ready) return;
+    const loadQueue = async () => {
+      try {
+        const r = await fetch('/monitor/queue', { credentials: 'include', cache: 'no-store' });
+        if (!r.ok) {
+          setQueueError(`Queue unavailable (${r.status})`);
+          return;
+        }
+        const data = await r.json();
+        setQueue(Array.isArray(data) ? data : []);
+        setQueueError(null);
+      } catch {
+        setQueueError('Could not load queue');
+      }
+    };
+    loadQueue();
+    const q = setInterval(loadQueue, 4000);
+    return () => clearInterval(q);
+  }, [ready]);
+
   if (!ready) {
     return (
       <AdminLayout>
@@ -113,7 +139,13 @@ export function DashboardPage() {
     pending_validation_tasks: 0,
     online_workers: 0,
     busy_workers: 0,
+    connected_workers: 0,
   };
+
+  const connected =
+    typeof s.connected_workers === 'number'
+      ? s.connected_workers
+      : s.online_workers + s.busy_workers;
 
   const clearAllJobs = async () => {
     if (
@@ -139,6 +171,11 @@ export function DashboardPage() {
         );
         setRecentJobs(sorted.slice(0, 12));
       }
+      const qr = await fetch('/monitor/queue', { credentials: 'include' });
+      if (qr.ok) {
+        const qd = await qr.json();
+        setQueue(Array.isArray(qd) ? qd : []);
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Clear failed');
     } finally {
@@ -153,7 +190,13 @@ export function DashboardPage() {
     { label: 'Running Tasks', value: s.running_tasks, icon: Clock, iconBg: 'bg-purple-500/20', iconColor: 'text-purple-400' },
     { label: 'Finished Tasks', value: s.submitted_tasks, icon: Layers, iconBg: 'bg-indigo-500/20', iconColor: 'text-indigo-400' },
     { label: 'Pending Validation', value: s.pending_validation_tasks, icon: ShieldAlert, iconBg: 'bg-orange-500/20', iconColor: 'text-orange-400' },
-    { label: 'Online Workers', value: s.online_workers, icon: Users, iconBg: 'bg-cyan-500/20', iconColor: 'text-cyan-400' },
+    {
+      label: 'Workers (idle)',
+      value: s.online_workers,
+      icon: Users,
+      iconBg: 'bg-cyan-500/20',
+      iconColor: 'text-cyan-400',
+    },
     { label: 'Busy Workers', value: s.busy_workers, icon: Cpu, iconBg: 'bg-pink-500/20', iconColor: 'text-pink-400' },
   ];
 
@@ -197,6 +240,15 @@ export function DashboardPage() {
             <p className="text-red-400 text-sm mb-4">{error}</p>
           )}
 
+          {connected === 0 && (s.queued_tasks > 0 || s.running_tasks > 0) && (
+            <p className="text-amber-400/90 text-sm mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3">
+              No worker has a fresh heartbeat — queued work will not run until at least one{' '}
+              <strong className="text-amber-200">dcn-worker</strong> is connected (run{' '}
+              <code className="text-amber-100/90">python app.py</code> or{' '}
+              <code className="text-amber-100/90">python run.py</code> on a machine that can reach this API).
+            </p>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {statCards.map((stat, index) => (
               <motion.div
@@ -228,11 +280,25 @@ export function DashboardPage() {
             <div className="flex items-center gap-2 mb-4">
               <List className="w-5 h-5 text-amber-400" />
               <h2 className="text-lg font-semibold text-white">Live queue</h2>
-              <span className="text-xs text-slate-500">(queued + running tasks · /monitor/queue)</span>
+              <span className="text-xs text-slate-500">
+                ({queue.length} task{queue.length === 1 ? '' : 's'} · refreshes every 4s)
+              </span>
             </div>
-            {queue.length === 0 ? (
-              <p className="text-sm text-slate-500">Nothing queued or running right now.</p>
-            ) : (
+            {queueError && <p className="text-sm text-red-400 mb-2">{queueError}</p>}
+            {!queueError && queue.length === 0 && (
+              <p className="text-sm text-slate-500">
+                Nothing queued or running right now
+                {(s.queued_tasks > 0 || s.running_tasks > 0) && (
+                  <span className="text-amber-400/90">
+                    {' '}
+                    — but stats show {s.queued_tasks + s.running_tasks} task(s) in DB; if this persists, refresh or
+                    check API access.
+                  </span>
+                )}
+                .
+              </p>
+            )}
+            {!queueError && queue.length > 0 && (
               <div className="overflow-x-auto max-h-[280px] overflow-y-auto rounded-xl border border-white/10">
                 <table className="w-full text-sm text-left">
                   <thead className="sticky top-0 bg-slate-900/95 text-xs text-slate-500 uppercase border-b border-white/10">
@@ -328,9 +394,12 @@ export function DashboardPage() {
                 </p>
               </div>
               <div>
-                <p className="text-slate-400 mb-2">Workers busy / online</p>
+                <p className="text-slate-400 mb-2">Workers busy / connected</p>
                 <p className="text-2xl font-bold text-blue-400">
-                  {s.busy_workers} / {s.online_workers}
+                  {s.busy_workers} / {connected}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Connected = heartbeat-OK (idle {s.online_workers} + busy {s.busy_workers})
                 </p>
               </div>
               <div>
