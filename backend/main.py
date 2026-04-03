@@ -331,12 +331,24 @@ async def auth_middleware(request: Request, call_next):
 
 # ── Auth routes ─────────────────────────────────────────────────
 
+def _session_cookie_args() -> dict:
+    """Session cookie flags — Secure on HTTPS so browsers keep the cookie on production."""
+    secure = BASE_URL.startswith("https://")
+    return {
+        "httponly": True,
+        "samesite": "lax",
+        "max_age": SESSION_MAX_AGE_SECONDS,
+        "path": "/",
+        "secure": secure,
+    }
+
+
 async def _finish_oauth_login(user: dict) -> RedirectResponse:
     """Shared helper: create session, set cookie, redirect."""
     token = await create_session(user)
     redirect = "/ops" if user["role"] in ELEVATED_ROLES else "/submit"
     response = RedirectResponse(redirect, status_code=302)
-    response.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="lax", max_age=SESSION_MAX_AGE_SECONDS)
+    response.set_cookie(SESSION_COOKIE, token, **_session_cookie_args())
     return response
 
 
@@ -488,7 +500,8 @@ async def do_logout(request: Request):
     if token:
         await destroy_session(token)
     response = RedirectResponse("/login", status_code=302)
-    response.delete_cookie(SESSION_COOKIE, path="/", samesite="lax")
+    secure = BASE_URL.startswith("https://")
+    response.delete_cookie(SESSION_COOKIE, path="/", samesite="lax", secure=secure)
     return response
 
 

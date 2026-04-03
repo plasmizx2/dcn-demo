@@ -13,8 +13,10 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { DCNVisualization } from '../components/dcn-visualization';
+import { useAuth } from '../hooks/use-auth';
 
 export function LandingPage() {
+  const { user, loading: authLoading } = useAuth();
   const [stats, setStats] = useState({
     jobs: 0,
     tasks: 0,
@@ -118,18 +120,50 @@ export function LandingPage() {
           </Link>
           
           <div className="flex items-center gap-2 md:gap-4">
-            <Link 
-              to="/login" 
-              className="px-3 py-2 md:px-4 md:py-2 text-xs md:text-sm rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 transition-all font-medium"
-            >
-              Sign In
-            </Link>
-            <Link 
-              to="/submit" 
-              className="px-3 py-2 md:px-6 md:py-3 text-xs md:text-base rounded-lg md:rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 font-semibold shadow-lg shadow-purple-500/50 transition-all"
-            >
-              Get Started
-            </Link>
+            {!authLoading && user ? (
+              <>
+                <span className="hidden sm:inline text-xs md:text-sm text-slate-300 max-w-[160px] truncate">
+                  {user.name || user.email}
+                </span>
+                <Link
+                  to="/submit"
+                  className="px-3 py-2 md:px-4 md:py-2 text-xs md:text-sm rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 transition-all font-medium"
+                >
+                  Submit Job
+                </Link>
+                {(user.role === 'admin' || user.role === 'ceo') && (
+                  <Link
+                    to="/ops"
+                    className="hidden md:inline px-3 py-2 text-sm rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 transition-all font-medium"
+                  >
+                    Dashboard
+                  </Link>
+                )}
+                <a
+                  href="/auth/logout"
+                  className="px-3 py-2 md:px-4 md:py-2 text-xs md:text-sm rounded-lg text-slate-300 hover:text-white border border-white/10 transition-all font-medium"
+                >
+                  Sign out
+                </a>
+              </>
+            ) : !authLoading ? (
+              <>
+                <Link
+                  to="/login"
+                  className="px-3 py-2 md:px-4 md:py-2 text-xs md:text-sm rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 transition-all font-medium"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/submit"
+                  className="px-3 py-2 md:px-6 md:py-3 text-xs md:text-base rounded-lg md:rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 font-semibold shadow-lg shadow-purple-500/50 transition-all"
+                >
+                  Get Started
+                </Link>
+              </>
+            ) : (
+              <div className="h-9 w-32 rounded-lg bg-white/5 animate-pulse" aria-hidden />
+            )}
           </div>
         </motion.nav>
 
