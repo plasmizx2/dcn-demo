@@ -9,3 +9,9 @@ frontend/web/dist/
 .worker_state.json
 dcn-worker/config.json
 *.zip
+
+# Auto-worker runtime (scripts in repo; logs/state stay local)
+.auto-worker-state.json
+auto-worker.log
+auto-worker-stdout.log
+auto-worker-stderr.log
