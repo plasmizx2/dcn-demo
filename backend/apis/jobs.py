@@ -237,6 +237,14 @@ async def delete_job(job_id: str, request: Request) -> dict:
 
         async with conn.transaction():
             await conn.execute(
+                """
+                DELETE FROM task_results
+                WHERE task_id IN (SELECT id FROM job_tasks WHERE job_id = $1::uuid)
+                """,
+                job_id,
+            )
+            await conn.execute("DELETE FROM job_tasks WHERE job_id = $1::uuid", job_id)
+            await conn.execute(
                 "DELETE FROM job_events WHERE job_id = $1::uuid", job_id
             )
             await conn.execute("DELETE FROM jobs WHERE id = $1::uuid", job_id)
