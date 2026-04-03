@@ -5,14 +5,6 @@ __pycache__/
 .venv/
 venv/
 node_modules/
+frontend/web/dist/
 .worker_state.json
-
-# Auto-worker agent (local tooling, not part of the app)
-auto-worker.sh
-auto-worker-uninstall.sh
-auto-worker.log
-auto-worker-stdout.log
-auto-worker-stderr.log
-.auto-worker-state.json
-.auto-worker-last-comment
-auto-worker-monitor/
+dcn-worker/config.json

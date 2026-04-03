@@ -147,3 +147,35 @@ W1    W2    W3    WN   ...
  Final Output
       |
 Timing + Results UI
+
+---
+
+## Ship the **new** UI (React) to production
+
+The redesigned site lives in **`frontend/web/`** (Vite + React). FastAPI serves the built files from **`frontend/web/dist`**. If that folder is missing at runtime, you get a 503 or the old static HTML (whatever was deployed before).
+
+**Why the live site can still look old:** Render builds from **Git**. Until **`frontend/web/`** (and the updated **`backend/main.py`**) are **committed and pushed**, production never receives the new bundle or the code that serves it.
+
+### What to push (minimum)
+
+- `frontend/web/` — the whole app, especially `package-lock.json` (needed for `npm ci` in Docker).
+- `backend/main.py` — wires routes to the SPA + `/assets`.
+- `Dockerfile` + `.dockerignore` — builds `dist/` inside the image (you do **not** commit `frontend/web/dist/`).
+
+Then on **Render**: set the web service to **Docker** (not “Python” only), Dockerfile **`./Dockerfile`**, root directory **`.`**. Trigger a **manual deploy** after the push.
+
+Env vars: see **`env.example`**. Set **`BASE_URL`** to your public URL (e.g. `https://dcn-demo.onrender.com`). OAuth callbacks: `{BASE_URL}/auth/google/callback` and `{BASE_URL}/auth/github/callback`. Health check: **`/health`**.
+
+### Local Docker check (optional)
+
+```bash
+docker build -t dcn-demo .
+docker run --rm -p 8000:8000 \
+  -e DATABASE_URL="postgresql://..." \
+  -e BASE_URL="http://localhost:8000" \
+  -e GOOGLE_CLIENT_ID="..." -e GOOGLE_CLIENT_SECRET="..." \
+  -e GITHUB_CLIENT_ID="..." -e GITHUB_CLIENT_SECRET="..." \
+  dcn-demo
+```
+
+Open `http://localhost:8000` — you should see the new UI, not the legacy HTML folders under `frontend/landing`, etc.
