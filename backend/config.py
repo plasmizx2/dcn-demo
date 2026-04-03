@@ -38,14 +38,14 @@ MAX_PRIORITY: int = 10
 MIN_REWARD: float = 0.0
 
 # ── Pricing ─────────────────────────────────────────────────
-# Base rate per compute-second, keyed by task type
+# Base rate per compute-second, keyed by task type (in dollars)
 BASE_RATES: dict[str, float] = {
-    "ml_experiment": 0.015,
+    "ml_experiment": 0.0015,
 }
 # Multiplier applied based on minimum worker tier required
-TIER_MULTIPLIER: dict[int, float] = {1: 1.0, 2: 1.5, 3: 2.5, 4: 4.0}
+TIER_MULTIPLIER: dict[int, float] = {1: 1.0, 2: 1.2, 3: 1.5, 4: 2.0}
 # Estimated seconds per tier (used for pre-submission cost estimates)
-ESTIMATED_SECONDS_PER_TIER: dict[int, int] = {1: 5, 2: 8, 3: 15, 4: 25}
+ESTIMATED_SECONDS_PER_TIER: dict[int, int] = {1: 3, 2: 5, 3: 10, 4: 18}
 # Platform fee as a percentage of compute cost
 PLATFORM_FEE_PERCENT: float = 15.0
 
