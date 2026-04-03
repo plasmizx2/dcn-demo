@@ -16,6 +16,7 @@ import { AdminUsersPage } from "./pages/admin-users";
 import { ContactPage } from "./pages/contact";
 import { ReportBugPage } from "./pages/report-bug";
 import { NotFoundPage } from "./pages/not-found";
+import { WaitlistPage } from "./pages/waitlist";
 
 export const router = createBrowserRouter([
   {
@@ -61,6 +62,10 @@ export const router = createBrowserRouter([
   {
     path: "/report-bug",
     Component: ReportBugPage,
+  },
+  {
+    path: "/waitlist",
+    Component: WaitlistPage,
   },
   {
     path: "*",

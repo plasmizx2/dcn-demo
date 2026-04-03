@@ -26,7 +26,7 @@ async def find_or_create_oauth_user(
 ) -> dict:
     """Upsert an OAuth user. Returns user dict. Auto-assigns CEO role if email matches."""
     pool = await get_pool()
-    role = "ceo" if email.lower() == CEO_EMAIL and CEO_EMAIL else "customer"
+    role = "ceo" if email.lower() == CEO_EMAIL and CEO_EMAIL else "waitlister"
 
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
@@ -114,7 +114,7 @@ async def destroy_session(token: str):
 
 async def update_user_role(user_id: str, new_role: str) -> bool:
     """CEO-only: change a user's role. Returns True on success."""
-    if new_role not in ("admin", "customer"):
+    if new_role not in ("admin", "customer", "waitlister"):
         return False
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -236,4 +236,5 @@ PUBLIC_PREFIXES = [
     "/stats",
     "/datasets",
     "/contact",
+    "/waitlist",
 ]

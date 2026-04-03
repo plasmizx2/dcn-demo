@@ -37,7 +37,7 @@ export function AdminUsersPage() {
   const [audit, setAudit] = useState<AuditData | null>(null);
   const [loadingAudit, setLoadingAudit] = useState(false);
   const [loadErr, setLoadErr] = useState<string | null>(null);
-  const [roleChoice, setRoleChoice] = useState<'customer' | 'admin'>('customer');
+  const [roleChoice, setRoleChoice] = useState<'customer' | 'admin' | 'waitlister'>('customer');
   const [savingRole, setSavingRole] = useState(false);
 
   const loadUsers = useCallback(async () => {
@@ -85,7 +85,7 @@ export function AdminUsersPage() {
 
   useEffect(() => {
     if (selected) {
-      setRoleChoice(selected.role === 'admin' ? 'admin' : 'customer');
+      setRoleChoice(selected.role === 'admin' ? 'admin' : selected.role === 'waitlister' ? 'waitlister' : 'customer');
     }
   }, [selected?.id, selected?.role]);
 
@@ -191,7 +191,9 @@ export function AdminUsersPage() {
                                 ? 'bg-amber-500/20 text-amber-300'
                                 : u.role === 'admin'
                                   ? 'bg-blue-500/20 text-blue-300'
-                                  : 'bg-white/10 text-slate-400'
+                                  : u.role === 'waitlister'
+                                    ? 'bg-orange-500/20 text-orange-300'
+                                    : 'bg-white/10 text-slate-400'
                             }`}
                           >
                             {u.role}
@@ -232,9 +234,10 @@ export function AdminUsersPage() {
                           <label className="text-sm text-slate-400">Role</label>
                           <select
                             value={roleChoice}
-                            onChange={(e) => setRoleChoice(e.target.value as 'customer' | 'admin')}
+                            onChange={(e) => setRoleChoice(e.target.value as 'customer' | 'admin' | 'waitlister')}
                             className="rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white"
                           >
+                            <option value="waitlister">waitlister</option>
                             <option value="customer">customer</option>
                             <option value="admin">admin</option>
                           </select>
