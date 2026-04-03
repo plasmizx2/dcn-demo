@@ -33,7 +33,7 @@ interface JobTiming {
   actual_cost?: { actual_total?: number; compute_cost?: number } | null;
 }
 
-export function ResultsPage() {
+export function AllJobsPage() {
   const { ready } = useRequireAdmin();
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -173,10 +173,10 @@ export function ResultsPage() {
     <AdminLayout>
       <div className="container mx-auto px-6 py-12 max-w-[1400px]">
         <motion.div initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-          <h1 className="text-4xl font-bold mb-2 text-white">Results</h1>
+          <h1 className="text-4xl font-bold mb-2 text-white">All jobs</h1>
           <p className="text-slate-400 mb-6">
-            Select a job — open the <strong className="text-slate-300">Timing</strong> tab for parallel vs
-            sequential speedup (same analysis as before).
+            Every job in the system — select one for output, task status, events, and the{' '}
+            <strong className="text-slate-300">Timing</strong> tab (parallel vs sequential speedup).
           </p>
 
           <div className="flex flex-col lg:flex-row gap-6 min-h-[60vh]">

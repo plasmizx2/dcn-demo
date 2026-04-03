@@ -573,6 +573,11 @@ async def serve_results():
     return _spa_index()
 
 
+@app.get("/jobs")
+async def serve_jobs_page():
+    return _spa_index()
+
+
 @app.get("/my-jobs")
 async def serve_my_jobs():
     return _spa_index()

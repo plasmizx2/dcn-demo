@@ -45,7 +45,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const navItems = [
     { path: '/submit', label: 'Submit Job', icon: Plus },
     { path: '/ops', label: 'Dashboard', icon: LayoutDashboard, adminOnly: true },
-    { path: '/results', label: 'Results', icon: FileText, adminOnly: true },
+    { path: '/jobs', label: 'All jobs', icon: FileText, adminOnly: true },
     { path: '/worker-logs', label: 'Worker Logs', icon: Monitor, adminOnly: true },
     { path: '/admin/users', label: 'Users', icon: Users, adminOnly: true },
     { path: '/my-jobs', label: 'My Jobs', icon: Clipboard },

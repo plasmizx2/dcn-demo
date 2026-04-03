@@ -170,7 +170,7 @@ export function DashboardPage() {
               <h1 className="text-4xl font-bold mb-3 text-white">Operator dashboard</h1>
               <p className="text-slate-400 text-lg">
                 Live queue and workers. For <strong className="text-slate-300">per-job speedup</strong> (parallel vs
-                sequential), open <Link className="text-purple-400 hover:underline" to="/results">Results</Link> → pick a
+                sequential), open <Link className="text-purple-400 hover:underline" to="/jobs">All jobs</Link> → pick a
                 job → <strong className="text-slate-300">Timing</strong> tab.
               </p>
             </div>
@@ -253,7 +253,7 @@ export function DashboardPage() {
                         <td className="p-2 capitalize text-amber-400/90">{String(row.status ?? '—')}</td>
                         <td className="p-2 text-slate-500 font-mono text-xs">
                           {row.job_id ? (
-                            <Link className="text-purple-400 hover:underline" to={`/results#${String(row.job_id)}`}>
+                            <Link className="text-purple-400 hover:underline" to={`/jobs#${String(row.job_id)}`}>
                               {String(row.job_id).slice(0, 8)}…
                             </Link>
                           ) : (
@@ -298,10 +298,10 @@ export function DashboardPage() {
                         </td>
                         <td className="py-2">
                           <Link
-                            to={`/results#${job.id}`}
+                            to={`/jobs#${job.id}`}
                             className="inline-flex items-center gap-1 text-purple-400 hover:text-purple-300 text-xs font-medium"
                           >
-                            Results & timing
+                            Job detail & timing
                             <ExternalLink className="w-3 h-3" />
                           </Link>
                         </td>

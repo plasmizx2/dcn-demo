@@ -4,7 +4,13 @@ import { LoginPage } from "./pages/login";
 import { SubmitJobPage } from "./pages/submit-job";
 import { MyJobsPage } from "./pages/my-jobs";
 import { DashboardPage } from "./pages/dashboard";
-import { ResultsPage } from "./pages/results";
+import { Navigate, useLocation } from "react-router";
+import { AllJobsPage } from "./pages/all-jobs";
+
+function RedirectResultsToJobs() {
+  const { hash } = useLocation();
+  return <Navigate to={`/jobs${hash}`} replace />;
+}
 import { WorkerLogsPage } from "./pages/worker-logs";
 import { AdminUsersPage } from "./pages/admin-users";
 import { ContactPage } from "./pages/contact";
@@ -33,8 +39,12 @@ export const router = createBrowserRouter([
     Component: DashboardPage,
   },
   {
+    path: "/jobs",
+    Component: AllJobsPage,
+  },
+  {
     path: "/results",
-    Component: ResultsPage,
+    Component: RedirectResultsToJobs,
   },
   {
     path: "/worker-logs",

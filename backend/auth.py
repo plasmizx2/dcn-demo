@@ -217,7 +217,7 @@ async def fetch_user_session_audit(user_id: str) -> dict:
 
 
 # Pages that require admin (or ceo) role
-ADMIN_PAGES = {"/ops", "/results", "/worker-logs", "/admin/users"}
+ADMIN_PAGES = {"/ops", "/jobs", "/results", "/worker-logs", "/admin/users"}
 # API routes that require admin (or ceo) role
 ADMIN_API_PREFIXES = ["/monitor/"]
 # Pages that require any authenticated user (non-admin)

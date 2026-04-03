@@ -9,7 +9,7 @@ interface Me {
   avatar_url?: string;
 }
 
-/** Redirects if not signed in, or if role is not admin/ceo. Used for /ops, /results, /worker-logs, /admin/users. */
+/** Redirects if not signed in, or if role is not admin/ceo. Used for /ops, /jobs, /worker-logs, /admin/users. */
 export function useRequireAdmin() {
   const navigate = useNavigate();
   const [ready, setReady] = useState(false);
