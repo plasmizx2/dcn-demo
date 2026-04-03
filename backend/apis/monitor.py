@@ -73,6 +73,11 @@ async def monitor_stats() -> dict:
         )
         worker_counts = {r["effective_status"]: r["count"] for r in worker_rows}
 
+    idle = worker_counts.get("online", 0)
+    busy_w = worker_counts.get("busy", 0)
+    # Heartbeat-fresh workers: idle (status=online) + busy — both exclude stale-heartbeat rows
+    connected = idle + busy_w
+
     # Count worker-finished tasks (submitted + awaiting admin validation)
     finished_tasks = task_counts.get("submitted", 0) + task_counts.get(
         "pending_validation", 0
@@ -85,8 +90,10 @@ async def monitor_stats() -> dict:
         "running_tasks": task_counts.get("running", 0),
         "submitted_tasks": finished_tasks,
         "pending_validation_tasks": task_counts.get("pending_validation", 0),
-        "online_workers": worker_counts.get("online", 0),
-        "busy_workers": worker_counts.get("busy", 0),
+        # "online" in DB = worker is connected and idle; "busy" = connected and running a task
+        "online_workers": idle,
+        "busy_workers": busy_w,
+        "connected_workers": connected,
     }
 
 
