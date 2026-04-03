@@ -9,7 +9,9 @@ import {
   LogOut,
   Cpu,
   Menu,
-  X
+  X,
+  Mail,
+  Bug,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ReactNode, useEffect, useState } from 'react';
@@ -47,6 +49,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     { path: '/worker-logs', label: 'Worker Logs', icon: Monitor, adminOnly: true },
     { path: '/admin/users', label: 'Users', icon: Users, adminOnly: true },
     { path: '/my-jobs', label: 'My Jobs', icon: Clipboard },
+    { path: '/report-bug', label: 'Report Bug', icon: Bug },
+    { path: '/contact', label: 'Contact', icon: Mail },
   ];
 
   const isAdmin = user?.role === 'admin' || user?.role === 'ceo';

@@ -31,8 +31,6 @@ class TaskComplete(BaseModel):
 
 
 class TaskFail(BaseModel):
-    """Optional error detail from worker (stored on job_events for ops debugging)."""
-
     error: Optional[str] = None
 
 

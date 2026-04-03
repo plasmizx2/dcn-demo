@@ -5,6 +5,7 @@ from fastapi.encoders import jsonable_encoder
 
 from database import get_pool
 from config import HEARTBEAT_OFFLINE_SECONDS
+from auth import ELEVATED_ROLES
 
 logger = logging.getLogger("dcn")
 
@@ -116,8 +117,8 @@ async def delete_worker(worker_id: str, request: Request) -> dict:
     from fastapi import HTTPException
     
     user = await get_session(request)
-    if not user or user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if not user or user.get("role") not in ELEVATED_ROLES:
+        raise HTTPException(status_code=403, detail="Admin or CEO access required")
         
     pool = await get_pool()
     async with pool.acquire() as conn:

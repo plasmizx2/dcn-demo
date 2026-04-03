@@ -8,3 +8,4 @@ node_modules/
 frontend/web/dist/
 .worker_state.json
 dcn-worker/config.json
+*.zip

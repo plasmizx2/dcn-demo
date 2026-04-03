@@ -67,7 +67,7 @@ export function PageLayout({ children, showAuth = true }: PageLayoutProps) {
                 <Link to="/my-jobs" className="text-slate-300 hover:text-white transition-colors text-sm font-medium">
                   My Jobs
                 </Link>
-                <Link to="/dashboard" className="text-slate-300 hover:text-white transition-colors text-sm font-medium">
+                <Link to="/ops" className="text-slate-300 hover:text-white transition-colors text-sm font-medium">
                   Monitor
                 </Link>
                 <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10">
