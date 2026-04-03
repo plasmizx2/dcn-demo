@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DCN — Report Bug</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#14161e;--surface:rgba(255,255,255,0.06);--surface2:rgba(255,255,255,0.08);
+  --border:rgba(255,255,255,0.10);--border2:rgba(255,255,255,0.14);
+  --text:#e8e8ec;--muted:#b4b4bc;--dim:#8a8a96;--dark:#52525b;
+  --accent:#7c3aed;--accent2:#6366f1;--accent3:#3b82f6;
+  --green:#22c55e;--red:#ef4444;--yellow:#eab308;
+}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+.app-layout{display:flex;min-height:100vh}
+.sidebar{width:240px;min-width:240px;background:rgba(16,18,26,0.55);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-right:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;padding:24px 0;position:fixed;top:0;left:0;bottom:0;z-index:10}
+.sidebar-logo{font-weight:800;font-size:20px;background:linear-gradient(135deg,#a78bfa,#60a5fa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-decoration:none;padding:0 24px;margin-bottom:8px;display:block}
+.sidebar-role{font-size:0.68rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#7c3aed;padding:0 24px;margin-bottom:24px}
+.sidebar-nav{display:flex;flex-direction:column;gap:2px;flex:1;padding:0 12px}
+.sidebar-nav a{display:flex;align-items:center;gap:10px;color:rgba(255,255,255,0.45);text-decoration:none;font-size:0.88rem;font-weight:500;padding:10px 14px;border-radius:10px;transition:all 0.15s}
+.sidebar-nav a:hover{color:#fff;background:rgba(255,255,255,0.04)}
+.sidebar-nav a.active{color:#fff;background:linear-gradient(135deg,rgba(124,58,237,0.15),rgba(59,130,246,0.10));border:1px solid rgba(124,58,237,0.2)}
+.sidebar-nav a svg{width:18px;height:18px;flex-shrink:0}
+.sidebar-bottom{padding:16px 12px 0;border-top:1px solid rgba(255,255,255,0.06);margin-top:auto}
+.sidebar-user{padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.sidebar-user-avatar{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#7c3aed,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:0.82rem;font-weight:700;color:#fff;flex-shrink:0}
+.sidebar-user-name{font-size:0.85rem;font-weight:600;color:#fff}
+.sidebar-user-role{font-size:0.7rem;color:rgba(255,255,255,0.35);text-transform:capitalize}
+.sidebar-signout{display:flex;align-items:center;gap:10px;color:rgba(255,255,255,0.35);text-decoration:none;font-size:0.82rem;font-weight:500;padding:10px 14px;border-radius:10px;transition:all 0.15s}
+.sidebar-signout:hover{color:#ef4444;background:rgba(239,68,68,0.06)}
+.sidebar-signout svg{width:16px;height:16px}
+.main-content{margin-left:240px;flex:1;min-width:0;padding:32px 40px 60px}
+.page-title{font-size:1.5rem;font-weight:800;color:#fff;letter-spacing:-0.5px;margin-bottom:4px}
+.page-subtitle{font-size:0.85rem;color:var(--dim);margin-bottom:28px}
+
+.form-card{max-width:560px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:28px 32px}
+.form-group{margin-bottom:18px}
+.form-label{display:block;font-size:0.78rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:rgba(255,255,255,0.5);margin-bottom:6px}
+.form-input,.form-textarea{width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 14px;color:#fff;font-family:inherit;font-size:0.88rem;outline:none;transition:border-color 0.15s}
+.form-input:focus,.form-textarea:focus{border-color:rgba(124,58,237,0.5)}
+.form-textarea{min-height:140px;resize:vertical}
+.form-hint{font-size:0.75rem;color:var(--dark);margin-top:4px}
+.form-btn{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;background:linear-gradient(135deg,var(--accent),var(--accent3));color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:0.88rem;font-weight:600;cursor:pointer;transition:all 0.2s}
+.form-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(124,58,237,0.3)}
+.form-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+.success-msg{display:none;padding:16px 20px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);border-radius:12px;color:#4ade80;font-size:0.88rem;margin-bottom:18px}
+.error-msg{display:none;padding:16px 20px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:12px;color:#f87171;font-size:0.88rem;margin-bottom:18px}
+
+@media(max-width:768px){.sidebar{display:none}.main-content{margin-left:0;padding:24px 20px}}
+</style>
+</head>
+<body>
+<div class="app-layout">
+<aside class="sidebar" id="sidebar">
+  <a href="/" class="sidebar-logo">DCN</a>
+  <div class="sidebar-role" id="sidebarRole">Customer</div>
+  <nav class="sidebar-nav" id="sidebarNav">
+    <a href="/submit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Submit Job</a>
+    <a href="/my-jobs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>My Jobs</a>
+    <a href="/report-bug" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Report Bug</a>
+    <a href="/contact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>Contact Us</a>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="sidebar-user" id="sidebarUser" style="display:none">
+      <div class="sidebar-user-avatar" id="userAvatar">?</div>
+      <div><div class="sidebar-user-name" id="userName">--</div><div class="sidebar-user-role" id="userRoleLabel">--</div></div>
+    </div>
+    <a href="/auth/logout" class="sidebar-signout" id="signoutLink" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Sign Out
+    </a>
+    <a href="/login" class="sidebar-signout" id="signinLink">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10,17 15,12 10,7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>Sign In
+    </a>
+  </div>
+</aside>
+
+<script>
+let currentUser=null;
+fetch('/auth/me',{credentials:'include'}).then(r=>r.ok?r.json():null).then(u=>{
+  if(!u)return;
+  currentUser=u;
+  document.getElementById('sidebarUser').style.display='flex';
+  document.getElementById('signoutLink').style.display='flex';
+  document.getElementById('signinLink').style.display='none';
+  document.getElementById('userName').textContent=u.name||u.email;
+  document.getElementById('userRoleLabel').textContent=u.role;
+  const av=document.getElementById('userAvatar');
+  if(u.avatar_url){av.innerHTML='<img src="'+u.avatar_url+'" style="width:100%;height:100%;border-radius:50%;object-fit:cover">';}
+  else{av.textContent=(u.name||u.email).charAt(0).toUpperCase();}
+  if(u.role==='admin'||u.role==='ceo'){
+    document.getElementById('sidebarRole').textContent='Admin Panel';
+  }
+}).catch(()=>{});
+</script>
+
+<div class="main-content">
+  <h1 class="page-title">Report a Bug</h1>
+  <p class="page-subtitle">Found something broken? Let us know and we'll fix it.</p>
+
+  <div class="form-card">
+    <div class="success-msg" id="successMsg">Bug report submitted! Thanks for helping us improve.</div>
+    <div class="error-msg" id="errorMsg"></div>
+
+    <div class="form-group">
+      <label class="form-label">Subject</label>
+      <input class="form-input" id="bugSubject" placeholder="Brief summary of the issue">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea class="form-textarea" id="bugDescription" placeholder="What happened? What did you expect to happen?"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Page URL / Job ID <span style="color:var(--dark)">(optional)</span></label>
+      <input class="form-input" id="bugPageUrl" placeholder="e.g. /my-jobs or a job ID">
+      <div class="form-hint">Auto-filled with current page if left blank</div>
+    </div>
+    <button class="form-btn" id="sendBtn" onclick="submitBug()">Submit Report</button>
+  </div>
+</div>
+</div>
+
+<script>
+async function submitBug(){
+  const subject=document.getElementById('bugSubject').value.trim();
+  const description=document.getElementById('bugDescription').value.trim();
+  const pageUrl=document.getElementById('bugPageUrl').value.trim()||window.location.href;
+  const errEl=document.getElementById('errorMsg');
+  const okEl=document.getElementById('successMsg');
+  errEl.style.display='none'; okEl.style.display='none';
+
+  if(!subject||!description){errEl.textContent='Please fill in subject and description.';errEl.style.display='block';return;}
+
+  const btn=document.getElementById('sendBtn');
+  btn.disabled=true; btn.textContent='Submitting...';
+  try{
+    const r=await fetch('/bugs',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({subject,description,page_url:pageUrl})});
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.detail||'Failed to submit');}
+    okEl.style.display='block';
+    document.getElementById('bugSubject').value='';
+    document.getElementById('bugDescription').value='';
+    document.getElementById('bugPageUrl').value='';
+  }catch(e){errEl.textContent=e.message;errEl.style.display='block';}
+  finally{btn.disabled=false;btn.textContent='Submit Report';}
+}
+</script>
+</body>
+</html>
