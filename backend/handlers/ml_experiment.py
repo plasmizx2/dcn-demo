@@ -58,7 +58,7 @@ def handle(task: dict, job: dict) -> str:
     source = payload.get("source", "built_in")
     dataset_id = payload.get("dataset_id", "")
 
-    if source in ("openml", "csv_url") and dataset_id:
+    if source in ("openml", "csv_url", "csv_upload") and dataset_id:
         rows, meta = load_external_dataset(source, dataset_id, target=target)
         target = meta["target"]
         task_category = meta["task_category"]

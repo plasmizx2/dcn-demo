@@ -215,6 +215,10 @@ def list_datasets() -> list[dict]:
 
 _external_cache: dict[str, tuple[list[dict], dict]] = {}
 
+# Ephemeral server-side CSV uploads (single-instance demo; re-upload after restart)
+_upload_csv_store: dict[str, bytes] = {}
+MAX_CSV_UPLOAD_BYTES = 10 * 1024 * 1024
+
 
 def _infer_task_category(y_values: list, target_name: str) -> str:
     """Guess regression vs classification from target values."""
@@ -379,6 +383,80 @@ def load_csv_url(url: str, target: str | None = None) -> tuple[list[dict], dict]
     return rows, meta
 
 
+def store_csv_upload(data: bytes) -> str:
+    """Store raw CSV bytes; returns token for preview + job input_payload."""
+    import uuid
+
+    if len(data) > MAX_CSV_UPLOAD_BYTES:
+        raise ValueError(f"CSV too large (max {MAX_CSV_UPLOAD_BYTES // (1024 * 1024)} MB)")
+    if not data or not data.strip():
+        raise ValueError("CSV file is empty")
+    token = str(uuid.uuid4())
+    _upload_csv_store[token] = data
+    return token
+
+
+def load_csv_from_upload_token(token: str, target: str | None = None) -> tuple[list[dict], dict]:
+    """Load dataset from a prior store_csv_upload token."""
+    if token not in _upload_csv_store:
+        raise ValueError("Upload not found — re-upload your CSV file")
+    data = _upload_csv_store[token]
+    cache_key = f"csv_upload:{token}:{target}"
+    if cache_key in _external_cache:
+        return _external_cache[cache_key]
+
+    import pandas as pd
+
+    df = pd.read_csv(io.BytesIO(data))
+    if df.empty:
+        raise ValueError("CSV is empty or could not be parsed")
+    df.columns = [str(c).strip() for c in df.columns]
+
+    resolved_target = str(target) if target else str(df.columns[-1])
+    if resolved_target not in df.columns:
+        raise ValueError(
+            f"Target column '{resolved_target}' not found. Columns: {list(df.columns)}"
+        )
+
+    feature_cols = [c for c in df.columns if c != resolved_target]
+    if not feature_cols:
+        raise ValueError("No feature columns after selecting target")
+
+    work = df[feature_cols + [resolved_target]].dropna(how="any")
+    if work.empty:
+        raise ValueError("CSV has no rows after dropping NaNs")
+
+    if len(work) > MAX_ROWS:
+        work = work.sample(n=MAX_ROWS, random_state=42)
+
+    y_series = work[resolved_target]
+    if pd.api.types.is_numeric_dtype(y_series):
+        y_vals = y_series.astype(float).tolist()[:5000]
+    else:
+        y_vals = pd.factorize(y_series)[0].tolist()[:5000]
+    task_category = _infer_task_category(y_vals, resolved_target)
+
+    work_enc = work.copy()
+    for col in work_enc.columns:
+        s = work_enc[col]
+        if pd.api.types.is_numeric_dtype(s):
+            work_enc[col] = s.astype(float)
+        else:
+            work_enc[col] = pd.factorize(s)[0].astype(float)
+
+    rows = work_enc.to_dict("records")
+
+    meta = {
+        "target": resolved_target,
+        "task_category": task_category,
+        "all_features": feature_cols,
+        "display_name": "Uploaded CSV",
+        "description": f"{len(rows):,} rows, {len(feature_cols)} features",
+    }
+    _external_cache[cache_key] = (rows, meta)
+    return rows, meta
+
+
 def load_external_dataset(
     source: str, dataset_id: str, target: str | None = None
 ) -> tuple[list[dict], dict]:
@@ -387,6 +465,8 @@ def load_external_dataset(
         return load_openml(dataset_id, target=target)
     elif source == "csv_url":
         return load_csv_url(dataset_id, target=target)
+    elif source == "csv_upload":
+        return load_csv_from_upload_token(dataset_id, target=target)
     elif source == "built_in":
         return get_dataset(dataset_id)
     else:
@@ -490,6 +570,39 @@ def preview_dataset(
             "suggested_target": suggested_target,
             "suggested_task_category": task_cat,
             "display_name": dataset_id.split("/")[-1][:60] or "CSV",
+        }
+
+    if source == "csv_upload":
+        import pandas as pd
+
+        if dataset_id not in _upload_csv_store:
+            raise ValueError("Upload not found — upload the CSV again")
+        df = pd.read_csv(io.BytesIO(_upload_csv_store[dataset_id]))
+        if df.empty:
+            raise ValueError("CSV is empty")
+        df.columns = [str(c).strip() for c in df.columns]
+        all_cols = list(df.columns)
+        numeric = list(df.select_dtypes(include=["number"]).columns)
+        suggested_target = str(all_cols[-1])
+        y_series = df[suggested_target].dropna()
+        if len(y_series):
+            if pd.api.types.is_numeric_dtype(y_series):
+                y_vals = y_series.astype(float).tolist()[:5000]
+            else:
+                y_vals = pd.factorize(y_series)[0].tolist()[:5000]
+            task_cat = _infer_task_category(y_vals, suggested_target)
+        else:
+            task_cat = "regression"
+        sample = df.head(5).to_dict("records")
+        return {
+            "columns": all_cols,
+            "numeric_columns": numeric,
+            "target_columns": all_cols,
+            "row_count": len(df),
+            "sample_rows": sample,
+            "suggested_target": suggested_target,
+            "suggested_task_category": task_cat,
+            "display_name": "Uploaded CSV",
         }
 
     raise ValueError(f"Unknown source: {source}")

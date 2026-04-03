@@ -32,7 +32,7 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
     dataset_id = input_payload.get("dataset_id", "")
     dataset_name = input_payload.get("dataset_name", "weather_ri")
 
-    if source in ("openml", "csv_url") and dataset_id:
+    if source in ("openml", "csv_url", "csv_upload") and dataset_id:
         from datasets import load_external_dataset
         target_override = input_payload.get("target")
         _, meta = load_external_dataset(source, dataset_id, target=target_override)
