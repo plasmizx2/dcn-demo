@@ -57,7 +57,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const filteredNavItems = navItems.filter(item => !item.adminOnly || isAdmin);
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950">
+    <div className="flex min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 text-white">
       {/* Animated background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <motion.div 
