@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from database import get_pool, close_pool
 from apis.jobs import router as jobs_router
@@ -33,17 +34,24 @@ BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 
 logger = logging.getLogger("dcn")
 
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "public_page")
-MONITOR_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "monitor")
-RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "results")
-LANDING_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "landing")
-LOGIN_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "login")
-MYJOBS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "my-jobs")
 ERROR_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "error")
-WORKER_LOGS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "worker-logs")
-ADMIN_USERS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "admin-users")
-CONTACT_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "contact")
-REPORT_BUG_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "report-bug")
+WEB_DIST = os.path.join(os.path.dirname(__file__), "..", "frontend", "web", "dist")
+
+
+def _spa_index(no_cache: bool = True) -> FileResponse:
+    """Vite/React shell from `frontend/web` (see Improve website design bundle)."""
+    path = os.path.join(WEB_DIST, "index.html")
+    if not os.path.isfile(path):
+        logger.error(
+            "SPA missing %s — run: cd frontend/web && npm install && npm run build",
+            path,
+        )
+        raise HTTPException(status_code=503, detail="Frontend not built — run npm run build in frontend/web")
+    r = FileResponse(path)
+    if no_cache:
+        r.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        r.headers["Pragma"] = "no-cache"
+    return r
 
 
 async def _maintenance_loop():
@@ -278,6 +286,10 @@ app.include_router(monitor_router)
 app.include_router(workers_router)
 app.include_router(feedback_router)
 
+_spa_assets = os.path.join(WEB_DIST, "assets")
+if os.path.isdir(_spa_assets):
+    app.mount("/assets", StaticFiles(directory=_spa_assets), name="spa_assets")
+
 
 # ── Auth middleware ──────────────────────────────────────────────
 @app.middleware("http")
@@ -333,7 +345,7 @@ async def serve_login(request: Request):
     user = await get_session(request)
     if user:
         return RedirectResponse("/ops" if user["role"] in ELEVATED_ROLES else "/submit")
-    return FileResponse(os.path.join(LOGIN_DIR, "index.html"))
+    return _spa_index()
 
 
 # ── Google OAuth ─────────────────────────────────────────────
@@ -527,68 +539,50 @@ async def change_role(request: Request):
     return {"ok": True}
 
 
-# ── Page routes ─────────────────────────────────────────────────
+# ── Page routes (Vite/React SPA — frontend/web) ─────────────────
 @app.get("/")
 async def serve_landing():
-    return FileResponse(os.path.join(LANDING_DIR, "index.html"))
+    return _spa_index(no_cache=False)
 
 
 @app.get("/submit")
 async def serve_frontend():
-    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+    return _spa_index()
 
 
 @app.get("/ops")
 async def serve_monitor():
-    response = FileResponse(os.path.join(MONITOR_DIR, "index.html"))
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    return response
+    return _spa_index()
 
 
 @app.get("/results")
 async def serve_results():
-    response = FileResponse(os.path.join(RESULTS_DIR, "index.html"))
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    return response
+    return _spa_index()
 
 
 @app.get("/my-jobs")
 async def serve_my_jobs():
-    response = FileResponse(os.path.join(MYJOBS_DIR, "index.html"))
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    return response
+    return _spa_index()
 
 
 @app.get("/worker-logs")
 async def serve_worker_logs():
-    response = FileResponse(os.path.join(WORKER_LOGS_DIR, "index.html"))
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    return response
+    return _spa_index()
 
 
 @app.get("/admin/users")
 async def serve_admin_users():
-    response = FileResponse(os.path.join(ADMIN_USERS_DIR, "index.html"))
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    return response
+    return _spa_index()
 
 
 @app.get("/contact")
 async def serve_contact():
-    return FileResponse(os.path.join(CONTACT_DIR, "index.html"))
+    return _spa_index(no_cache=False)
 
 
 @app.get("/report-bug")
 async def serve_report_bug():
-    response = FileResponse(os.path.join(REPORT_BUG_DIR, "index.html"))
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    return response
+    return _spa_index()
 
 
 
@@ -604,10 +598,11 @@ async def health():
 
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc):
-    """Serve branded 404 page for unknown routes."""
-    # Return JSON for API requests
+    """Unknown HTML routes → React Router (client 404); APIs return JSON."""
     if request.url.path.startswith("/api/") or request.url.path.startswith("/monitor/"):
         return JSONResponse({"detail": "Not found"}, status_code=404)
+    if request.method == "GET" and os.path.isfile(os.path.join(WEB_DIST, "index.html")):
+        return FileResponse(os.path.join(WEB_DIST, "index.html"))
     return FileResponse(os.path.join(ERROR_DIR, "404.html"), status_code=404)
 
 

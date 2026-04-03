@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DCN -- Distributed Computation Network</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --surface: #161922;
+      --surface-elevated: #1a1d28;
+      --border: rgba(255, 255, 255, 0.07);
+      --text: #ececf1;
+      --text-muted: rgba(236, 236, 241, 0.65);
+      --text-dim: rgba(236, 236, 241, 0.45);
+      --accent: #8b5cf6;
+      --accent-hover: #7c3aed;
+      --accent-muted: rgba(139, 92, 246, 0.15);
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0c0e14;
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Page gradient mesh */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 900px;
+      height: 900px;
+      background: radial-gradient(circle, rgba(124,58,237,0.1) 0%, rgba(124,58,237,0.02) 45%, transparent 68%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Sidebar ── */
+    .app-layout {
+      display: flex;
+      min-height: 100vh;
+    }
+    .sidebar {
+      width: 240px;
+      min-width: 240px;
+      background: rgba(16,18,26,0.55);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-right: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      z-index: 10;
+    }
+    .sidebar-logo {
+      font-weight: 800;
+      font-size: 20px;
+      background: linear-gradient(135deg, #a78bfa, #60a5fa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-decoration: none;
+      padding: 0 24px;
+      margin-bottom: 8px;
+      display: block;
+    }
+    .sidebar-role {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #7c3aed;
+      padding: 0 24px;
+      margin-bottom: 24px;
+    }
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      padding: 0 12px;
+    }
+    .sidebar-nav a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: rgba(255,255,255,0.45);
+      text-decoration: none;
+      font-size: 0.88rem;
+      font-weight: 500;
+      padding: 10px 14px;
+      border-radius: 10px;
+      transition: all 0.15s;
+    }
+    .sidebar-nav a:hover {
+      color: #fff;
+      background: rgba(255,255,255,0.04);
+    }
+    .sidebar-nav a.active {
+      color: #fff;
+      background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(59,130,246,0.10));
+      border: 1px solid rgba(124,58,237,0.2);
+    }
+    .sidebar-nav a svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+    .sidebar-bottom {
+      padding: 16px 12px 0;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      margin-top: auto;
+    }
+    .sidebar-user {
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    .sidebar-user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(145deg, #8b5cf6, #6d28d9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .sidebar-user-info {
+      min-width: 0;
+    }
+    .sidebar-user-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sidebar-user-role {
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.35);
+      text-transform: capitalize;
+    }
+    .sidebar-signout {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: rgba(255,255,255,0.35);
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 500;
+      padding: 10px 14px;
+      border-radius: 10px;
+      transition: all 0.15s;
+    }
+    .sidebar-signout:hover {
+      color: #ef4444;
+      background: rgba(239,68,68,0.06);
+    }
+    .sidebar-signout svg {
+      width: 16px;
+      height: 16px;
+    }
+    .main-content {
+      margin-left: 240px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .ds-preview-card {
+      margin-top: 16px;
+      padding: 16px 18px;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+    }
+    .ds-preview-card .ds-preview-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+    .ds-preview-card .ds-preview-meta {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      margin-bottom: 14px;
+    }
+    .ds-hint {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-top: 8px;
+      line-height: 1.45;
+    }
+    .ds-hint a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .ds-hint a:hover {
+      text-decoration: underline;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 40px 72px;
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px 40px;
+      align-items: start;
+    }
+    .container.single-col {
+      grid-template-columns: 1fr;
+      max-width: 860px;
+    }
+    @media(max-width:960px) {
+      .sidebar { display: none; }
+      .main-content { margin-left: 0; }
+      .container { grid-template-columns: 1fr; padding: 24px 24px 64px; }
+    }
+    .left-col, .right-col {
+      min-width: 0;
+    }
+
+    /* Cards — calm surface, light border */
+    .card {
+      position: relative;
+      background: var(--surface);
+      border-radius: 16px;
+      padding: 28px 32px 32px;
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card:hover {
+      border-color: rgba(139, 92, 246, 0.12);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+    .card h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 6px;
+      letter-spacing: -0.4px;
+    }
+    .form-card-lead {
+      font-size: 0.875rem;
+      color: var(--text-dim);
+      line-height: 1.5;
+      margin-bottom: 28px;
+      font-weight: 400;
+    }
+
+    /* Form */
+    .field-group {
+      margin-bottom: 22px;
+    }
+    .field-group:last-of-type {
+      margin-bottom: 0;
+    }
+    label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* Segmented dataset source */
+    .ds-segment {
+      display: flex;
+      padding: 4px;
+      gap: 4px;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+    .ds-segment-item {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin: 0;
+      padding: 10px 12px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text-dim);
+      text-transform: none !important;
+      letter-spacing: 0.01em !important;
+      transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .ds-segment-item:hover {
+      color: var(--text-muted);
+    }
+    .ds-segment-item:has(input:checked) {
+      background: var(--accent-muted);
+      color: #fff;
+      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+    .ds-external-row {
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .ds-external-row input[type="text"] {
+      flex: 1;
+      min-width: 0;
+      margin-bottom: 0;
+    }
+    input:not([type="radio"]):not([type="checkbox"]):not([type="hidden"]),
+    select, textarea {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 0.9375rem;
+      font-family: 'Inter', inherit;
+      margin-bottom: 0;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    #inputGroup input:not([type="radio"]),
+    #inputGroup select,
+    #inputGroup textarea {
+      margin-bottom: 0;
+    }
+    /* Radios/checkboxes must not inherit full-width text-input styles */
+    input[type="radio"], input[type="checkbox"] {
+      width: auto;
+      min-width: 1rem;
+      max-width: none;
+      padding: 0;
+      margin: 0 8px 0 0;
+      margin-bottom: 0;
+      border: none;
+      background: transparent;
+      flex-shrink: 0;
+      vertical-align: middle;
+      accent-color: #7c3aed;
+    }
+    input:not([type="radio"]):not([type="checkbox"]):focus,
+    select:focus, textarea:focus {
+      outline: none;
+      border-color: rgba(139, 92, 246, 0.45);
+      box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12);
+    }
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+    .form-actions {
+      margin-top: 28px;
+      padding-top: 8px;
+    }
+    select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23666' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 16px center;
+    }
+
+    /* Primary submit */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 24px;
+      background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      font-family: 'Inter', inherit;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.15s ease;
+      width: 100%;
+      position: relative;
+      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 4px 16px rgba(124, 58, 237, 0.25);
+    }
+    .btn:hover:not(:disabled) {
+      filter: brightness(1.06);
+      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 6px 24px rgba(124, 58, 237, 0.35);
+    }
+    .btn:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+    .btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    /* Secondary — Load dataset */
+    .btn-secondary-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 18px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      font-family: 'Inter', inherit;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+    .btn-secondary-action:hover:not(:disabled) {
+      background: var(--accent-muted);
+      border-color: rgba(139, 92, 246, 0.35);
+      color: #fff;
+    }
+    .btn-secondary-action:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .btn .btn-spinner {
+      display: none;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    .btn.loading .btn-spinner {
+      display: inline-block;
+    }
+    .btn.loading .btn-label {
+      /* keep visible alongside spinner */
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Status */
+    .status-section, .output-section {
+      display: none;
+    }
+
+    .job-id-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 22px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .job-id-row code {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.30);
+      background: rgba(255,255,255,0.03);
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 100px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .status-badge::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    .status-pending { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.45); }
+    .status-pending::before { background: rgba(255,255,255,0.3); }
+    .status-running { background: rgba(59,130,246,0.1); color: #60a5fa; }
+    .status-running::before { background: #3b82f6; animation: pulse-dot 1.5s infinite; }
+    .status-completed { background: rgba(74,222,128,0.1); color: #4ade80; }
+    .status-completed::before { background: #4ade80; }
+    .status-failed { background: rgba(239,68,68,0.1); color: #f87171; }
+    .status-failed::before { background: #ef4444; }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Task list */
+    .task-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .task-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 18px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 12px;
+      border-left: 3px solid rgba(255,255,255,0.08);
+      transition: all 0.2s ease;
+    }
+    .task-item:hover {
+      background: rgba(255,255,255,0.035);
+    }
+    .task-item.ti-queued {
+      border-left-color: rgba(255,255,255,0.12);
+    }
+    .task-item.ti-running {
+      border-left-color: #3b82f6;
+      background: rgba(59,130,246,0.03);
+    }
+    .task-item.ti-submitted {
+      border-left-color: #4ade80;
+    }
+    .task-item.ti-failed {
+      border-left-color: #ef4444;
+    }
+    .task-name {
+      font-size: 0.88rem;
+      color: rgba(255,255,255,0.7);
+      font-weight: 500;
+    }
+    .task-status {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 100px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .task-status::before {
+      content: '';
+      display: inline-block;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+    }
+    .ts-queued { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.4); }
+    .ts-queued::before { background: rgba(255,255,255,0.25); }
+    .ts-running { background: rgba(59,130,246,0.1); color: #60a5fa; }
+    .ts-running::before { background: #3b82f6; animation: pulse-dot 1.5s infinite; }
+    .ts-submitted { background: rgba(74,222,128,0.1); color: #4ade80; }
+    .ts-submitted::before { background: #4ade80; }
+    .ts-failed { background: rgba(239,68,68,0.1); color: #f87171; }
+    .ts-failed::before { background: #ef4444; }
+
+    /* Progress bar */
+    .progress-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 100px;
+      margin-bottom: 26px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #a78bfa, #7c3aed);
+      border-radius: 100px;
+      transition: width 0.5s ease;
+      width: 0%;
+      position: relative;
+    }
+    .progress-bar-fill::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%);
+      animation: shimmer 2s infinite;
+    }
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    /* Output */
+    .output-block {
+      background: rgba(15,17,23,0.9);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 14px;
+      padding: 32px;
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: rgba(255,255,255,0.65);
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    .output-block::-webkit-scrollbar {
+      width: 6px;
+    }
+    .output-block::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .output-block::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+    }
+    .output-block h1, .output-block h2, .output-block h3, .output-block h4 {
+      color: #fff; margin: 20px 0 8px 0; letter-spacing: -0.3px;
+    }
+    .output-block h1 { font-size: 1.4rem; font-weight: 700; }
+    .output-block h2 { font-size: 1.15rem; font-weight: 700; }
+    .output-block h3 { font-size: 1rem; font-weight: 600; }
+    .output-block p { margin: 10px 0; }
+    .output-block ul, .output-block ol { margin: 10px 0 10px 24px; }
+    .output-block li { margin: 6px 0; }
+    .output-block strong { color: rgba(255,255,255,0.85); }
+    .output-block a { color: #60a5fa; text-decoration: none; }
+    .output-block a:hover { text-decoration: underline; }
+    .output-block code {
+      background: rgba(124,58,237,0.1); padding: 2px 7px; border-radius: 6px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; font-size: 0.84rem; color: #a78bfa;
+    }
+    .output-block pre {
+      background: #060609; border: 1px solid rgba(255,255,255,0.10); border-radius: 10px;
+      padding: 18px; margin: 14px 0; overflow-x: auto;
+    }
+    .output-block pre code { background: none; padding: 0; color: rgba(255,255,255,0.6); }
+    .output-block blockquote {
+      border-left: 3px solid #7c3aed; padding-left: 16px; margin: 14px 0; color: rgba(255,255,255,0.4);
+    }
+    .output-block hr { border: none; border-top: 1px solid rgba(255,255,255,0.10); margin: 18px 0; }
+    .output-block table {
+      width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.82rem;
+    }
+    .output-block th {
+      text-align: left; padding: 10px 12px; background: rgba(255,255,255,0.10);
+      border-bottom: 2px solid rgba(124,58,237,0.3); color: rgba(255,255,255,0.6); font-size: 0.75rem;
+      text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600;
+    }
+    .output-block td {
+      padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); color: rgba(255,255,255,0.55);
+    }
+    .output-block tr:first-child td { color: #4ade80; font-weight: 600; }
+
+    .html-preview-public {
+      background: #fff; border: 1px solid rgba(255,255,255,0.10); border-radius: 12px;
+      width: 100%; height: 400px; min-height: 200px; resize: vertical; overflow: auto;
+    }
+    .output-tabs {
+      display: flex; gap: 8px; margin-bottom: 14px;
+    }
+    .output-tab {
+      padding: 7px 16px; border-radius: 10px; font-size: 0.78rem; font-weight: 600;
+      text-transform: uppercase; cursor: pointer; border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.02); color: rgba(255,255,255,0.4);
+      transition: all 0.2s ease; letter-spacing: 0.3px;
+    }
+    .output-tab:hover {
+      border-color: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.6);
+    }
+    .output-tab.active {
+      background: linear-gradient(180deg, #8b5cf6, #7c3aed);
+      color: #fff;
+      border-color: transparent;
+    }
+
+    /* Error */
+    .error-msg {
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.2);
+      color: #f87171;
+      padding: 14px 18px;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      margin-bottom: 20px;
+      display: none;
+      font-weight: 500;
+    }
+
+    /* Timing comparison */
+    .timing-card {
+      position: relative;
+      background: rgba(255,255,255,0.02);
+      border-radius: 18px;
+      padding: 36px;
+      margin-bottom: 28px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid transparent;
+      background-clip: padding-box;
+    }
+    .timing-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 18px;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(34,197,94,0.25), rgba(16,185,129,0.15), rgba(255,255,255,0.04));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+    .timing-card h3 {
+      font-size: 0.82rem;
+      font-weight: 700;
+      background: linear-gradient(180deg, #c4b5fd, #7c3aed);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 28px;
+    }
+    .timing-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .timing-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .timing-label {
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.55);
+      min-width: 100px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+    .timing-bar-track {
+      flex: 1;
+      height: 36px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+    }
+    .timing-bar-fill {
+      height: 100%;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 14px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #fff;
+      transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+      min-width: fit-content;
+    }
+    .timing-bar-fill.sequential {
+      background: linear-gradient(90deg, #ef4444, #f97316);
+    }
+    .timing-bar-fill.parallel {
+      background: linear-gradient(90deg, #22c55e, #10b981);
+    }
+    .timing-stats {
+      display: flex;
+      gap: 14px;
+      margin-top: 24px;
+      flex-wrap: wrap;
+    }
+    .timing-stat {
+      position: relative;
+      background: rgba(255,255,255,0.03);
+      border-radius: 14px;
+      padding: 18px 22px;
+      text-align: center;
+      flex: 1;
+      min-width: 100px;
+      border: 1px solid transparent;
+      background-clip: padding-box;
+    }
+    .timing-stat::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 14px;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+    .timing-stat .stat-val {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.5px;
+    }
+    .timing-stat .stat-val.highlight {
+      background: linear-gradient(135deg, #22c55e, #10b981);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .timing-stat .stat-lbl {
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.35);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-top: 4px;
+      font-weight: 600;
+    }
+
+    /* New job button */
+    .btn-secondary {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.5);
+      padding: 8px 20px;
+      border-radius: 10px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: 'Inter', inherit;
+    }
+    .btn-secondary:hover {
+      border-color: rgba(124,58,237,0.4);
+      color: #fff;
+      background: rgba(124,58,237,0.08);
+    }
+
+    .export-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .export-bar-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: rgba(255,255,255,0.35);
+      margin-right: 4px;
+    }
+    .btn-export {
+      background: rgba(124,58,237,0.12);
+      border: 1px solid rgba(124,58,237,0.25);
+      color: #c4b5fd;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: 'Inter', inherit;
+      transition: all 0.15s ease;
+    }
+    .btn-export:hover {
+      background: rgba(124,58,237,0.22);
+      color: #fff;
+      border-color: rgba(124,58,237,0.45);
+    }
+
+    /* Task description panel */
+    .task-description-panel {
+      position: sticky;
+      top: 28px;
+      background: var(--surface);
+      border-radius: 16px;
+      padding: 24px 26px 26px;
+      animation: descFadeIn 0.3s ease;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    }
+    @keyframes descFadeIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .task-description-panel .desc-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(124,58,237,0.12);
+      margin-bottom: 10px;
+      font-size: 0.85rem;
+    }
+    .task-description-panel .desc-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 12px;
+    }
+    .task-description-panel .desc-body {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+      margin-bottom: 18px;
+    }
+    .task-description-panel .desc-why {
+      font-size: 0.8125rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .task-description-panel .desc-why strong {
+      color: rgba(255,255,255,0.65);
+    }
+
+    /* Scrollbar for body */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0c0e14;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.08);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255,255,255,0.12);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <a href="/" class="sidebar-logo">DCN</a>
+    <div class="sidebar-role" id="sidebarRole"></div>
+    <nav class="sidebar-nav" id="sidebarNav">
+      <a href="/submit" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        Submit Job
+      </a>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="sidebarUser" style="display:none">
+        <div class="sidebar-user-avatar" id="userAvatar">?</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name" id="userName">—</div>
+          <div class="sidebar-user-role" id="userRole">—</div>
+        </div>
+      </div>
+      <a href="/auth/logout" class="sidebar-signout" id="signoutLink" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign Out
+      </a>
+      <a href="/login" class="sidebar-signout" id="signinLink">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10,17 15,12 10,7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        Sign In
+      </a>
+    </div>
+  </aside>
+  <script>
+  (function(){
+    const h = window.location.hostname;
+    const isLocalPreview = h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === '';
+  fetch('/auth/me').then(r=>r.ok?r.json():null).then(u=>{
+    if(!u){
+      if (isLocalPreview) return;
+      window.location.href='/login';
+      return;
+    }
+    const nav=document.getElementById('sidebarNav');
+    const role=document.getElementById('sidebarRole');
+    if(u){
+      document.getElementById('sidebarUser').style.display='flex';
+      document.getElementById('signoutLink').style.display='flex';
+      document.getElementById('signinLink').style.display='none';
+      document.getElementById('userName').textContent=u.name||u.email;
+      document.getElementById('userRole').textContent=u.role;
+      const av=document.getElementById('userAvatar');if(u.avatar_url){av.innerHTML='<img src="'+u.avatar_url+'" style="width:100%;height:100%;border-radius:50%;object-fit:cover">';}else{av.textContent=(u.name||u.email).charAt(0).toUpperCase();}
+      if(u.role==='admin'||u.role==='ceo'){
+        role.textContent='Admin Panel';
+        nav.innerHTML=`
+          <a href="/submit" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Submit Job</a>
+          <a href="/ops"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</a>
+          <a href="/results"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>Results</a>
+          <a href="/worker-logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Worker Logs</a>
+          <a href="/my-jobs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>My Jobs</a>
+        `;
+      } else {
+        role.textContent='Customer';
+        nav.innerHTML=`
+          <a href="/submit" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Submit Job</a>
+          <a href="/my-jobs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>My Jobs</a>
+        `;
+      }
+    } else {
+      role.textContent='';
+    }
+  }).catch(()=>{});
+  })();
+  </script>
+
+  <!-- Main content area -->
+  <div class="main-content">
+  <div class="container" id="mainContainer">
+    <!-- LEFT: Form -->
+    <div class="left-col">
+      <!-- Error -->
+      <div class="error-msg" id="errorMsg"></div>
+
+      <!-- Input Form -->
+      <div class="card" id="formCard">
+        <h2>Submit a job</h2>
+        <p class="form-card-lead">Run distributed ML experiments against your chosen dataset. Workers train models in parallel and aggregate results.</p>
+
+        <div class="field-group">
+          <label for="title">Job title</label>
+          <input type="text" id="title" placeholder="e.g. Churn benchmark — week 12">
+        </div>
+
+        <input type="hidden" id="taskType" value="ml_experiment">
+
+        <div id="inputGroup"></div>
+
+        <div id="costEstimate" style="display:none;margin-bottom:16px;padding:16px 20px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.2);border-radius:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:0.78rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:rgba(255,255,255,0.5)">Cost Estimate</span>
+            <span id="costTotal" style="font-size:1.1rem;font-weight:700;color:#a78bfa">--</span>
+          </div>
+          <div style="display:flex;gap:16px;font-size:0.78rem;color:rgba(255,255,255,0.45)">
+            <span><span id="costTasks">0</span> tasks</span>
+            <span>Compute: $<span id="costCompute">0.00</span></span>
+            <span>Fee (<span id="costFeePercent">15</span>%): $<span id="costFee">0.00</span></span>
+          </div>
+        </div>
+        <div class="form-actions" style="display:flex;gap:10px">
+          <button class="btn" id="estimateBtn" onclick="estimateCost()" type="button" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12)">
+            <span class="btn-label">Estimate Cost</span>
+          </button>
+          <button class="btn" id="submitBtn" onclick="submitJob()" type="button">
+            <span class="btn-spinner"></span>
+            <span class="btn-label">Submit job</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Description / Status / Output -->
+    <div class="right-col">
+      <!-- Task description (shown before submit) -->
+      <div id="taskDescriptionPanel" class="task-description-panel"></div>
+
+      <!-- Status (shown after submit) -->
+      <div class="card status-section" id="statusCard">
+        <div class="job-id-row">
+          <h2 style="margin-bottom:0">Job Status</h2>
+          <code id="jobIdDisplay"></code>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+          <span class="status-badge status-pending" id="jobStatus">PENDING</span>
+          <span style="font-size:0.82rem; color:rgba(255,255,255,0.35); font-weight:500;" id="taskCount"></span>
+        </div>
+
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+
+        <ul class="task-list" id="taskList"></ul>
+      </div>
+
+      <!-- Timing Comparison -->
+      <div class="timing-card" id="timingCard" style="display:none;">
+        <h3>Distributed Execution Performance</h3>
+        <div class="timing-bars" id="timingBars"></div>
+        <div class="timing-stats" id="timingStats"></div>
+      </div>
+
+      <!-- Output -->
+      <div class="card output-section" id="outputCard">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+          <h2 style="margin-bottom:0">Final Output</h2>
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <div class="export-bar" id="exportBar" style="display:none;" title="Requires signed-in session (same as submit)">
+              <span class="export-bar-label">Download</span>
+              <button type="button" class="btn-export" onclick="downloadJobExport('md')">Markdown</button>
+              <button type="button" class="btn-export" onclick="downloadJobExport('json')">JSON</button>
+              <button type="button" class="btn-export" onclick="downloadJobExport('csv')">CSV</button>
+            </div>
+            <button class="btn-secondary" onclick="resetForm()">New Job</button>
+          </div>
+        </div>
+        <div class="output-block" id="outputBlock"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = window.location.origin;
+    let currentJobId = null;
+    let pollInterval = null;
+
+
+    // Task descriptions
+    const taskDescriptions = {
+      ml_experiment: {
+        desc: 'DCN distributes machine learning experiment workloads across workers, where each worker runs a different model configuration, hyperparameter set, or dataset split. Workers independently train, evaluate, and report metrics, and the system aggregates all experiment results into one unified comparison report.',
+        why: 'ML experimentation involves testing many configurations — different architectures, learning rates, batch sizes, feature sets, and data augmentations. Running these sequentially is painfully slow. DCN makes it possible to parallelize experiment runs across distributed workers, dramatically reducing the time from hypothesis to insight. This is especially valuable for hyperparameter sweeps, AutoML pipelines, model selection, and large-scale benchmarking.'
+      },
+    };
+
+    // Swap input field based on task type
+    const inputConfig = {
+      ml_experiment:              { label: 'ML Experiment', tag: 'custom_ml', placeholder: '' },
+    };
+
+    function updateTaskDescription() {
+      const type = taskTypeSelect.value;
+      const info = taskDescriptions[type];
+      const panel = document.getElementById('taskDescriptionPanel');
+      if (info) {
+        panel.innerHTML = `
+          <div class="desc-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          </div>
+          <div class="desc-title">How it works</div>
+          <div class="desc-body">${info.desc}</div>
+          <div class="desc-why"><strong>Why DCN at scale:</strong> ${info.why}</div>
+        `;
+        panel.style.display = 'block';
+      } else {
+        panel.style.display = 'none';
+      }
+    }
+
+    let _datasetMeta = null;
+
+    function updateInputField() {
+      const type = taskTypeSelect.value;
+      const cfg = inputConfig[type] || inputConfig.ml_experiment;
+      const group = document.getElementById('inputGroup');
+      _datasetMeta = null;
+      if (cfg.tag === 'custom_ml') {
+        group.innerHTML = `
+          <div class="field-group">
+            <label>Dataset source</label>
+            <div class="ds-segment" role="radiogroup" aria-label="Dataset source">
+              <label class="ds-segment-item"><input type="radio" name="dsSource" value="built_in" checked> Built-in</label>
+              <label class="ds-segment-item"><input type="radio" name="dsSource" value="openml"> OpenML</label>
+              <label class="ds-segment-item"><input type="radio" name="dsSource" value="csv_url"> CSV URL</label>
+            </div>
+          </div>
+
+          <div id="dsBuiltIn" class="field-group">
+            <label for="mlDataset">Dataset</label>
+            <select id="mlDataset">
+              <option value="weather_ri">Rhode Island Weather (Regression — predict temperature)</option>
+              <option value="customer_churn">Customer Churn (Classification — predict churn)</option>
+            </select>
+          </div>
+
+          <div id="dsExternal" class="field-group" style="display:none;">
+            <label id="dsIdLabel">OpenML dataset ID</label>
+            <div class="ds-external-row">
+              <input type="text" id="dsIdInput" placeholder="e.g. 41146" autocomplete="off">
+              <button type="button" class="btn-secondary-action" onclick="loadDatasetPreview()" id="dsLoadBtn">Load</button>
+            </div>
+            <div id="dsHint" class="ds-hint"></div>
+          </div>
+
+          <div id="dsPreview" class="field-group ds-preview-card" style="display:none;">
+            <div class="ds-preview-title" id="dsPreviewTitle"></div>
+            <div class="ds-preview-meta" id="dsPreviewInfo"></div>
+            <label for="dsTarget">Target column</label>
+            <select id="dsTarget"></select>
+          </div>
+
+          <div class="field-group">
+            <label for="inputText">Modeling goal <span style="font-weight:400;color:var(--text-dim);text-transform:none;letter-spacing:0;">(optional)</span></label>
+            <textarea id="inputText" placeholder="Optional context for your run…"></textarea>
+          </div>
+        `;
+
+        document.querySelectorAll('input[name="dsSource"]').forEach(r => {
+          r.addEventListener('change', () => {
+            const v = r.value;
+            document.getElementById('dsBuiltIn').style.display = v === 'built_in' ? '' : 'none';
+            document.getElementById('dsExternal').style.display = v !== 'built_in' ? '' : 'none';
+            document.getElementById('dsPreview').style.display = 'none';
+            _datasetMeta = null;
+            if (v === 'openml') {
+              document.getElementById('dsIdLabel').textContent = 'OpenML dataset ID';
+              document.getElementById('dsIdInput').placeholder = 'e.g. 41146';
+              document.getElementById('dsHint').innerHTML = 'Find datasets on <a href="https://openml.org/search?type=data" target="_blank" rel="noopener">openml.org</a>, then paste the ID.';
+            } else if (v === 'csv_url') {
+              document.getElementById('dsIdLabel').textContent = 'CSV URL';
+              document.getElementById('dsIdInput').placeholder = 'https://…';
+              document.getElementById('dsHint').textContent = 'Direct link to a public CSV (e.g. raw file on GitHub).';
+            }
+          });
+        });
+      } else if (cfg.tag === 'input') {
+        group.innerHTML = `<label for="inputText">${cfg.label}</label>
+          <input type="${cfg.type || 'text'}" id="inputText" placeholder="${cfg.placeholder}">`;
+      } else {
+        group.innerHTML = `<label for="inputText">${cfg.label}</label>
+          <textarea id="inputText" placeholder="${cfg.placeholder}"></textarea>`;
+      }
+    }
+
+    async function loadDatasetPreview() {
+      const source = document.querySelector('input[name="dsSource"]:checked')?.value;
+      const datasetId = document.getElementById('dsIdInput')?.value.trim();
+      if (!datasetId) { showError('Enter a dataset ID or URL first.'); return; }
+
+      const btn = document.getElementById('dsLoadBtn');
+      btn.disabled = true; btn.textContent = 'Loading...';
+
+      try {
+        const resp = await fetch(`${API}/datasets/load`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source, dataset_id: datasetId }),
+        });
+        if (!resp.ok) {
+          const err = await resp.json();
+          throw new Error(err.detail || 'Failed to load dataset');
+        }
+        const data = await resp.json();
+        _datasetMeta = data;
+
+        document.getElementById('dsPreviewTitle').textContent = data.display_name || 'Dataset';
+        const colCount = (data.columns && data.columns.length) || (data.target_columns && data.target_columns.length) || 0;
+        document.getElementById('dsPreviewInfo').textContent =
+          `${data.row_count.toLocaleString()} rows · ${colCount} columns`;
+
+        const targetChoices = data.target_columns || data.columns || data.numeric_columns || [];
+        const sel = document.getElementById('dsTarget');
+        sel.innerHTML = '';
+        targetChoices.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c; opt.textContent = c;
+          if (c === data.suggested_target) opt.selected = true;
+          sel.appendChild(opt);
+        });
+
+        document.getElementById('dsPreview').style.display = '';
+      } catch (e) {
+        showError(e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Load';
+      }
+    }
+
+    const taskTypeSelect = document.getElementById('taskType');
+    taskTypeSelect.addEventListener('change', () => {
+      updateInputField();
+      updateTaskDescription();
+    });
+    updateInputField();
+    updateTaskDescription();
+
+    function showError(msg) {
+      const el = document.getElementById('errorMsg');
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+
+    function buildPayload() {
+      const inputText = document.getElementById('inputText').value.trim();
+      const sourceEl = document.querySelector('input[name="dsSource"]:checked');
+      const source = sourceEl ? sourceEl.value : 'built_in';
+      const payload = { goal: inputText || 'Run distributed ML experiments' };
+      if (source === 'built_in') {
+        const datasetEl = document.getElementById('mlDataset');
+        payload.dataset_name = datasetEl ? datasetEl.value : 'weather_ri';
+        payload.source = 'built_in';
+      } else {
+        const dsId = document.getElementById('dsIdInput')?.value.trim();
+        if (!dsId || !_datasetMeta) return null;
+        payload.source = source;
+        payload.dataset_id = dsId;
+        const targetEl = document.getElementById('dsTarget');
+        if (targetEl) payload.target = targetEl.value;
+      }
+      return payload;
+    }
+
+    async function estimateCost() {
+      const taskType = document.getElementById('taskType').value;
+      const payload = buildPayload();
+      if (!payload) { showError('Load a dataset first.'); return; }
+      const btn = document.getElementById('estimateBtn');
+      btn.disabled = true;
+      btn.querySelector('.btn-label').textContent = 'Estimating...';
+      try {
+        const resp = await fetch(`${API}/jobs/estimate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: 'estimate', task_type: taskType, input_payload: payload }),
+        });
+        if (!resp.ok) throw new Error(await resp.text());
+        const est = await resp.json();
+        document.getElementById('costTotal').textContent = '$' + est.estimated_total.toFixed(2);
+        document.getElementById('costTasks').textContent = est.subtask_count;
+        document.getElementById('costCompute').textContent = est.compute_cost.toFixed(2);
+        document.getElementById('costFee').textContent = est.platform_fee.toFixed(2);
+        document.getElementById('costFeePercent').textContent = est.platform_fee_percent;
+        document.getElementById('costEstimate').style.display = 'block';
+      } catch (e) {
+        showError('Could not estimate cost: ' + e.message.slice(0, 200));
+      } finally {
+        btn.disabled = false;
+        btn.querySelector('.btn-label').textContent = 'Estimate Cost';
+      }
+    }
+
+    async function submitJob() {
+      const title = document.getElementById('title').value.trim();
+      const taskType = document.getElementById('taskType').value;
+      const inputText = document.getElementById('inputText').value.trim();
+
+      if (!title) { showError('Please enter a job title.'); return; }
+      if (taskType !== 'ml_experiment' && !inputText) { showError('Please enter some input.'); return; }
+
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.classList.add('loading');
+      btn.querySelector('.btn-label').textContent = 'Submitting...';
+
+      try {
+        const payload = buildPayload();
+        if (!payload) {
+          showError('Load a dataset first.');
+          btn.disabled = false; btn.classList.remove('loading'); btn.querySelector('.btn-label').textContent = 'Submit Job';
+          return;
+        }
+
+        const resp = await fetch(`${API}/jobs`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: title,
+            task_type: taskType,
+            input_payload: payload,
+            requires_validation: false,
+          }),
+        });
+
+        if (!resp.ok) {
+          const err = await resp.text();
+          throw new Error(err);
+        }
+
+        const job = await resp.json();
+        currentJobId = job.id;
+
+        // Show status card, hide form + description
+        document.getElementById('formCard').style.display = 'none';
+        document.getElementById('taskDescriptionPanel').style.display = 'none';
+        document.getElementById('statusCard').style.display = 'block';
+        document.getElementById('jobIdDisplay').textContent = currentJobId;
+        document.getElementById('mainContainer').classList.add('single-col');
+
+        // Start polling
+        pollInterval = setInterval(pollJob, 1500);
+        pollJob();
+
+      } catch (e) {
+        showError('Failed to submit job: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+        btn.querySelector('.btn-label').textContent = 'Submit Job';
+      }
+    }
+
+    async function pollJob() {
+      if (!currentJobId) return;
+
+      try {
+        const [jobResp, tasksResp] = await Promise.all([
+          fetch(`${API}/jobs/${currentJobId}`, { credentials: 'include' }),
+          fetch(`${API}/jobs/${currentJobId}/tasks`, { credentials: 'include' }),
+        ]);
+
+        const job = await jobResp.json();
+        const tasks = await tasksResp.json();
+
+        // Update status badge
+        const badge = document.getElementById('jobStatus');
+        badge.textContent = job.status ? job.status.toUpperCase() : 'PENDING';
+        badge.className = 'status-badge status-' + (job.status || 'pending');
+
+        // Update task count with phase info
+        const done = tasks.filter(t => t.status === 'submitted').length;
+        const running = tasks.filter(t => t.status === 'running').length;
+        let phaseText = `${done} / ${tasks.length} tasks done`;
+        if (running > 0) phaseText += ` — ${running} processing`;
+        else if (done === 0) phaseText = `${tasks.length} tasks queued — waiting for workers`;
+        document.getElementById('taskCount').textContent = phaseText;
+
+        // Update progress bar
+        const pct = tasks.length > 0 ? (done / tasks.length) * 100 : 0;
+        document.getElementById('progressBar').style.width = pct + '%';
+
+        // Update task list
+        const list = document.getElementById('taskList');
+        list.innerHTML = tasks.map(t => `
+          <li class="task-item ti-${t.status}">
+            <span class="task-name">${t.task_name}</span>
+            <span class="task-status ts-${t.status}">${t.status}</span>
+          </li>
+        `).join('');
+
+        // Check if completed
+        if (job.status === 'completed' && job.final_output) {
+          clearInterval(pollInterval);
+          document.getElementById('outputCard').style.display = 'block';
+          const eb = document.getElementById('exportBar');
+          if (eb) eb.style.display = 'flex';
+          renderOutput(job.final_output, job.task_type);
+          loadTimingComparison();
+        }
+
+        // Check if failed
+        if (job.status === 'failed') {
+          clearInterval(pollInterval);
+          const failedCount = tasks.filter(t => t.status === 'failed').length;
+          document.getElementById('outputCard').style.display = 'block';
+          document.getElementById('outputBlock').innerHTML = `
+            <div style="text-align:center; padding:32px 0;">
+              <div style="font-size:2rem; margin-bottom:12px;">&#9888;&#65039;</div>
+              <h3 style="color:#f87171; margin-bottom:8px;">Job Failed</h3>
+              <p style="color:rgba(255,255,255,0.4);">${failedCount} of ${tasks.length} tasks failed during processing.</p>
+              <p style="color:rgba(255,255,255,0.25); font-size:0.85rem; margin-top:12px;">This can happen when workers encounter errors or lose connection.</p>
+            </div>
+          `;
+        }
+
+      } catch (e) {
+        console.error('Poll error:', e);
+      }
+    }
+
+    function cleanOutput(text) {
+      return text
+        .replace(/^=== \S+ ===\s*\n?/gm, '')
+        .replace(/```html?\s*\n?/gi, '')
+        .replace(/\n?```\s*$/gm, '')
+        .replace(/^```\s*\n?/gm, '')
+        .trim();
+    }
+
+    function renderOutput(raw, taskType) {
+      const el = document.getElementById('outputBlock');
+      const cleaned = cleanOutput(raw);
+      const preview = cleaned.length > 6000 ? cleaned.substring(0, 6000) + '\n\n*... (truncated)*' : cleaned;
+      el.innerHTML = marked.parse(preview);
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function togglePublicOutput(tab) {
+      const preview = document.getElementById('pub-preview');
+      const source = document.getElementById('pub-source');
+      const tabs = document.querySelectorAll('.output-tab');
+      tabs.forEach(t => t.classList.remove('active'));
+      if (tab === 'preview') {
+        if (preview) preview.style.display = 'block';
+        if (source) source.style.display = 'none';
+        tabs[0]?.classList.add('active');
+      } else {
+        if (preview) preview.style.display = 'none';
+        if (source) source.style.display = 'block';
+        tabs[1]?.classList.add('active');
+      }
+    }
+
+    async function loadTimingComparison() {
+      if (!currentJobId) return;
+      try {
+        const resp = await fetch(`${API}/jobs/${currentJobId}/timing`, { credentials: 'include' });
+        if (!resp.ok) return;
+        const timing = await resp.json();
+
+        if (timing.sequential_time_seconds <= 0 || timing.parallel_time_seconds <= 0) return;
+
+        const seqTime = timing.sequential_time_seconds;
+        const parTime = timing.parallel_time_seconds;
+        const maxTime = Math.max(seqTime, parTime);
+        const speedup = timing.speedup;
+        const numWorkers = timing.num_workers;
+        const numTasks = timing.total_tasks;
+
+        const barsEl = document.getElementById('timingBars');
+        barsEl.innerHTML = `
+          <div class="timing-row">
+            <div class="timing-label">Sequential</div>
+            <div class="timing-bar-track">
+              <div class="timing-bar-fill sequential" style="width: ${(seqTime / maxTime * 100)}%">
+                ${seqTime.toFixed(1)}s
+              </div>
+            </div>
+          </div>
+          <div class="timing-row">
+            <div class="timing-label">Distributed</div>
+            <div class="timing-bar-track">
+              <div class="timing-bar-fill parallel" style="width: ${(parTime / maxTime * 100)}%">
+                ${parTime.toFixed(1)}s
+              </div>
+            </div>
+          </div>
+        `;
+
+        const statsEl = document.getElementById('timingStats');
+        statsEl.innerHTML = `
+          <div class="timing-stat">
+            <div class="stat-val highlight">${speedup}x</div>
+            <div class="stat-lbl">Speedup</div>
+          </div>
+          <div class="timing-stat">
+            <div class="stat-val">${numWorkers}</div>
+            <div class="stat-lbl">Workers</div>
+          </div>
+          <div class="timing-stat">
+            <div class="stat-val">${numTasks}</div>
+            <div class="stat-lbl">Tasks</div>
+          </div>
+          <div class="timing-stat">
+            <div class="stat-val">${(seqTime - parTime).toFixed(1)}s</div>
+            <div class="stat-lbl">Time Saved</div>
+          </div>
+        `;
+
+        document.getElementById('timingCard').style.display = 'block';
+      } catch (e) {
+        console.error('Timing load error:', e);
+      }
+    }
+
+    async function downloadJobExport(fmt) {
+      if (!currentJobId) return;
+      try {
+        const r = await fetch(`${API}/jobs/${currentJobId}/export?format=${fmt}`, { credentials: 'include' });
+        if (r.status === 401) {
+          alert('Sign in to download exports (same account as job submit).');
+          return;
+        }
+        if (!r.ok) {
+          let msg = await r.text();
+          try {
+            const j = JSON.parse(msg);
+            if (j.detail) msg = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail);
+          } catch (_) {}
+          alert('Download failed: ' + msg.slice(0, 300));
+          return;
+        }
+        const blob = await r.blob();
+        let name = 'dcn-export.' + (fmt === 'md' ? 'md' : fmt === 'json' ? 'json' : 'csv');
+        const cd = r.headers.get('Content-Disposition');
+        if (cd) {
+          const m = cd.match(/filename="([^"]+)"/);
+          if (m) name = m[1];
+        }
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(a.href);
+      } catch (e) {
+        alert('Download failed.');
+      }
+    }
+
+    function resetForm() {
+      currentJobId = null;
+      if (pollInterval) clearInterval(pollInterval);
+
+      const eb = document.getElementById('exportBar');
+      if (eb) eb.style.display = 'none';
+
+      document.getElementById('formCard').style.display = 'block';
+      document.getElementById('taskDescriptionPanel').style.display = '';
+      document.getElementById('statusCard').style.display = 'none';
+      document.getElementById('outputCard').style.display = 'none';
+      document.getElementById('timingCard').style.display = 'none';
+      document.getElementById('mainContainer').classList.remove('single-col');
+      document.getElementById('title').value = '';
+      document.getElementById('inputText').value = '';
+      document.getElementById('taskList').innerHTML = '';
+      document.getElementById('progressBar').style.width = '0%';
+    }
+
+    window.addEventListener('pageshow', function(event) {
+      if (event.persisted) {
+        window.location.reload();
+      }
+    });
+  </script>
+  </div><!-- /main-content -->
+  </div><!-- /app-layout -->
+</body>
+</html>
