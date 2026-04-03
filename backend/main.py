@@ -336,11 +336,13 @@ async def auth_middleware(request: Request, call_next):
     if any(path.startswith(p) for p in PUBLIC_PREFIXES):
         return await call_next(request)
 
-    # Auth-required pages → redirect to login if not signed in
+    # Auth-required pages → redirect to login if not signed in, waitlisters to /waitlist
     if path in AUTH_REQUIRED_PAGES:
         user = await get_session(request)
         if not user:
             return RedirectResponse("/login", status_code=302)
+        if user["role"] == "waitlister":
+            return RedirectResponse("/waitlist", status_code=302)
 
     # Admin-only pages → redirect to login if not admin/ceo
     if path in ADMIN_PAGES:
@@ -382,7 +384,12 @@ def _session_cookie_args() -> dict:
 async def _finish_oauth_login(user: dict) -> RedirectResponse:
     """Shared helper: create session, set cookie, redirect."""
     token = await create_session(user)
-    redirect = "/ops" if user["role"] in ELEVATED_ROLES else "/submit"
+    if user["role"] == "waitlister":
+        redirect = "/waitlist"
+    elif user["role"] in ELEVATED_ROLES:
+        redirect = "/ops"
+    else:
+        redirect = "/submit"
     response = RedirectResponse(redirect, status_code=302)
     response.set_cookie(SESSION_COOKIE, token, **_session_cookie_args())
     return response
@@ -392,6 +399,8 @@ async def _finish_oauth_login(user: dict) -> RedirectResponse:
 async def serve_login(request: Request):
     user = await get_session(request)
     if user:
+        if user["role"] == "waitlister":
+            return RedirectResponse("/waitlist")
         return RedirectResponse("/ops" if user["role"] in ELEVATED_ROLES else "/submit")
     return _spa_index()
 
@@ -638,6 +647,10 @@ async def serve_contact():
 async def serve_report_bug():
     return _spa_index()
 
+
+@app.get("/waitlist")
+async def serve_waitlist():
+    return _spa_index()
 
 
 

@@ -10,7 +10,7 @@ export function LoginPage() {
 
   useEffect(() => {
     if (loading || !user) return;
-    const dest = user.role === 'admin' || user.role === 'ceo' ? '/ops' : '/submit';
+    const dest = user.role === 'waitlister' ? '/waitlist' : (user.role === 'admin' || user.role === 'ceo') ? '/ops' : '/submit';
     navigate(dest, { replace: true });
   }, [loading, user, navigate]);
 
