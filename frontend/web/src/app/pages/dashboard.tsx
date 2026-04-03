@@ -47,7 +47,18 @@ type QueueRow = Record<string, unknown> & {
   status?: string;
   job_title?: string;
   job_id?: string;
+  job_status?: string;
 };
+
+function taskStatusClass(status: string | undefined): string {
+  const s = (status || '').toLowerCase();
+  if (s === 'running') return 'text-purple-400';
+  if (s === 'queued') return 'text-amber-400';
+  if (s === 'submitted') return 'text-emerald-400';
+  if (s === 'failed') return 'text-red-400';
+  if (s === 'pending_validation') return 'text-orange-400';
+  return 'text-slate-400';
+}
 
 export function DashboardPage() {
   const { ready, me } = useRequireAdmin();
@@ -103,7 +114,7 @@ export function DashboardPage() {
     if (!ready) return;
     const loadQueue = async () => {
       try {
-        const r = await fetch('/monitor/queue', { credentials: 'include', cache: 'no-store' });
+        const r = await fetch('/monitor/queue?scope=all', { credentials: 'include', cache: 'no-store' });
         if (!r.ok) {
           setQueueError(`Queue unavailable (${r.status})`);
           return;
@@ -171,7 +182,7 @@ export function DashboardPage() {
         );
         setRecentJobs(sorted.slice(0, 12));
       }
-      const qr = await fetch('/monitor/queue', { credentials: 'include' });
+      const qr = await fetch('/monitor/queue?scope=all', { credentials: 'include' });
       if (qr.ok) {
         const qd = await qr.json();
         setQueue(Array.isArray(qd) ? qd : []);
@@ -281,7 +292,8 @@ export function DashboardPage() {
               <List className="w-5 h-5 text-amber-400" />
               <h2 className="text-lg font-semibold text-white">Live queue</h2>
               <span className="text-xs text-slate-500">
-                ({queue.length} task{queue.length === 1 ? '' : 's'} · refreshes every 4s)
+                ({queue.length} task{queue.length === 1 ? '' : 's'} · queued, running, submitted, failed, pending
+                validation · refreshes every 4s)
               </span>
             </div>
             {queueError && <p className="text-sm text-red-400 mb-2">{queueError}</p>}
@@ -305,7 +317,7 @@ export function DashboardPage() {
                     <tr>
                       <th className="p-2">Task</th>
                       <th className="p-2">Job</th>
-                      <th className="p-2">Status</th>
+                      <th className="p-2">Task status</th>
                       <th className="p-2">Job ID</th>
                     </tr>
                   </thead>
@@ -316,7 +328,9 @@ export function DashboardPage() {
                           {String(row.task_name ?? '—')}
                         </td>
                         <td className="p-2 text-slate-300 truncate max-w-[160px]">{String(row.job_title ?? '—')}</td>
-                        <td className="p-2 capitalize text-amber-400/90">{String(row.status ?? '—')}</td>
+                        <td className={`p-2 capitalize font-medium ${taskStatusClass(String(row.status))}`}>
+                          {String(row.status ?? '—').replace(/_/g, ' ')}
+                        </td>
                         <td className="p-2 text-slate-500 font-mono text-xs">
                           {row.job_id ? (
                             <Link className="text-purple-400 hover:underline" to={`/jobs#${String(row.job_id)}`}>
