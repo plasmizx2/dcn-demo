@@ -2,7 +2,7 @@ import { AdminLayout } from '../components/admin-layout';
 import { motion } from 'motion/react';
 import { useCallback, useEffect, useState } from 'react';
 import { useRequireAdmin } from '../hooks/use-require-admin';
-import { Loader2, Copy, Search } from 'lucide-react';
+import { Loader2, Copy, Search, Gauge, Zap } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -22,6 +22,17 @@ interface TaskRow {
   status: string;
 }
 
+interface JobTiming {
+  sequential_time_seconds: number;
+  parallel_time_seconds: number;
+  speedup: number;
+  time_saved: number;
+  worker_count: number;
+  total_tasks: number;
+  tasks: { task_name: string; status: string; execution_time: number | null }[];
+  actual_cost?: { actual_total?: number; compute_cost?: number } | null;
+}
+
 export function ResultsPage() {
   const { ready } = useRequireAdmin();
   const [jobs, setJobs] = useState<JobRow[]>([]);
@@ -31,6 +42,8 @@ export function ResultsPage() {
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState('rendered');
   const [loading, setLoading] = useState(true);
+  const [timing, setTiming] = useState<JobTiming | null>(null);
+  const [timingLoading, setTimingLoading] = useState(false);
 
   const loadJobs = useCallback(async () => {
     try {
@@ -61,18 +74,34 @@ export function ResultsPage() {
   useEffect(() => {
     if (!selectedId) {
       setTasks([]);
+      setTiming(null);
       return;
     }
     fetch(`/jobs/${selectedId}/tasks`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
       .then(setTasks)
       .catch(() => setTasks([]));
+
+    setTiming(null);
+    setTimingLoading(true);
+    fetch(`/jobs/${selectedId}/timing`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: JobTiming | null) => {
+        if (data) setTiming(data);
+        else setTiming(null);
+      })
+      .catch(() => setTiming(null))
+      .finally(() => setTimingLoading(false));
   }, [selectedId]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !ready || !jobs.length) return;
     const hash = window.location.hash?.replace(/^#/, '');
-    if (hash && jobs.some((j) => j.id === hash)) setSelectedId(hash);
+    if (hash && jobs.some((j) => j.id === hash)) {
+      setSelectedId(hash);
+      const job = jobs.find((j) => j.id === hash);
+      if (job?.status === 'completed') setTab('timing');
+    }
   }, [ready, jobs]);
 
   const filtered = jobs.filter((j) => {
@@ -106,8 +135,11 @@ export function ResultsPage() {
     <AdminLayout>
       <div className="container mx-auto px-6 py-12 max-w-[1400px]">
         <motion.div initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-          <h1 className="text-4xl font-bold mb-2">Results</h1>
-          <p className="text-slate-400 mb-6">All jobs — select one for output and tasks</p>
+          <h1 className="text-4xl font-bold mb-2 text-white">Results</h1>
+          <p className="text-slate-400 mb-6">
+            Select a job — open the <strong className="text-slate-300">Timing</strong> tab for parallel vs
+            sequential speedup (same analysis as before).
+          </p>
 
           <div className="flex flex-col lg:flex-row gap-6 min-h-[60vh]">
             <div className="lg:w-96 flex-shrink-0 flex flex-col rounded-2xl border border-white/10 bg-slate-900/40 overflow-hidden">
@@ -146,7 +178,7 @@ export function ResultsPage() {
                     type="button"
                     onClick={() => {
                       setSelectedId(j.id);
-                      setTab('rendered');
+                      setTab(j.status === 'completed' ? 'timing' : 'rendered');
                       window.location.hash = j.id;
                     }}
                     className={`w-full text-left px-4 py-3 border-b border-white/5 hover:bg-white/5 ${
@@ -196,9 +228,13 @@ export function ResultsPage() {
                   </div>
 
                   <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col p-4 min-h-0">
-                    <TabsList className="bg-slate-950/80 border border-white/10 mb-3">
+                    <TabsList className="bg-slate-950/80 border border-white/10 mb-3 flex-wrap">
                       <TabsTrigger value="rendered">Rendered</TabsTrigger>
                       <TabsTrigger value="raw">Raw</TabsTrigger>
+                      <TabsTrigger value="timing" className="gap-1">
+                        <Gauge className="w-3.5 h-3.5" />
+                        Timing
+                      </TabsTrigger>
                       <TabsTrigger value="tasks">
                         Tasks ({doneTasks}/{tasks.length})
                       </TabsTrigger>
@@ -206,6 +242,136 @@ export function ResultsPage() {
                         <TabsTrigger value="preview">Preview</TabsTrigger>
                       ) : null}
                     </TabsList>
+                    <TabsContent value="timing" className="flex-1 overflow-auto mt-0 space-y-6">
+                      {timingLoading ? (
+                        <div className="flex justify-center py-12">
+                          <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+                        </div>
+                      ) : !timing ? (
+                        <p className="text-slate-500 text-sm">Could not load timing for this job.</p>
+                      ) : !timing.tasks?.length ? (
+                        <p className="text-slate-500 text-sm">No tasks on this job yet.</p>
+                      ) : timing.sequential_time_seconds <= 0 &&
+                        timing.parallel_time_seconds <= 0 &&
+                        !timing.tasks.some((x) => x.execution_time != null) ? (
+                        <p className="text-slate-500 text-sm">
+                          Speed comparison appears after workers finish tasks and report execution times. Check back when
+                          the job is further along or completed.
+                        </p>
+                      ) : (
+                        <>
+                          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+                              <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Sequential (sum)</p>
+                              <p className="text-2xl font-bold text-amber-300 tabular-nums">
+                                {timing.sequential_time_seconds.toFixed(1)}s
+                              </p>
+                              <p className="text-xs text-slate-500 mt-1">One machine, tasks back-to-back</p>
+                            </div>
+                            <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+                              <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Parallel (wall)</p>
+                              <p className="text-2xl font-bold text-cyan-300 tabular-nums">
+                                {timing.parallel_time_seconds.toFixed(1)}s
+                              </p>
+                              <p className="text-xs text-slate-500 mt-1">Merged worker intervals</p>
+                            </div>
+                            <div className="rounded-xl border border-purple-500/30 bg-purple-500/10 p-4">
+                              <p className="text-xs text-purple-300 uppercase tracking-wide mb-1 flex items-center gap-1">
+                                <Zap className="w-3.5 h-3.5" /> Speedup
+                              </p>
+                              <p className="text-2xl font-bold text-white tabular-nums">{timing.speedup}×</p>
+                              <p className="text-xs text-slate-400 mt-1">
+                                {timing.time_saved.toFixed(1)}s saved vs sequential
+                              </p>
+                            </div>
+                            <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+                              <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Workers used</p>
+                              <p className="text-2xl font-bold text-white tabular-nums">{timing.worker_count}</p>
+                              <p className="text-xs text-slate-500 mt-1">{timing.total_tasks} tasks</p>
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className="text-sm text-slate-400 mb-2">Compare</p>
+                            <div className="space-y-2">
+                              <div>
+                                <div className="flex justify-between text-xs text-slate-500 mb-1">
+                                  <span>Sequential time</span>
+                                  <span>{timing.sequential_time_seconds.toFixed(1)}s</span>
+                                </div>
+                                <div className="h-3 rounded-full bg-white/10 overflow-hidden">
+                                  <div
+                                    className="h-full bg-amber-500/80 rounded-full transition-all"
+                                    style={{
+                                      width: `${Math.min(
+                                        100,
+                                        (timing.sequential_time_seconds /
+                                          Math.max(timing.sequential_time_seconds, timing.parallel_time_seconds, 0.001)) *
+                                          100,
+                                      )}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <div className="flex justify-between text-xs text-slate-500 mb-1">
+                                  <span>Parallel wall time</span>
+                                  <span>{timing.parallel_time_seconds.toFixed(1)}s</span>
+                                </div>
+                                <div className="h-3 rounded-full bg-white/10 overflow-hidden">
+                                  <div
+                                    className="h-full bg-cyan-500/80 rounded-full transition-all"
+                                    style={{
+                                      width: `${Math.min(
+                                        100,
+                                        (timing.parallel_time_seconds /
+                                          Math.max(timing.sequential_time_seconds, timing.parallel_time_seconds, 0.001)) *
+                                          100,
+                                      )}%`,
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {timing.actual_cost && (
+                            <p className="text-sm text-slate-400">
+                              Actual compute (estimate):{' '}
+                              <span className="text-emerald-400 font-mono">
+                                ${Number(timing.actual_cost.actual_total ?? 0).toFixed(4)}
+                              </span>
+                            </p>
+                          )}
+
+                          <div>
+                            <p className="text-sm font-medium text-white mb-2">Per-task execution</p>
+                            <div className="rounded-xl border border-white/10 overflow-hidden max-h-[40vh] overflow-y-auto">
+                              <table className="w-full text-sm">
+                                <thead className="sticky top-0 bg-slate-900/95 text-left text-xs text-slate-500 uppercase">
+                                  <tr>
+                                    <th className="p-3">Task</th>
+                                    <th className="p-3">Status</th>
+                                    <th className="p-3 text-right">Seconds</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                  {(timing.tasks || []).map((row, i) => (
+                                    <tr key={`${row.task_name}-${i}`} className="hover:bg-white/[0.03]">
+                                      <td className="p-3 text-slate-200 font-mono text-xs">{row.task_name}</td>
+                                      <td className="p-3 text-slate-500 capitalize">{row.status}</td>
+                                      <td className="p-3 text-right text-cyan-300 tabular-nums">
+                                        {row.execution_time != null ? row.execution_time.toFixed(2) : '—'}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </TabsContent>
                     <TabsContent value="rendered" className="flex-1 overflow-auto mt-0">
                       {output ? (
                         <div className="prose prose-invert prose-sm max-w-none rounded-lg border border-white/10 bg-black/20 p-4">
@@ -222,15 +388,23 @@ export function ResultsPage() {
                     </TabsContent>
                     <TabsContent value="tasks" className="flex-1 overflow-auto mt-0">
                       <div className="space-y-2 max-h-[55vh] overflow-auto">
-                        {tasks.map((t) => (
-                          <div
-                            key={t.id}
-                            className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm"
-                          >
-                            <span className="text-slate-200">{t.task_name}</span>
-                            <span className="text-xs text-slate-500 capitalize">{t.status}</span>
-                          </div>
-                        ))}
+                        {tasks.map((t) => {
+                          const sec = timing?.tasks?.find((x) => x.task_name === t.task_name)?.execution_time;
+                          return (
+                            <div
+                              key={t.id}
+                              className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm gap-3"
+                            >
+                              <span className="text-slate-200 truncate">{t.task_name}</span>
+                              <div className="flex items-center gap-3 shrink-0">
+                                {sec != null && (
+                                  <span className="text-xs text-cyan-400/90 tabular-nums">{sec.toFixed(2)}s</span>
+                                )}
+                                <span className="text-xs text-slate-500 capitalize">{t.status}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
                         {!tasks.length && <p className="text-slate-500 text-sm">No tasks</p>}
                       </div>
                     </TabsContent>

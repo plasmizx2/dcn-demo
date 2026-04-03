@@ -1,7 +1,8 @@
 import { AdminLayout } from '../components/admin-layout';
 import { motion } from 'motion/react';
 import { useState, useEffect } from 'react';
-import { Activity, Cpu, CheckCircle2, Clock, TrendingUp, Users, Layers, ShieldAlert } from 'lucide-react';
+import { Link } from 'react-router';
+import { Activity, Cpu, CheckCircle2, Clock, TrendingUp, Users, Layers, ShieldAlert, ExternalLink } from 'lucide-react';
 import { useRequireAdmin } from '../hooks/use-require-admin';
 import { Loader2 } from 'lucide-react';
 
@@ -16,10 +17,38 @@ interface MonitorStats {
   busy_workers: number;
 }
 
+interface JobListRow {
+  id: string;
+  title: string;
+  status: string;
+  created_at?: string;
+}
+
 export function DashboardPage() {
   const { ready } = useRequireAdmin();
   const [stats, setStats] = useState<MonitorStats | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [recentJobs, setRecentJobs] = useState<JobListRow[]>([]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const loadJobs = async () => {
+      try {
+        const r = await fetch('/jobs', { credentials: 'include' });
+        if (!r.ok) return;
+        const data = await r.json();
+        const sorted = [...(data as JobListRow[])].sort(
+          (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+        );
+        setRecentJobs(sorted.slice(0, 12));
+      } catch {
+        /* ignore */
+      }
+    };
+    loadJobs();
+    const j = setInterval(loadJobs, 30000);
+    return () => clearInterval(j);
+  }, [ready]);
 
   useEffect(() => {
     if (!ready) return;
@@ -84,8 +113,12 @@ export function DashboardPage() {
         >
           <div className="mb-8 flex items-center justify-between">
             <div>
-              <h1 className="text-4xl font-bold mb-3">Operator dashboard</h1>
-              <p className="text-slate-400 text-lg">Live queue, workers, and jobs — from /monitor/stats</p>
+              <h1 className="text-4xl font-bold mb-3 text-white">Operator dashboard</h1>
+              <p className="text-slate-400 text-lg">
+                Live queue and workers. For <strong className="text-slate-300">per-job speedup</strong> (parallel vs
+                sequential), open <Link className="text-purple-400 hover:underline" to="/results">Results</Link> → pick a
+                job → <strong className="text-slate-300">Timing</strong> tab.
+              </p>
             </div>
             <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/30">
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
@@ -122,10 +155,55 @@ export function DashboardPage() {
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.35, duration: 0.5 }}
+            className="mt-8 rounded-2xl border border-white/10 bg-slate-900/40 p-6"
+          >
+            <h2 className="text-lg font-semibold text-white mb-4">Recent jobs</h2>
+            {recentJobs.length === 0 ? (
+              <p className="text-sm text-slate-500">No jobs yet — submit from Submit Job.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs text-slate-500 uppercase border-b border-white/10">
+                    <tr>
+                      <th className="pb-2 pr-4">Title</th>
+                      <th className="pb-2 pr-4">Status</th>
+                      <th className="pb-2 pr-4">Created</th>
+                      <th className="pb-2">Analysis</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {recentJobs.map((job) => (
+                      <tr key={job.id} className="hover:bg-white/[0.03]">
+                        <td className="py-2 pr-4 text-slate-200 max-w-[200px] truncate">{job.title}</td>
+                        <td className="py-2 pr-4 capitalize text-slate-400">{job.status}</td>
+                        <td className="py-2 pr-4 text-slate-500 whitespace-nowrap text-xs">
+                          {job.created_at ? new Date(job.created_at).toLocaleString() : '—'}
+                        </td>
+                        <td className="py-2">
+                          <Link
+                            to={`/results#${job.id}`}
+                            className="inline-flex items-center gap-1 text-purple-400 hover:text-purple-300 text-xs font-medium"
+                          >
+                            Results & timing
+                            <ExternalLink className="w-3 h-3" />
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </motion.div>
+
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.5 }}
             className="mt-8 bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-2xl p-8"
           >
-            <h2 className="text-2xl font-bold mb-4">Snapshot</h2>
+            <h2 className="text-2xl font-bold mb-4 text-white">Snapshot</h2>
             <div className="grid md:grid-cols-3 gap-6 text-sm">
               <div>
                 <p className="text-slate-400 mb-2">Job completion rate</p>
