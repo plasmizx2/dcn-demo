@@ -13,6 +13,7 @@ from database import get_pool, close_pool
 from apis.jobs import router as jobs_router
 from apis.monitor import router as monitor_router
 from apis.workers import router as workers_router
+from apis.feedback import router as feedback_router
 from auth import (
     find_or_create_oauth_user, create_session, get_session, destroy_session,
     update_user_role, list_users,
@@ -41,6 +42,8 @@ MYJOBS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "my-jobs"
 ERROR_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "error")
 WORKER_LOGS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "worker-logs")
 ADMIN_USERS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "admin-users")
+CONTACT_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "contact")
+REPORT_BUG_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "report-bug")
 
 
 async def _maintenance_loop():
@@ -234,6 +237,26 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error("job_tasks retry columns migration failed: %s", e, exc_info=True)
             raise
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS bug_reports (
+                id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id     UUID REFERENCES dcn_users(id),
+                subject     TEXT NOT NULL,
+                description TEXT NOT NULL,
+                page_url    TEXT,
+                status      VARCHAR DEFAULT 'open',
+                created_at  TIMESTAMPTZ DEFAULT now()
+            );
+            CREATE TABLE IF NOT EXISTS contact_messages (
+                id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id     UUID REFERENCES dcn_users(id),
+                name        TEXT NOT NULL,
+                email       TEXT NOT NULL,
+                subject     TEXT NOT NULL DEFAULT 'general',
+                message     TEXT NOT NULL,
+                created_at  TIMESTAMPTZ DEFAULT now()
+            );
+        """)
     maintenance_task = asyncio.create_task(_maintenance_loop())
     yield
     maintenance_task.cancel()
@@ -253,6 +276,7 @@ app.add_middleware(
 app.include_router(jobs_router)
 app.include_router(monitor_router)
 app.include_router(workers_router)
+app.include_router(feedback_router)
 
 
 # ── Auth middleware ──────────────────────────────────────────────
@@ -549,6 +573,19 @@ async def serve_worker_logs():
 @app.get("/admin/users")
 async def serve_admin_users():
     response = FileResponse(os.path.join(ADMIN_USERS_DIR, "index.html"))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
+@app.get("/contact")
+async def serve_contact():
+    return FileResponse(os.path.join(CONTACT_DIR, "index.html"))
+
+
+@app.get("/report-bug")
+async def serve_report_bug():
+    response = FileResponse(os.path.join(REPORT_BUG_DIR, "index.html"))
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     return response
