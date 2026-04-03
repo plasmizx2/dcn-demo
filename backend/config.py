@@ -50,5 +50,12 @@ ESTIMATED_SECONDS_PER_TIER: dict[int, int] = {1: 3, 2: 5, 3: 8, 4: 14}
 # Platform fee as a percentage of compute cost
 PLATFORM_FEE_PERCENT: float = 15.0
 
+# ── Task Timeouts ──────────────────────────────────────────
+# Max seconds a single ML training call (cross_validate + fit) may run
+TASK_TRAINING_TIMEOUT_SECONDS: int = 300  # 5 minutes
+
+# Max minutes a job may run before the maintenance loop force-fails it
+MAX_JOB_DURATION_MINUTES: int = 60  # 1 hour
+
 # ── Aggregation ─────────────────────────────────────────────
 CONCAT_TASK_TYPES: set[str] = set()

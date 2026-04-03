@@ -10,6 +10,7 @@ from planner import plan_tasks
 from config import VALID_TASK_TYPES, MIN_PRIORITY, MAX_PRIORITY, MIN_REWARD
 from auth import get_session, ELEVATED_ROLES
 from pricing import estimate_job_cost, calculate_actual_cost
+from rate_limit import check_rate_limit
 from aggregator import parse_ml_experiments_from_task_rows, sort_ml_experiments_by_metric
 from job_export import (
     build_json_export,
@@ -78,6 +79,7 @@ async def get_job(job_id: str) -> dict:
 @router.post("/jobs")
 async def create_job(job: JobCreate, request: Request) -> dict:
     """Create a new job, plan subtasks, and log events (transactional)."""
+    check_rate_limit(request, max_requests=10, window_seconds=60)  # 10 jobs/min
     user = await get_session(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")

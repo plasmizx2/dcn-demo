@@ -1,8 +1,20 @@
 """Handler for ml_experiment tasks — trains and evaluates a single ML model with cross-validation."""
 
+import signal
 import time
 import json
 from resource_guard import safe_n_jobs, safe_dataset_size
+from config import TASK_TRAINING_TIMEOUT_SECONDS
+
+
+class TrainingTimeout(Exception):
+    """Raised when model training exceeds the allowed time limit."""
+
+
+def _timeout_handler(signum, frame):
+    raise TrainingTimeout(
+        f"Training exceeded {TASK_TRAINING_TIMEOUT_SECONDS}s limit"
+    )
 
 
 def handle(task: dict, job: dict) -> str:
@@ -199,7 +211,7 @@ def handle(task: dict, job: dict) -> str:
 
     model = model_factory(params)
 
-    # ── Cross-validation (the heavy part) ──
+    # ── Cross-validation (the heavy part) — with timeout guard ──
     cv_start = time.time()
 
     if task_category == "regression":
@@ -207,19 +219,26 @@ def handle(task: dict, job: dict) -> str:
     else:
         cv_scoring = ["accuracy", "f1_weighted", "precision_weighted", "recall_weighted"]
 
-    cv_results = cross_validate(
-        model, X_train, y_train,
-        cv=cv_folds,
-        scoring=cv_scoring,
-        return_train_score=True,
-        n_jobs=safe_n_jobs(),
-    )
-    cv_time = round(time.time() - cv_start, 3)
+    # Set alarm-based timeout (Unix only; harmless no-op on Windows)
+    old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+    signal.alarm(TASK_TRAINING_TIMEOUT_SECONDS)
+    try:
+        cv_results = cross_validate(
+            model, X_train, y_train,
+            cv=cv_folds,
+            scoring=cv_scoring,
+            return_train_score=True,
+            n_jobs=safe_n_jobs(),
+        )
+        cv_time = round(time.time() - cv_start, 3)
 
-    # ── Final model fit on full training set + test eval ──
-    train_start = time.time()
-    model.fit(X_train, y_train)
-    train_time = round(time.time() - train_start, 3)
+        # ── Final model fit on full training set + test eval ──
+        train_start = time.time()
+        model.fit(X_train, y_train)
+        train_time = round(time.time() - train_start, 3)
+    finally:
+        signal.alarm(0)  # Cancel the alarm
+        signal.signal(signal.SIGALRM, old_handler)
 
     y_pred = model.predict(X_test)
 
