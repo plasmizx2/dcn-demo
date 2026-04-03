@@ -61,11 +61,41 @@ async def list_bug_reports(request: Request) -> list[dict]:
             """
             SELECT b.*, u.email AS reporter_email, u.name AS reporter_name
             FROM bug_reports b
-            LEFT JOIN users u ON u.id = b.user_id
+            LEFT JOIN dcn_users u ON u.id = b.user_id
             ORDER BY b.created_at DESC
             """
         )
     return [dict(r) for r in rows]
+
+
+class BugStatusUpdate(BaseModel):
+    status: str  # open, investigating, resolved
+
+
+@router.patch("/bugs/{bug_id}/status")
+async def update_bug_status(bug_id: str, body: BugStatusUpdate, request: Request) -> dict:
+    """Update bug report status. Admin/CEO only."""
+    user = await get_session(request)
+    if not user or user.get("role") not in ELEVATED_ROLES:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    valid_statuses = {"open", "investigating", "resolved"}
+    if body.status not in valid_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status. Must be one of: {', '.join(sorted(valid_statuses))}",
+        )
+
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "UPDATE bug_reports SET status = $1 WHERE id = $2::uuid RETURNING id, status",
+            body.status,
+            bug_id,
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Bug report not found")
+    return {"id": str(row["id"]), "status": row["status"]}
 
 
 @router.post("/contact")

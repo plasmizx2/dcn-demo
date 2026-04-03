@@ -23,11 +23,24 @@ router = APIRouter()
 
 @router.get("/jobs")
 async def list_jobs() -> list[dict]:
-    """Return all jobs, newest first."""
+    """Return all jobs with task counts, newest first."""
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT * FROM jobs ORDER BY created_at DESC"
+            """
+            SELECT j.*,
+                   COALESCE(tc.total, 0)     AS task_count,
+                   COALESCE(tc.completed, 0) AS completed_tasks,
+                   COALESCE(tc.failed, 0)    AS failed_tasks
+            FROM jobs j
+            LEFT JOIN LATERAL (
+                SELECT COUNT(*)                                          AS total,
+                       COUNT(*) FILTER (WHERE status = 'submitted')      AS completed,
+                       COUNT(*) FILTER (WHERE status = 'failed')         AS failed
+                FROM job_tasks WHERE job_id = j.id
+            ) tc ON TRUE
+            ORDER BY j.created_at DESC
+            """
         )
     return [dict(r) for r in rows]
 
@@ -49,14 +62,28 @@ async def estimate_cost(job: JobCreate) -> dict:
 
 @router.get("/jobs/mine")
 async def list_my_jobs(request: Request) -> list[dict]:
-    """Return jobs belonging to the authenticated user, newest first."""
+    """Return jobs belonging to the authenticated user with task counts, newest first."""
     user = await get_session(request)
     if not user:
         raise HTTPException(status_code=401, detail="Not logged in")
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT * FROM jobs WHERE user_id = $1::uuid ORDER BY created_at DESC",
+            """
+            SELECT j.*,
+                   COALESCE(tc.total, 0)     AS task_count,
+                   COALESCE(tc.completed, 0) AS completed_tasks,
+                   COALESCE(tc.failed, 0)    AS failed_tasks
+            FROM jobs j
+            LEFT JOIN LATERAL (
+                SELECT COUNT(*)                                          AS total,
+                       COUNT(*) FILTER (WHERE status = 'submitted')      AS completed,
+                       COUNT(*) FILTER (WHERE status = 'failed')         AS failed
+                FROM job_tasks WHERE job_id = j.id
+            ) tc ON TRUE
+            WHERE j.user_id = $1::uuid
+            ORDER BY j.created_at DESC
+            """,
             user["id"],
         )
     return [dict(r) for r in rows]

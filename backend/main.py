@@ -44,6 +44,8 @@ WORKER_LOGS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "wor
 ADMIN_USERS_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "admin-users")
 CONTACT_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "contact")
 REPORT_BUG_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "report-bug")
+REACT_DIST_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend-react", "dist")
+USE_REACT = os.path.isfile(os.path.join(REACT_DIST_DIR, "index.html"))
 
 
 async def _maintenance_loop():
@@ -333,6 +335,8 @@ async def serve_login(request: Request):
     user = await get_session(request)
     if user:
         return RedirectResponse("/ops" if user["role"] in ELEVATED_ROLES else "/submit")
+    if USE_REACT:
+        return _react_index()
     return FileResponse(os.path.join(LOGIN_DIR, "index.html"))
 
 
@@ -528,67 +532,111 @@ async def change_role(request: Request):
 
 
 # ── Page routes ─────────────────────────────────────────────────
-@app.get("/")
-async def serve_landing():
-    return FileResponse(os.path.join(LANDING_DIR, "index.html"))
 
-
-@app.get("/submit")
-async def serve_frontend():
-    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
-
-
-@app.get("/ops")
-async def serve_monitor():
-    response = FileResponse(os.path.join(MONITOR_DIR, "index.html"))
+def _react_index():
+    """Serve React SPA index.html with no-cache headers."""
+    response = FileResponse(os.path.join(REACT_DIST_DIR, "index.html"))
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     return response
 
 
-@app.get("/results")
-async def serve_results():
-    response = FileResponse(os.path.join(RESULTS_DIR, "index.html"))
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    return response
+if USE_REACT:
+    # Serve React build assets (JS, CSS, etc.)
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/assets", StaticFiles(directory=os.path.join(REACT_DIST_DIR, "assets")), name="react-assets")
 
+    @app.get("/")
+    async def serve_landing():
+        return _react_index()
 
-@app.get("/my-jobs")
-async def serve_my_jobs():
-    response = FileResponse(os.path.join(MYJOBS_DIR, "index.html"))
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    return response
+    @app.get("/submit")
+    async def serve_frontend():
+        return _react_index()
 
+    @app.get("/ops")
+    async def serve_monitor():
+        return _react_index()
 
-@app.get("/worker-logs")
-async def serve_worker_logs():
-    response = FileResponse(os.path.join(WORKER_LOGS_DIR, "index.html"))
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    return response
+    @app.get("/results")
+    async def serve_results():
+        return _react_index()
 
+    @app.get("/my-jobs")
+    async def serve_my_jobs():
+        return _react_index()
 
-@app.get("/admin/users")
-async def serve_admin_users():
-    response = FileResponse(os.path.join(ADMIN_USERS_DIR, "index.html"))
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    return response
+    @app.get("/worker-logs")
+    async def serve_worker_logs():
+        return _react_index()
 
+    @app.get("/admin/users")
+    async def serve_admin_users():
+        return _react_index()
 
-@app.get("/contact")
-async def serve_contact():
-    return FileResponse(os.path.join(CONTACT_DIR, "index.html"))
+    @app.get("/contact")
+    async def serve_contact():
+        return _react_index()
 
+    @app.get("/report-bug")
+    async def serve_report_bug():
+        return _react_index()
 
-@app.get("/report-bug")
-async def serve_report_bug():
-    response = FileResponse(os.path.join(REPORT_BUG_DIR, "index.html"))
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    return response
+else:
+    # Legacy static HTML pages
+    @app.get("/")
+    async def serve_landing():
+        return FileResponse(os.path.join(LANDING_DIR, "index.html"))
+
+    @app.get("/submit")
+    async def serve_frontend():
+        return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
+    @app.get("/ops")
+    async def serve_monitor():
+        response = FileResponse(os.path.join(MONITOR_DIR, "index.html"))
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        return response
+
+    @app.get("/results")
+    async def serve_results():
+        response = FileResponse(os.path.join(RESULTS_DIR, "index.html"))
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        return response
+
+    @app.get("/my-jobs")
+    async def serve_my_jobs():
+        response = FileResponse(os.path.join(MYJOBS_DIR, "index.html"))
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        return response
+
+    @app.get("/worker-logs")
+    async def serve_worker_logs():
+        response = FileResponse(os.path.join(WORKER_LOGS_DIR, "index.html"))
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        return response
+
+    @app.get("/admin/users")
+    async def serve_admin_users():
+        response = FileResponse(os.path.join(ADMIN_USERS_DIR, "index.html"))
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        return response
+
+    @app.get("/contact")
+    async def serve_contact():
+        return FileResponse(os.path.join(CONTACT_DIR, "index.html"))
+
+    @app.get("/report-bug")
+    async def serve_report_bug():
+        response = FileResponse(os.path.join(REPORT_BUG_DIR, "index.html"))
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        return response
 
 
 
@@ -608,6 +656,9 @@ async def not_found_handler(request: Request, exc):
     # Return JSON for API requests
     if request.url.path.startswith("/api/") or request.url.path.startswith("/monitor/"):
         return JSONResponse({"detail": "Not found"}, status_code=404)
+    # React SPA handles its own 404 via client-side router
+    if USE_REACT:
+        return _react_index()
     return FileResponse(os.path.join(ERROR_DIR, "404.html"), status_code=404)
 
 
