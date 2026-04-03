@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 from database import get_pool
 from auth import get_session, ELEVATED_ROLES
+from rate_limit import check_rate_limit
 
 router = APIRouter()
 
@@ -25,6 +26,7 @@ class ContactMessage(BaseModel):
 @router.post("/bugs")
 async def create_bug_report(body: BugReport, request: Request) -> dict:
     """Submit a bug report. Requires authentication."""
+    check_rate_limit(request, max_requests=5, window_seconds=60)  # 5 reports/min
     user = await get_session(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -71,6 +73,7 @@ async def list_bug_reports(request: Request) -> list[dict]:
 @router.post("/contact")
 async def create_contact_message(body: ContactMessage, request: Request) -> dict:
     """Submit a contact message. Works for both authenticated and anonymous users."""
+    check_rate_limit(request, max_requests=3, window_seconds=60)  # 3 messages/min
     if not body.name.strip() or not body.email.strip() or not body.message.strip():
         raise HTTPException(status_code=400, detail="Name, email, and message are required")
 

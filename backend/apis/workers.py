@@ -1,6 +1,7 @@
 import json
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from database import get_pool
+from rate_limit import check_rate_limit
 from schemas import TaskClaim, TaskComplete, TaskFail, WorkerHeartbeat, WorkerRegister, CacheLookup, CacheStore
 from aggregator import aggregate_job
 from config import (
@@ -13,8 +14,9 @@ router = APIRouter()
 
 
 @router.post("/workers/register")
-async def register_worker(body: WorkerRegister) -> dict:
+async def register_worker(body: WorkerRegister, request: Request) -> dict:
     """Register a new worker node. Returns the worker UUID."""
+    check_rate_limit(request, max_requests=5, window_seconds=60)  # 5 registrations/min
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(

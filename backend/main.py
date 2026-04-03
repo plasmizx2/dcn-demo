@@ -24,6 +24,7 @@ from auth import (
 from config import (
     MAINTENANCE_INTERVAL_SECONDS, STALE_TASK_TIMEOUT_MINUTES,
     WORKER_PRUNE_TIMEOUT_MINUTES, SESSION_MAX_AGE_SECONDS,
+    MAX_JOB_DURATION_MINUTES,
 )
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
@@ -98,6 +99,35 @@ async def _maintenance_loop():
                 )
                 for row in pruned:
                     logger.info("Pruned dead worker: %s (%s)", row['node_name'], str(row['id'])[:8])
+
+                # Force-fail jobs that exceeded max duration
+                expired_jobs = await conn.fetch(
+                    """
+                    UPDATE jobs
+                    SET status = 'failed'
+                    WHERE status IN ('queued', 'running')
+                      AND created_at < NOW() - INTERVAL '{} minutes'
+                    RETURNING id
+                    """.format(MAX_JOB_DURATION_MINUTES),
+                )
+                for row in expired_jobs:
+                    # Also fail all remaining non-terminal tasks
+                    await conn.execute(
+                        """
+                        UPDATE job_tasks SET status = 'failed'
+                        WHERE job_id = $1 AND status IN ('queued', 'running')
+                        """,
+                        row["id"],
+                    )
+                    await conn.execute(
+                        """
+                        INSERT INTO job_events (job_id, event_type, message)
+                        VALUES ($1, 'job_failed', $2)
+                        """,
+                        row["id"],
+                        f"Job force-failed after exceeding {MAX_JOB_DURATION_MINUTES}min max duration",
+                    )
+                    logger.info("Force-failed expired job %s", str(row['id'])[:8])
 
         except Exception as e:
             logger.error("Maintenance loop error: %s", e, exc_info=True)
@@ -264,6 +294,12 @@ async def lifespan(app: FastAPI):
                 message     TEXT NOT NULL,
                 created_at  TIMESTAMPTZ DEFAULT now()
             );
+        """)
+        # Performance indexes (safe to re-run)
+        await conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON jobs(user_id);
+            CREATE INDEX IF NOT EXISTS idx_job_tasks_claim_after ON job_tasks(claim_after) WHERE claim_after IS NOT NULL;
+            CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC);
         """)
     maintenance_task = asyncio.create_task(_maintenance_loop())
     yield
