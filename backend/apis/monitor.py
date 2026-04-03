@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
 
 from database import get_pool
@@ -24,20 +24,54 @@ async def monitor_jobs() -> list[dict]:
 
 
 @router.get("/queue")
-async def monitor_queue() -> list[dict]:
-    """Return tasks that are queued or in-progress."""
+async def monitor_queue(
+    scope: str = Query(
+        "active",
+        description="active = queued+running only; all = include submitted, failed, pending_validation (ops view)",
+    ),
+) -> list[dict]:
+    """Return tasks for the live queue.
+
+    - **active** (default): queued and running only (backward compatible).
+    - **all**: also submitted, failed, pending_validation — sorted so in-flight work
+      appears first, then terminal states by recency within the result cap.
+    """
     pool = await get_pool()
     async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            """
-            SELECT jt.*, j.title as job_title
-            FROM job_tasks jt
-            JOIN jobs j ON j.id = jt.job_id
-            WHERE jt.status IN ('queued', 'running')
-            ORDER BY jt.created_at
-            """
-        )
-    return [dict(r) for r in rows]
+        if scope == "all":
+            rows = await conn.fetch(
+                """
+                SELECT jt.*, j.title AS job_title, j.status AS job_status
+                FROM job_tasks jt
+                JOIN jobs j ON j.id = jt.job_id
+                WHERE jt.status IN (
+                    'queued', 'running', 'submitted', 'failed', 'pending_validation'
+                )
+                ORDER BY
+                    CASE jt.status
+                        WHEN 'running' THEN 0
+                        WHEN 'queued' THEN 1
+                        WHEN 'pending_validation' THEN 2
+                        WHEN 'failed' THEN 3
+                        WHEN 'submitted' THEN 4
+                        ELSE 5
+                    END,
+                    COALESCE(jt.completed_at, jt.started_at, jt.created_at) DESC NULLS LAST,
+                    jt.created_at DESC
+                LIMIT 400
+                """
+            )
+        else:
+            rows = await conn.fetch(
+                """
+                SELECT jt.*, j.title AS job_title, j.status AS job_status
+                FROM job_tasks jt
+                JOIN jobs j ON j.id = jt.job_id
+                WHERE jt.status IN ('queued', 'running')
+                ORDER BY jt.created_at
+                """
+            )
+    return jsonable_encoder([dict(r) for r in rows])
 
 
 @router.get("/stats")
