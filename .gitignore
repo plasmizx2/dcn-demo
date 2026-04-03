@@ -10,7 +10,10 @@ frontend/web/dist/
 dcn-worker/config.json
 *.zip
 
-# Auto-worker runtime (scripts in repo; logs/state stay local)
+# Local-only: GitHub issue auto-worker (keep copies on your machine; not in repo)
+auto-worker.sh
+auto-worker-uninstall.sh
+auto-worker-monitor/
 .auto-worker-state.json
 auto-worker.log
 auto-worker-stdout.log
