@@ -49,7 +49,7 @@ Best supporting demos:
 DCN uses **cookie-based sessions** backed by PostgreSQL.
 
 - **Default demo users**:
-  - `admin` / `admin123` (admin access to `/ops`, `/results`, `/worker-logs`, and `/monitor/*`)
+  - `admin` / `admin123` (admin access to `/ops`, `/jobs`, `/worker-logs`, and `/monitor/*`; `/results` redirects to `/jobs`)
   - `customer` / `customer123` (access to job submission + “My Jobs”)
 - **Self-registration**:
   - Users can create a new customer account from the login page (Sign Up toggle), which calls `POST /auth/register`.
@@ -146,7 +146,7 @@ W1    W2    W3    WN   ...
       |
  Final Output
       |
-Timing + Results UI
+Timing + All jobs UI
 
 ---
 

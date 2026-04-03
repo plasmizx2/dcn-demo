@@ -36,7 +36,7 @@ Remove everything that isn't `ml_experiment`. This reduces scope, sharpens the p
 - Full planner → worker → aggregator pipeline
 - Coordinator server, job API, worker API
 - Operator dashboard (`/ops`)
-- Results page (`/results`)
+- All jobs page (`/jobs`; `/results` redirects)
 - [dcn-worker](https://github.com/plasmizx2/dcn-worker) desktop app
 
 ---

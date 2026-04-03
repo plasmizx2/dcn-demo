@@ -19,7 +19,7 @@ DCN has three user-facing layers:
 
 1. Public job submission at `/`
 2. Operator monitoring at `/ops`
-3. Results browsing at `/results`
+3. All jobs (admin) at `/jobs` (`/results` redirects)
 
 A user submits a job, the planner decomposes it into subtasks, workers claim and execute those subtasks in parallel, and the aggregator produces the final output. The UI then shows both the result and the timing difference between sequential and distributed execution.
 
@@ -430,7 +430,7 @@ The current implementation includes:
 - aggregation into final output
 - public UI at `/`
 - operator dashboard at `/ops`
-- results browsing at `/results`
+- all jobs browsing at `/jobs` (`/results` redirects)
 - timing comparison
 - ML experiment hero demo
 
