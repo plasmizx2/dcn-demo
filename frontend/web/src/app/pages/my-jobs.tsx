@@ -1,7 +1,7 @@
 import { AdminLayout } from '../components/admin-layout';
 import { motion } from 'motion/react';
 import { useState, useEffect } from 'react';
-import { CheckCircle2, Clock, XCircle, Loader2, ExternalLink, Download } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, Loader2, ExternalLink, Download, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Job {
@@ -91,6 +91,23 @@ export function MyJobsPage() {
     }
   };
 
+  const deleteJob = async (jobId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm('Delete this job and all its tasks and results?')) return;
+    try {
+      const response = await fetch(`/jobs/${jobId}`, { method: 'DELETE', credentials: 'include' });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error((err as { detail?: string }).detail || 'Delete failed');
+      }
+      toast.success('Job deleted');
+      if (selectedJob === jobId) setSelectedJob(null);
+      loadJobs();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Delete failed');
+    }
+  };
+
   const downloadExport = async (jobId: string, format: string) => {
     try {
       const response = await fetch(`/jobs/${jobId}/export?format=${format}`, { credentials: 'include' });
@@ -128,7 +145,7 @@ export function MyJobsPage() {
           transition={{ duration: 0.5 }}
         >
           <div className="mb-8">
-            <h1 className="text-4xl font-bold mb-3">My Jobs</h1>
+            <h1 className="text-4xl font-bold mb-3 text-white">My Jobs</h1>
             <p className="text-slate-400 text-lg">
               Track the status and results of your submitted jobs
             </p>
@@ -175,8 +192,18 @@ export function MyJobsPage() {
                           <span className="text-slate-600">#{job.id.substring(0, 8)}</span>
                         </div>
                       </div>
-                      <div className={`px-4 py-2 rounded-full border text-sm font-medium ${getStatusColor(job.status)}`}>
-                        {job.status}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => deleteJob(job.id, e)}
+                          className="p-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors"
+                          title="Delete job"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                        <div className={`px-4 py-2 rounded-full border text-sm font-medium ${getStatusColor(job.status)}`}>
+                          {job.status}
+                        </div>
                       </div>
                     </div>
                   </div>

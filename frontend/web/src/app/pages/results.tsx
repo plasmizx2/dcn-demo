@@ -2,7 +2,7 @@ import { AdminLayout } from '../components/admin-layout';
 import { motion } from 'motion/react';
 import { useCallback, useEffect, useState } from 'react';
 import { useRequireAdmin } from '../hooks/use-require-admin';
-import { Loader2, Copy, Search, Gauge, Zap } from 'lucide-react';
+import { Loader2, Copy, Search, Gauge, Zap, Trash2, ScrollText } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -44,6 +44,9 @@ export function ResultsPage() {
   const [loading, setLoading] = useState(true);
   const [timing, setTiming] = useState<JobTiming | null>(null);
   const [timingLoading, setTimingLoading] = useState(false);
+  const [events, setEvents] = useState<JobEventRow[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const loadJobs = useCallback(async () => {
     try {
@@ -92,7 +95,42 @@ export function ResultsPage() {
       })
       .catch(() => setTiming(null))
       .finally(() => setTimingLoading(false));
+
+    setEvents([]);
+    setEventsLoading(true);
+    fetch(`/jobs/${selectedId}/events`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: JobEventRow[]) => setEvents(Array.isArray(rows) ? rows : []))
+      .catch(() => setEvents([]))
+      .finally(() => setEventsLoading(false));
   }, [selectedId]);
+
+  const deleteSelectedJob = async () => {
+    if (!selectedId) return;
+    if (
+      !window.confirm(
+        'Delete this job and all its tasks, events, and results? This cannot be undone.',
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      const r = await fetch(`/jobs/${selectedId}`, { method: 'DELETE', credentials: 'include' });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error((err as { detail?: string }).detail || 'Delete failed');
+      }
+      toast.success('Job deleted');
+      setSelectedId(null);
+      window.location.hash = '';
+      await loadJobs();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Delete failed');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined' || !ready || !jobs.length) return;
@@ -219,12 +257,24 @@ export function ResultsPage() {
                         {output ? ` · ${output.length.toLocaleString()} chars` : ''}
                       </p>
                     </div>
-                    {output ? (
-                      <Button variant="outline" size="sm" onClick={copyOutput}>
-                        <Copy className="w-4 h-4" />
-                        Copy output
+                    <div className="flex flex-wrap gap-2">
+                      {output ? (
+                        <Button variant="outline" size="sm" onClick={copyOutput}>
+                          <Copy className="w-4 h-4" />
+                          Copy output
+                        </Button>
+                      ) : null}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={deleting}
+                        onClick={deleteSelectedJob}
+                        className="border-red-500/40 text-red-300 hover:bg-red-500/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        {deleting ? 'Deleting…' : 'Delete job'}
                       </Button>
-                    ) : null}
+                    </div>
                   </div>
 
                   <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col p-4 min-h-0">
@@ -237,6 +287,10 @@ export function ResultsPage() {
                       </TabsTrigger>
                       <TabsTrigger value="tasks">
                         Tasks ({doneTasks}/{tasks.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="events" className="gap-1">
+                        <ScrollText className="w-3.5 h-3.5" />
+                        Events ({events.length})
                       </TabsTrigger>
                       {looksHtml && output ? (
                         <TabsTrigger value="preview">Preview</TabsTrigger>
@@ -407,6 +461,40 @@ export function ResultsPage() {
                         })}
                         {!tasks.length && <p className="text-slate-500 text-sm">No tasks</p>}
                       </div>
+                    </TabsContent>
+                    <TabsContent value="events" className="flex-1 overflow-auto mt-0">
+                      {eventsLoading ? (
+                        <div className="flex justify-center py-12">
+                          <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
+                        </div>
+                      ) : !events.length ? (
+                        <p className="text-slate-500 text-sm">No events logged for this job yet.</p>
+                      ) : (
+                        <div className="rounded-xl border border-white/10 overflow-hidden max-h-[55vh] overflow-y-auto">
+                          <table className="w-full text-sm">
+                            <thead className="sticky top-0 bg-slate-900/95 text-left text-xs text-slate-500 uppercase">
+                              <tr>
+                                <th className="p-3">When</th>
+                                <th className="p-3">Type</th>
+                                <th className="p-3">Message</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                              {events.map((ev, i) => (
+                                <tr key={String(ev.id ?? i)} className="hover:bg-white/[0.03]">
+                                  <td className="p-3 text-slate-500 whitespace-nowrap text-xs align-top">
+                                    {ev.created_at ? new Date(ev.created_at).toLocaleString() : '—'}
+                                  </td>
+                                  <td className="p-3 text-amber-400/90 font-mono text-xs align-top">
+                                    {ev.event_type ?? '—'}
+                                  </td>
+                                  <td className="p-3 text-slate-300 align-top">{ev.message ?? '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </TabsContent>
                     {looksHtml && output ? (
                       <TabsContent value="preview" className="flex-1 mt-0 min-h-0">

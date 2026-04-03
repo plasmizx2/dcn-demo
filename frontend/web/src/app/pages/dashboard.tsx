@@ -2,9 +2,22 @@ import { AdminLayout } from '../components/admin-layout';
 import { motion } from 'motion/react';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
-import { Activity, Cpu, CheckCircle2, Clock, TrendingUp, Users, Layers, ShieldAlert, ExternalLink } from 'lucide-react';
+import {
+  Activity,
+  Cpu,
+  CheckCircle2,
+  Clock,
+  TrendingUp,
+  Users,
+  Layers,
+  ShieldAlert,
+  ExternalLink,
+  List,
+  Trash2,
+} from 'lucide-react';
 import { useRequireAdmin } from '../hooks/use-require-admin';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface MonitorStats {
   total_jobs: number;
@@ -24,11 +37,21 @@ interface JobListRow {
   created_at?: string;
 }
 
+type QueueRow = Record<string, unknown> & {
+  id?: string;
+  task_name?: string;
+  status?: string;
+  job_title?: string;
+  job_id?: string;
+};
+
 export function DashboardPage() {
-  const { ready } = useRequireAdmin();
+  const { ready, me } = useRequireAdmin();
   const [stats, setStats] = useState<MonitorStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recentJobs, setRecentJobs] = useState<JobListRow[]>([]);
+  const [queue, setQueue] = useState<QueueRow[]>([]);
+  const [clearing, setClearing] = useState(false);
 
   useEffect(() => {
     if (!ready) return;
@@ -92,6 +115,37 @@ export function DashboardPage() {
     busy_workers: 0,
   };
 
+  const clearAllJobs = async () => {
+    if (
+      !window.confirm(
+        'Delete ALL jobs, tasks, results, and events? This cannot be undone. (Admin/CEO demo reset)',
+      )
+    ) {
+      return;
+    }
+    setClearing(true);
+    try {
+      const r = await fetch('/jobs/all', { method: 'DELETE', credentials: 'include' });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error((err as { detail?: string }).detail || 'Failed');
+      }
+      toast.success('All jobs cleared');
+      const jr = await fetch('/jobs', { credentials: 'include' });
+      if (jr.ok) {
+        const data = await jr.json();
+        const sorted = [...(data as JobListRow[])].sort(
+          (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
+        );
+        setRecentJobs(sorted.slice(0, 12));
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Clear failed');
+    } finally {
+      setClearing(false);
+    }
+  };
+
   const statCards = [
     { label: 'Total Jobs', value: s.total_jobs, icon: Activity, iconBg: 'bg-blue-500/20', iconColor: 'text-blue-400' },
     { label: 'Completed Jobs', value: s.completed_jobs, icon: CheckCircle2, iconBg: 'bg-green-500/20', iconColor: 'text-green-400' },
@@ -120,9 +174,22 @@ export function DashboardPage() {
                 job → <strong className="text-slate-300">Timing</strong> tab.
               </p>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/30">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              <span className="text-sm text-green-400 font-medium">Live</span>
+            <div className="flex items-center gap-3 flex-wrap justify-end">
+              {(me?.role === 'ceo' || me?.role === 'admin') && (
+                <button
+                  type="button"
+                  disabled={clearing}
+                  onClick={clearAllJobs}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border border-red-500/40 text-red-300 hover:bg-red-500/10 disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  {clearing ? 'Clearing…' : 'Clear all jobs'}
+                </button>
+              )}
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/30">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                <span className="text-sm text-green-400 font-medium">Live</span>
+              </div>
             </div>
           </div>
 
@@ -151,6 +218,55 @@ export function DashboardPage() {
               </motion.div>
             ))}
           </div>
+
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="mt-8 rounded-2xl border border-amber-500/20 bg-slate-900/40 p-6"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <List className="w-5 h-5 text-amber-400" />
+              <h2 className="text-lg font-semibold text-white">Live queue</h2>
+              <span className="text-xs text-slate-500">(queued + running tasks · /monitor/queue)</span>
+            </div>
+            {queue.length === 0 ? (
+              <p className="text-sm text-slate-500">Nothing queued or running right now.</p>
+            ) : (
+              <div className="overflow-x-auto max-h-[280px] overflow-y-auto rounded-xl border border-white/10">
+                <table className="w-full text-sm text-left">
+                  <thead className="sticky top-0 bg-slate-900/95 text-xs text-slate-500 uppercase border-b border-white/10">
+                    <tr>
+                      <th className="p-2">Task</th>
+                      <th className="p-2">Job</th>
+                      <th className="p-2">Status</th>
+                      <th className="p-2">Job ID</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {queue.map((row, i) => (
+                      <tr key={String(row.id ?? i)} className="hover:bg-white/[0.03]">
+                        <td className="p-2 text-slate-200 font-mono text-xs truncate max-w-[180px]">
+                          {String(row.task_name ?? '—')}
+                        </td>
+                        <td className="p-2 text-slate-300 truncate max-w-[160px]">{String(row.job_title ?? '—')}</td>
+                        <td className="p-2 capitalize text-amber-400/90">{String(row.status ?? '—')}</td>
+                        <td className="p-2 text-slate-500 font-mono text-xs">
+                          {row.job_id ? (
+                            <Link className="text-purple-400 hover:underline" to={`/results#${String(row.job_id)}`}>
+                              {String(row.job_id).slice(0, 8)}…
+                            </Link>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </motion.div>
 
           <motion.div
             initial={{ y: 20, opacity: 0 }}

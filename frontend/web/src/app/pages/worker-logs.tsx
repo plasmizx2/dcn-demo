@@ -2,7 +2,8 @@ import { AdminLayout } from '../components/admin-layout';
 import { motion } from 'motion/react';
 import { useCallback, useEffect, useState } from 'react';
 import { useRequireAdmin } from '../hooks/use-require-admin';
-import { Loader2, Cpu } from 'lucide-react';
+import { Loader2, Cpu, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface WorkerNode {
   id: string;
@@ -96,6 +97,26 @@ export function WorkerLogsPage() {
     };
   }, [selectedId, ready]);
 
+  const removeWorker = async (workerId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm('Remove this worker from the registry? Running tasks will be re-queued.')) return;
+    try {
+      const r = await fetch(`/monitor/workers/${encodeURIComponent(workerId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        throw new Error(typeof data.detail === 'string' ? data.detail : 'Failed to remove worker');
+      }
+      toast.success('Worker removed');
+      if (selectedId === workerId) setSelectedId(null);
+      await loadWorkers();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to remove worker');
+    }
+  };
+
   const selectedWorker = workers.find((w) => w.id === selectedId);
 
   if (!ready || loadingWorkers) {
@@ -123,11 +144,18 @@ export function WorkerLogsPage() {
                 {workers.map((w) => {
                   const st = (w.status || 'offline').toLowerCase();
                   return (
-                    <button
+                    <div
                       key={w.id}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setSelectedId(w.id)}
-                      className={`text-left rounded-xl border p-4 transition-colors ${
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setSelectedId(w.id);
+                        }
+                      }}
+                      className={`text-left rounded-xl border p-4 transition-colors cursor-pointer ${
                         selectedId === w.id
                           ? 'border-purple-500/50 bg-purple-500/10'
                           : 'border-white/10 bg-slate-900/50 hover:border-white/20'
@@ -138,17 +166,27 @@ export function WorkerLogsPage() {
                           <Cpu className="w-4 h-4 text-slate-500 flex-shrink-0" />
                           <span className="font-medium text-white truncate">{w.node_name}</span>
                         </div>
-                        <span
-                          className={`text-xs uppercase font-semibold px-2 py-0.5 rounded ${
-                            st === 'online'
-                              ? 'bg-green-500/20 text-green-400'
-                              : st === 'busy'
-                                ? 'bg-blue-500/20 text-blue-400'
-                                : 'bg-slate-500/20 text-slate-400'
-                          }`}
-                        >
-                          {st}
-                        </span>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => removeWorker(w.id, e)}
+                            className="p-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors"
+                            title="Remove worker"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                          <span
+                            className={`text-xs uppercase font-semibold px-2 py-0.5 rounded ${
+                              st === 'online'
+                                ? 'bg-green-500/20 text-green-400'
+                                : st === 'busy'
+                                  ? 'bg-blue-500/20 text-blue-400'
+                                  : 'bg-slate-500/20 text-slate-400'
+                            }`}
+                          >
+                            {st}
+                          </span>
+                        </div>
                       </div>
                       <p className="text-xs text-slate-500">
                         Heartbeat: {timeAgo(w.last_heartbeat)}
@@ -157,7 +195,7 @@ export function WorkerLogsPage() {
                         Since{' '}
                         {w.created_at ? new Date(w.created_at).toLocaleDateString() : '—'}
                       </p>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
