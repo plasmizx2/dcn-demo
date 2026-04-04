@@ -66,38 +66,60 @@ export function AccountPage() {
     }
   };
 
-  // Check URL params for topup success — verify and credit via backend
+  // Check URL params for success — verify topup or pro upgrade via backend
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("topup") === "success") {
-      const sessionId = params.get("session_id");
-      if (sessionId) {
-        fetch("/billing/verify-topup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ session_id: sessionId }),
+    const sessionId = params.get("session_id");
+
+    if (params.get("topup") === "success" && sessionId) {
+      fetch("/billing/verify-topup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ session_id: sessionId }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.credited) {
+            toast.success(`Balance topped up by ${money(data.amount_cents)}!`);
+          } else if (data.reason === "already_credited") {
+            toast.success("Balance already credited!");
+          } else {
+            toast.error("Could not verify payment. It may take a moment.");
+          }
+          fetchBalance();
+          fetchTransactions();
         })
-          .then((res) => res.json())
-          .then((data) => {
-            if (data.credited) {
-              toast.success(`Balance topped up by ${money(data.amount_cents)}!`);
-            } else if (data.reason === "already_credited") {
-              toast.success("Balance already credited!");
-            } else {
-              toast.error("Could not verify payment. It may take a moment.");
-            }
-            fetchBalance();
-            fetchTransactions();
-          })
-          .catch(() => toast.error("Could not verify payment"));
-      } else {
-        toast.success("Payment completed! Balance will update shortly.");
-        fetchBalance();
-      }
-      // Clean up the URL
+        .catch(() => toast.error("Could not verify payment"));
+    } else if (params.get("upgrade") === "success" && sessionId) {
+      fetch("/billing/verify-pro", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ session_id: sessionId }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.activated) {
+            toast.success("Welcome to Pro! Unlimited jobs, faster queue priority.");
+          } else if (data.reason === "already_activated") {
+            toast.success("Pro tier already active!");
+          } else {
+            toast.error("Could not activate Pro. It may take a moment.");
+          }
+          // Re-fetch tier to update UI
+          fetch("/billing/tier", { credentials: "include" })
+            .then((r) => r.json())
+            .then((data) => setTierInfo(data));
+        })
+        .catch(() => toast.error("Could not verify Pro upgrade"));
+    }
+
+    // Clean up the URL
+    if (params.has("topup") || params.has("upgrade")) {
       const url = new URL(window.location.href);
       url.searchParams.delete("topup");
+      url.searchParams.delete("upgrade");
       url.searchParams.delete("session_id");
       window.history.replaceState({}, "", url.pathname + url.search);
     }

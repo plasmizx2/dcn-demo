@@ -212,6 +212,29 @@ async def create_topup(request: Request) -> dict:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@router.post("/verify-pro")
+async def verify_pro(request: Request) -> dict:
+    """Verify a Pro subscription Checkout session and activate tier."""
+    user = await get_session(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if not billing.is_enabled():
+        raise HTTPException(status_code=503, detail="Billing not configured")
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+    session_id = body.get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id required")
+    try:
+        result = await billing.verify_and_activate_pro(session_id, str(user["id"]))
+        return result
+    except Exception as e:
+        logger.error("verify-pro failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.post("/verify-topup")
 async def verify_topup(request: Request) -> dict:
     """Verify a completed Stripe Checkout session and credit balance."""
