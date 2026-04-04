@@ -30,11 +30,7 @@ The hero demo is the `ml_experiment` pipeline.
 
 A user selects a dataset and submits an ML experiment job. The system generates multiple model-training experiments with different models and hyperparameters, distributes them across workers, ranks the results, and returns the best-performing configuration with a comparison table.
 
-Supporting demos are:
-- `document_analysis`
-- `codebase_review`
-
-These prove that the same orchestration engine generalizes to other task types.
+This is currently the only fully implemented task type. The architecture supports adding more task types (each with its own planner strategy, handler, and aggregation logic), but depth on `ml_experiment` is prioritized over breadth across many shallow implementations.
 
 ---
 
@@ -78,11 +74,11 @@ This turns a manual experimentation workflow into an automated distributed pipel
 ## Benchmark
 The current system includes a sequential-vs-distributed timing comparison.
 
-For document analysis:
-- sequential execution: about 50 seconds
-- distributed execution with 5 workers: about 12 seconds
+For ML experiments with multiple model configurations:
+- sequential execution scales linearly with each additional experiment
+- distributed execution with multiple workers processes experiments in parallel
 
-This is about a 4x speedup and serves as the clearest demonstration of DCN’s value proposition.
+The timing comparison on completed jobs serves as the clearest demonstration of DCN’s value proposition.
 
 ---
 
@@ -98,17 +94,10 @@ The backend creates the job and stores its metadata.
 ### 2. Planner
 The planner decomposes the job into subtasks using task-type-specific strategies.
 
-Supported task types:
-- document_analysis
-- codebase_review
-- website_builder
-- research_pipeline
-- data_processing
+Currently implemented task type:
 - ml_experiment
-- image_processing
-- web_scraping
-- audio_transcription
-- sentiment_classification
+
+The planner includes a generic fallback for unknown task types, but only `ml_experiment` has a full handler, planner strategy, and aggregation pipeline.
 
 ### 3. Worker Pool
 Workers:
@@ -123,12 +112,9 @@ Task claiming uses `SELECT ... FOR UPDATE SKIP LOCKED`, which prevents two worke
 The aggregator combines results after all subtasks are complete.
 
 Aggregation is task-type-specific:
-- document analysis uses chunk merge and synthesis
-- codebase review produces a structured report
-- website builder assembles HTML sections
-- research pipeline merges phases
-- sentiment classification aggregates counts
 - ml_experiment ranks model results and returns a best configuration
+
+Future task types would add their own aggregation strategies.
 
 ### 5. Monitoring
 The operator dashboard at `/ops` shows:
@@ -147,25 +133,10 @@ This makes the orchestration visible during the demo.
 
 The planner is task-type-aware and decomposes jobs differently depending on the workflow.
 
-### document_analysis
-The planner examines input length and paragraph structure, then splits the document into 1–6 actual chunks based on content size. Each task includes real chunk text in `task_payload` so workers process distinct parts of the document rather than placeholder sections.
-
-### codebase_review
-The planner creates focused review tasks that target different concerns such as core logic, architecture, and security/quality. These tasks use repo-specific descriptions instead of generic placeholders.
-
-### website_builder
-The planner parses the user request for section keywords such as hero, pricing, features, or footer. If no strong section hints are found, it falls back to a standard multi-section layout.
-
-### research_pipeline
-The planner generates structured research phases such as landscape survey, deep analysis, critical evaluation, and future outlook.
-
-### data_processing
-The planner looks at actual record count and splits the input into 1–6 data batches. Each task receives its own slice of the dataset through `task_payload`.
-
 ### ml_experiment
-The planner generates multiple experiment configurations with different models and hyperparameters so workers can train and evaluate them in parallel.
+The planner generates multiple experiment configurations with different models and hyperparameters so workers can train and evaluate them in parallel. It selects model families based on the dataset's task type (regression vs classification) and creates one subtask per experiment.
 
-This makes the planner more than a lookup table: it is a deterministic decomposition layer that uses real input size, structure, and task type to generate executable subtasks.
+The planner is a deterministic decomposition layer that uses real input structure and task type to generate executable subtasks. Future task types would add their own planner strategies here.
 
 ---
 
@@ -173,13 +144,7 @@ This makes the planner more than a lookup table: it is a deterministic decomposi
 
 Handlers consume task-specific data from `task_payload` first, and fall back to the original job payload only if needed.
 
-This allows:
-- document workers to analyze their assigned chunk
-- data-processing workers to operate on their assigned batch
-- website workers to generate the correct section
-- research workers to focus on their assigned phase
-
-This keeps execution aligned with planner decomposition.
+Currently only the `ml_experiment` handler is implemented. It trains the assigned model on the dataset, runs cross-validation, and returns structured metrics. Future task types would add their own handlers following the same pattern.
 
 ---
 
@@ -386,13 +351,9 @@ Primary demo milestone:
 Hero milestone:
 - fully working `ml_experiment` flow with ranked output and timing comparison
 
-Fallback milestone:
-- if breadth becomes a risk, focus on:
-  - ml_experiment
-  - document_analysis
-  - codebase_review
-
-Depth is prioritized over breadth.
+Current focus:
+- ml_experiment is the only fully implemented task type
+- depth on one strong pipeline is prioritized over breadth across many shallow ones
 
 ---
 
@@ -400,7 +361,6 @@ Depth is prioritized over breadth.
 ### Main Risks
 - AI API instability or rate limits
 - worker desynchronization
-- shallow implementation across too many task types
 - polling overhead
 - DB contention at higher concurrency
 

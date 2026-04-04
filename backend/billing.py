@@ -334,7 +334,7 @@ async def handle_webhook_event(event) -> None:
                     "UPDATE dcn_users SET tier = 'pro', stripe_subscription_id = $1 WHERE id = $2::uuid",
                     sub_id, user_id,
                 )
-            logger.info("User %s upgraded to Pro (subscription %s)", user_id, sub_id)
+            print(f"[HANDLER] User {user_id} upgraded to Pro (subscription {sub_id})", flush=True)
 
     elif etype == "customer.subscription.deleted":
         sub_id = data.id
@@ -344,7 +344,7 @@ async def handle_webhook_event(event) -> None:
                 "UPDATE dcn_users SET tier = 'free', stripe_subscription_id = NULL WHERE stripe_subscription_id = $1",
                 sub_id,
             )
-        logger.info("Subscription %s cancelled — user downgraded to free", sub_id)
+        print(f"[HANDLER] Subscription {sub_id} cancelled — user downgraded to free", flush=True)
 
     elif etype == "account.updated":
         acct_id = data.id
