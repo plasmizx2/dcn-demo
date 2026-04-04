@@ -432,7 +432,7 @@ export function LandingPage() {
             <p className="text-slate-300 text-lg mb-8">
               Join the waitlist — we’ll enable job submission as capacity opens.
             </p>
-            <Link 
+            <Link
               to="/login"
               className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 font-semibold shadow-lg shadow-purple-500/50 transition-all"
             >
