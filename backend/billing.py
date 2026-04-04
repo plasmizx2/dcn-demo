@@ -224,14 +224,14 @@ async def handle_webhook_event(event) -> None:
     etype = event.type
     data = event.data.object
 
-    logger.info("Processing webhook event type: %s", etype)
+    print(f"[HANDLER] Processing event type: {etype}", flush=True)
 
     if etype == "checkout.session.completed":
         user_id = data.metadata.get("dcn_user_id")
         topup_amount = data.metadata.get("topup_amount_cents")
         sub_id = data.subscription
 
-        logger.info("checkout.session.completed: user_id=%s, topup_amount=%s, sub_id=%s", user_id, topup_amount, sub_id)
+        print(f"[HANDLER] checkout.session.completed: user_id={user_id}, topup_amount={topup_amount}, sub_id={sub_id}", flush=True)
 
         if user_id and topup_amount:
             # Top-up: credit user balance
@@ -254,7 +254,7 @@ async def handle_webhook_event(event) -> None:
                                VALUES ($1::uuid, $2, $3, 'topup', $4, $5)""",
                             user_id, amount_cents, new_balance, data.id, f"Top-up ${amount_cents/100:.2f}",
                         )
-                    logger.info("User %s topped up %d cents (new balance: %d)", user_id, amount_cents, new_balance)
+                    print(f"[HANDLER] User {user_id} topped up {amount_cents} cents (new balance: {new_balance})", flush=True)
 
         elif user_id and sub_id:
             # Pro subscription
