@@ -412,25 +412,27 @@ async def admin_list_payouts(request: Request):
 @router.post("/webhooks")
 async def stripe_webhook(request: Request):
     """Stripe webhook endpoint — verifies signature and processes events."""
-    logger.info("Webhook received")
+    print(f"[WEBHOOK] Received POST /billing/webhooks", flush=True)
     payload = await request.body()
     sig = request.headers.get("stripe-signature", "")
 
     if not billing.STRIPE_WEBHOOK_SECRET:
-        logger.warning("STRIPE_WEBHOOK_SECRET not set — cannot verify webhook")
+        print("[WEBHOOK] ERROR: STRIPE_WEBHOOK_SECRET not set", flush=True)
         raise HTTPException(status_code=500, detail="Webhook secret not configured")
 
     try:
         event = billing.construct_webhook_event(payload, sig)
-        logger.info("Webhook signature verified, event type: %s", event.type)
+        print(f"[WEBHOOK] Signature OK, event type: {event.type}", flush=True)
     except Exception as e:
-        logger.error("Webhook signature verification failed: %s", e, exc_info=True)
+        print(f"[WEBHOOK] Signature FAILED: {e}", flush=True)
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     try:
-        logger.info("Handling webhook event: %s", event.type)
+        print(f"[WEBHOOK] Handling event: {event.type}", flush=True)
         await billing.handle_webhook_event(event)
+        print(f"[WEBHOOK] Event handled OK", flush=True)
     except Exception as e:
-        logger.error("Webhook event processing failed: %s", e, exc_info=True)
+        print(f"[WEBHOOK] Event processing FAILED: {e}", flush=True)
+        import traceback; traceback.print_exc()
         raise HTTPException(status_code=500, detail="Event processing failed") from e
     return {"received": True}
