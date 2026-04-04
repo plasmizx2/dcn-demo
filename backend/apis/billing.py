@@ -157,6 +157,9 @@ async def upgrade_tier(body: UpgradeTierRequest, request: Request):
             return result
         except ValueError as e:
             raise HTTPException(status_code=500, detail=str(e)) from e
+        except Exception as e:
+            logger.error("Pro upgrade failed for user %s: %s", user["id"], e, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
     if tier == "paygo":
         async with pool.acquire() as conn:
