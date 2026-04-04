@@ -88,7 +88,7 @@ async def get_session(request: Request) -> dict | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            """SELECT u.id, u.email, u.name, u.avatar_url, u.role
+            """SELECT u.id, u.email, u.name, u.avatar_url, u.role, u.tier
                FROM sessions s
                JOIN dcn_users u ON s.user_id = u.id
                WHERE s.token_id = $1""",
@@ -101,6 +101,7 @@ async def get_session(request: Request) -> dict | None:
                 "name": row["name"],
                 "avatar_url": row["avatar_url"],
                 "role": row["role"],
+                "tier": row.get("tier", "free"),
             }
     return None
 
@@ -237,4 +238,6 @@ PUBLIC_PREFIXES = [
     "/datasets",
     "/contact",
     "/waitlist",
+    "/billing/webhooks",
+    "/billing/config",
 ]

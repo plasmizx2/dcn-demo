@@ -7,10 +7,11 @@ from fastapi.responses import Response
 from database import get_pool
 from schemas import JobCreate
 from planner import plan_tasks
-from config import VALID_TASK_TYPES, MIN_PRIORITY, MAX_PRIORITY, MIN_REWARD
+from config import VALID_TASK_TYPES, MIN_PRIORITY, MAX_PRIORITY, MIN_REWARD, FREE_TIER_DAILY_JOB_LIMIT
 from auth import get_session, ELEVATED_ROLES
 from pricing import estimate_job_cost, calculate_actual_cost
 from rate_limit import check_rate_limit
+from billing import verify_payment_intent, link_payment_to_job
 from aggregator import parse_ml_experiments_from_task_rows, sort_ml_experiments_by_metric
 from job_export import (
     build_json_export,
@@ -95,6 +96,42 @@ async def create_job(job: JobCreate, request: Request) -> dict:
             detail="Waitlist accounts cannot submit jobs yet",
         )
 
+    # ── Tier enforcement ──────────────────────────────────────
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        user_tier = await conn.fetchval(
+            "SELECT tier FROM dcn_users WHERE id = $1::uuid", user["id"],
+        )
+    user_tier = user_tier or "free"
+
+    if user_tier == "free":
+        # Enforce daily job limit
+        async with pool.acquire() as conn:
+            today_count = await conn.fetchval(
+                """
+                SELECT COUNT(*) FROM jobs
+                WHERE user_id = $1::uuid
+                  AND created_at >= CURRENT_DATE
+                """,
+                user["id"],
+            )
+        if today_count >= FREE_TIER_DAILY_JOB_LIMIT:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Free tier limit: {FREE_TIER_DAILY_JOB_LIMIT} jobs per day. Upgrade to pay-as-you-go or Pro for unlimited jobs.",
+            )
+
+    if user_tier == "paygo" and not job.payment_intent_id:
+        raise HTTPException(
+            status_code=402,
+            detail="Pay-as-you-go tier requires payment. Create a payment intent first via /billing/create-payment-intent.",
+        )
+
+    if job.payment_intent_id:
+        payment = await verify_payment_intent(job.payment_intent_id, user["id"])
+        if not payment:
+            raise HTTPException(status_code=400, detail="Invalid or unauthorized payment intent")
+
     if not job.title or not job.title.strip():
         raise HTTPException(status_code=400, detail="Job title is required")
     if not job.task_type or not job.task_type.strip():
@@ -109,7 +146,6 @@ async def create_job(job: JobCreate, request: Request) -> dict:
             status_code=400,
             detail=f"Priority must be between {MIN_PRIORITY} and {MAX_PRIORITY}",
         )
-    pool = await get_pool()
     async with pool.acquire() as conn:
         async with conn.transaction():
             # Plan subtasks first so we can price the job
@@ -172,6 +208,10 @@ async def create_job(job: JobCreate, request: Request) -> dict:
                 row["id"],
                 f"Job split into {len(subtasks)} tasks",
             )
+
+            # Link payment intent to the newly created job
+            if job.payment_intent_id:
+                await link_payment_to_job(job.payment_intent_id, str(row["id"]))
 
     result = dict(row)
     result["task_count"] = len(subtasks)

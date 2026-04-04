@@ -11,6 +11,7 @@ class JobCreate(BaseModel):
     priority: int = 1
     reward_amount: float = 0.00
     requires_validation: bool = False
+    payment_intent_id: Optional[str] = None
 
 
 class TaskClaim(BaseModel):

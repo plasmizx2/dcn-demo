@@ -59,3 +59,10 @@ MAX_JOB_DURATION_MINUTES: int = 60  # 1 hour
 
 # ── Aggregation ─────────────────────────────────────────────
 CONCAT_TASK_TYPES: set[str] = set()
+
+# ── Billing / Stripe ────────────────────────────────────────
+STRIPE_CURRENCY: str = "usd"
+STRIPE_MIN_CHARGE_CENTS: int = 50  # Stripe minimum $0.50
+
+# ── User Tiers ──────────────────────────────────────────────
+FREE_TIER_DAILY_JOB_LIMIT: int = 3

@@ -15,6 +15,7 @@ from apis.jobs import router as jobs_router
 from apis.monitor import router as monitor_router
 from apis.workers import router as workers_router
 from apis.feedback import router as feedback_router
+from apis.billing import router as billing_router
 from auth import (
     find_or_create_oauth_user, create_session, get_session, destroy_session,
     update_user_role, list_users,
@@ -226,6 +227,56 @@ async def _migrate_job_tasks_retry_columns(conn) -> None:
     logger.info("Ensured job_tasks.claim_after and job_tasks.failure_count exist")
 
 
+async def _migrate_billing_tables(conn) -> None:
+    """Add Stripe billing tables and tier/stripe columns on users & workers."""
+    # User tier + Stripe customer ID
+    await conn.execute("ALTER TABLE dcn_users ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'free'")
+    await conn.execute("ALTER TABLE dcn_users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT")
+    await conn.execute("ALTER TABLE dcn_users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT")
+
+    # Worker Stripe Connect account ID
+    exists = await conn.fetchval(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='worker_nodes')"
+    )
+    if exists:
+        await conn.execute("ALTER TABLE worker_nodes ADD COLUMN IF NOT EXISTS stripe_connect_id TEXT")
+
+    # Payments table — tracks each Payment Intent per job
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS payments (
+            id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            job_id                  UUID REFERENCES jobs(id) ON DELETE CASCADE,
+            user_id                 UUID NOT NULL REFERENCES dcn_users(id) ON DELETE CASCADE,
+            stripe_payment_intent_id TEXT UNIQUE,
+            amount_cents            INTEGER NOT NULL,
+            platform_fee_cents      INTEGER NOT NULL DEFAULT 0,
+            currency                TEXT NOT NULL DEFAULT 'usd',
+            status                  TEXT NOT NULL DEFAULT 'pending',
+            created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """)
+
+    # Worker payouts table — tracks transfers to worker Connect accounts
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS worker_payouts (
+            id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            job_id            UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+            worker_node_id    UUID NOT NULL,
+            stripe_transfer_id TEXT UNIQUE,
+            amount_cents      INTEGER NOT NULL,
+            status            TEXT NOT NULL DEFAULT 'pending',
+            created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """)
+
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_payments_job_id ON payments(job_id)")
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status)")
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_worker_payouts_job_id ON worker_payouts(job_id)")
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_worker_payouts_status ON worker_payouts(status)")
+    logger.info("Billing tables and columns migrated")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start up: connect to DB, create static cache table, + start maintenance. Shut down: clean up."""
@@ -275,6 +326,11 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error("job_tasks retry columns migration failed: %s", e, exc_info=True)
             raise
+        try:
+            await _migrate_billing_tables(conn)
+        except Exception as e:
+            logger.error("Billing tables migration failed: %s", e, exc_info=True)
+            raise
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS bug_reports (
                 id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -321,6 +377,7 @@ app.include_router(jobs_router)
 app.include_router(monitor_router)
 app.include_router(workers_router)
 app.include_router(feedback_router)
+app.include_router(billing_router)
 
 _spa_assets = os.path.join(WEB_DIST, "assets")
 if os.path.isdir(_spa_assets):
