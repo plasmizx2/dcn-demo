@@ -57,5 +57,9 @@ TASK_TRAINING_TIMEOUT_SECONDS: int = 300  # 5 minutes
 # Max minutes a job may run before the maintenance loop force-fails it
 MAX_JOB_DURATION_MINUTES: int = 60  # 1 hour
 
+# ── Stripe ───────────────────────────────────────────────────
+# Stripe's minimum charge is $0.50; keep cents here so it's obvious
+STRIPE_MINIMUM_CHARGE_CENTS: int = 50
+
 # ── Aggregation ─────────────────────────────────────────────
 CONCAT_TASK_TYPES: set[str] = set()

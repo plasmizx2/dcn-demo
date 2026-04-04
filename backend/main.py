@@ -15,6 +15,7 @@ from apis.jobs import router as jobs_router
 from apis.monitor import router as monitor_router
 from apis.workers import router as workers_router
 from apis.feedback import router as feedback_router
+from apis.billing import router as billing_router
 from auth import (
     find_or_create_oauth_user, create_session, get_session, destroy_session,
     update_user_role, list_users,
@@ -202,6 +203,42 @@ async def _migrate_jobs_user_fk_to_dcn_users(conn) -> None:
     logger.info("Added jobs.user_id foreign key to dcn_users")
 
 
+async def _migrate_billing_tables(conn) -> None:
+    """Add stripe_accounts, payments tables and jobs.payment_intent_id column."""
+    await conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS stripe_accounts (
+            id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id             UUID UNIQUE NOT NULL REFERENCES dcn_users(id) ON DELETE CASCADE,
+            stripe_account_id   TEXT NOT NULL,
+            status              TEXT NOT NULL DEFAULT 'pending',
+            created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS payments (
+            id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            job_id          UUID REFERENCES jobs(id) ON DELETE SET NULL,
+            user_id         UUID REFERENCES dcn_users(id) ON DELETE SET NULL,
+            stripe_id       TEXT,
+            amount_cents    INTEGER NOT NULL DEFAULT 0,
+            status          TEXT NOT NULL DEFAULT 'pending',
+            payment_type    TEXT NOT NULL DEFAULT 'charge',
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        """
+    )
+    await conn.execute(
+        "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS payment_intent_id TEXT"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_payments_job_id ON payments(job_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id)"
+    )
+    logger.info("Billing tables and jobs.payment_intent_id column ensured")
+
+
 async def _migrate_job_tasks_retry_columns(conn) -> None:
     """Add claim_after + failure_count for requeue-on-fail with cooldown."""
     exists = await conn.fetchval(
@@ -275,6 +312,11 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error("job_tasks retry columns migration failed: %s", e, exc_info=True)
             raise
+        try:
+            await _migrate_billing_tables(conn)
+        except Exception as e:
+            logger.error("Billing tables migration failed: %s", e, exc_info=True)
+            raise
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS bug_reports (
                 id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -321,6 +363,7 @@ app.include_router(jobs_router)
 app.include_router(monitor_router)
 app.include_router(workers_router)
 app.include_router(feedback_router)
+app.include_router(billing_router)
 
 _spa_assets = os.path.join(WEB_DIST, "assets")
 if os.path.isdir(_spa_assets):
@@ -650,6 +693,11 @@ async def serve_report_bug():
 
 @app.get("/waitlist")
 async def serve_waitlist():
+    return _spa_index()
+
+
+@app.get("/worker/stripe")
+async def serve_worker_stripe():
     return _spa_index()
 
 
