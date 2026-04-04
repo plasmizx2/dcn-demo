@@ -131,7 +131,7 @@ async def create_job(job: JobCreate, request: Request) -> dict:
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e)) from e
             _estimate = estimate_job_cost(_subtasks_preview)
-            paygo_deduction_cents = billing.dollars_to_cents(_estimate["estimated_total"])
+            paygo_deduction_cents = billing._dollars_to_cents_raw(_estimate["estimated_total"])
             async with pool.acquire() as conn:
                 current_balance = await conn.fetchval(
                     "SELECT balance_cents FROM dcn_users WHERE id = $1::uuid", user["id"],
