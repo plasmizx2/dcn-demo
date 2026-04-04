@@ -224,10 +224,14 @@ async def handle_webhook_event(event) -> None:
     etype = event.type
     data = event.data.object
 
+    logger.info("Processing webhook event type: %s", etype)
+
     if etype == "checkout.session.completed":
         user_id = data.metadata.get("dcn_user_id")
         topup_amount = data.metadata.get("topup_amount_cents")
         sub_id = data.subscription
+
+        logger.info("checkout.session.completed: user_id=%s, topup_amount=%s, sub_id=%s", user_id, topup_amount, sub_id)
 
         if user_id and topup_amount:
             # Top-up: credit user balance
