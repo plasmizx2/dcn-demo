@@ -203,42 +203,6 @@ async def _migrate_jobs_user_fk_to_dcn_users(conn) -> None:
     logger.info("Added jobs.user_id foreign key to dcn_users")
 
 
-async def _migrate_billing_tables(conn) -> None:
-    """Add stripe_accounts, payments tables and jobs.payment_intent_id column."""
-    await conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS stripe_accounts (
-            id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id             UUID UNIQUE NOT NULL REFERENCES dcn_users(id) ON DELETE CASCADE,
-            stripe_account_id   TEXT NOT NULL,
-            status              TEXT NOT NULL DEFAULT 'pending',
-            created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
-        CREATE TABLE IF NOT EXISTS payments (
-            id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            job_id          UUID REFERENCES jobs(id) ON DELETE SET NULL,
-            user_id         UUID REFERENCES dcn_users(id) ON DELETE SET NULL,
-            stripe_id       TEXT,
-            amount_cents    INTEGER NOT NULL DEFAULT 0,
-            status          TEXT NOT NULL DEFAULT 'pending',
-            payment_type    TEXT NOT NULL DEFAULT 'charge',
-            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
-        """
-    )
-    await conn.execute(
-        "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS payment_intent_id TEXT"
-    )
-    await conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_payments_job_id ON payments(job_id)"
-    )
-    await conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id)"
-    )
-    logger.info("Billing tables and jobs.payment_intent_id column ensured")
-
-
 async def _migrate_job_tasks_retry_columns(conn) -> None:
     """Add claim_after + failure_count for requeue-on-fail with cooldown."""
     exists = await conn.fetchval(
@@ -264,52 +228,46 @@ async def _migrate_job_tasks_retry_columns(conn) -> None:
 
 
 async def _migrate_billing_tables(conn) -> None:
-    """Add Stripe billing tables and tier/stripe columns on users & workers."""
-    # User tier + Stripe customer ID
+    """Add all Stripe billing tables, columns, and indexes."""
+    # ── User tier + Stripe IDs ──
     await conn.execute("ALTER TABLE dcn_users ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'free'")
     await conn.execute("ALTER TABLE dcn_users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT")
     await conn.execute("ALTER TABLE dcn_users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT")
 
-    # Worker Stripe Connect account ID
-    exists = await conn.fetchval(
-        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='worker_nodes')"
-    )
-    if exists:
-        await conn.execute("ALTER TABLE worker_nodes ADD COLUMN IF NOT EXISTS stripe_connect_id TEXT")
+    # ── Stripe Connect accounts (worker payouts) ──
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS stripe_accounts (
+            id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id             UUID UNIQUE NOT NULL REFERENCES dcn_users(id) ON DELETE CASCADE,
+            stripe_account_id   TEXT NOT NULL,
+            status              TEXT NOT NULL DEFAULT 'pending',
+            created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """)
 
-    # Payments table — tracks each Payment Intent per job
+    # ── Payments ledger (charges + payouts) ──
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS payments (
-            id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            job_id                  UUID REFERENCES jobs(id) ON DELETE CASCADE,
-            user_id                 UUID NOT NULL REFERENCES dcn_users(id) ON DELETE CASCADE,
-            stripe_payment_intent_id TEXT UNIQUE,
-            amount_cents            INTEGER NOT NULL,
-            platform_fee_cents      INTEGER NOT NULL DEFAULT 0,
-            currency                TEXT NOT NULL DEFAULT 'usd',
-            status                  TEXT NOT NULL DEFAULT 'pending',
-            created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            job_id          UUID REFERENCES jobs(id) ON DELETE SET NULL,
+            user_id         UUID REFERENCES dcn_users(id) ON DELETE SET NULL,
+            stripe_id       TEXT,
+            amount_cents    INTEGER NOT NULL DEFAULT 0,
+            status          TEXT NOT NULL DEFAULT 'pending',
+            payment_type    TEXT NOT NULL DEFAULT 'charge',
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     """)
 
-    # Worker payouts table — tracks transfers to worker Connect accounts
-    await conn.execute("""
-        CREATE TABLE IF NOT EXISTS worker_payouts (
-            id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            job_id            UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
-            worker_node_id    UUID NOT NULL,
-            stripe_transfer_id TEXT UNIQUE,
-            amount_cents      INTEGER NOT NULL,
-            status            TEXT NOT NULL DEFAULT 'pending',
-            created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-    """)
+    # ── Jobs payment intent tracking ──
+    await conn.execute("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS payment_intent_id TEXT")
 
+    # ── Indexes ──
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_payments_job_id ON payments(job_id)")
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id)")
     await conn.execute("CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_worker_payouts_job_id ON worker_payouts(job_id)")
-    await conn.execute("CREATE INDEX IF NOT EXISTS idx_worker_payouts_status ON worker_payouts(status)")
+
     logger.info("Billing tables and columns migrated")
 
 
