@@ -150,7 +150,7 @@ async def create_pro_subscription(user_id: str, email: str) -> dict:
         customer=customer_id,
         mode="subscription",
         line_items=[{"price": STRIPE_PRO_PRICE_ID, "quantity": 1}],
-        success_url=f"{BASE_URL}/account?upgrade=success",
+        success_url=f"{BASE_URL}/account?upgrade=success&session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{BASE_URL}/account?upgrade=cancelled",
         metadata={"dcn_user_id": uid},
     )
@@ -227,6 +227,38 @@ async def verify_and_credit_topup(session_id: str, user_id: str) -> dict:
                 str(user_id), amount_cents, new_balance, session_id, f"Top-up ${amount_cents/100:.2f}",
             )
     return {"credited": True, "balance_cents": new_balance, "amount_cents": amount_cents}
+
+
+async def verify_and_activate_pro(session_id: str, user_id: str) -> dict:
+    """Verify a Pro subscription Checkout session and activate Pro tier."""
+    from database import get_pool
+
+    session = stripe.checkout.Session.retrieve(session_id)
+    if session.payment_status != "paid":
+        return {"activated": False, "reason": "not_paid"}
+
+    session_user = getattr(session.metadata, "dcn_user_id", None) if session.metadata else None
+    sub_id = session.subscription
+
+    if not sub_id or str(session_user) != str(user_id):
+        return {"activated": False, "reason": "invalid_metadata"}
+
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        # Check if already activated for this subscription
+        already = await conn.fetchval(
+            "SELECT 1 FROM dcn_users WHERE id = $1::uuid AND stripe_subscription_id = $2",
+            str(user_id), sub_id,
+        )
+        if already:
+            return {"activated": False, "reason": "already_activated"}
+
+        async with conn.transaction():
+            await conn.execute(
+                "UPDATE dcn_users SET tier = 'pro', stripe_subscription_id = $1 WHERE id = $2::uuid",
+                sub_id, str(user_id),
+            )
+    return {"activated": True, "tier": "pro", "subscription_id": sub_id}
 
 
 async def cancel_pro_subscription(user_id: str) -> bool:
