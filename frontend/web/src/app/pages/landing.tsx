@@ -14,6 +14,7 @@ import {
 import { useEffect, useState } from 'react';
 import { DCNVisualization } from '../components/dcn-visualization';
 import { useAuth } from '../hooks/use-auth';
+import { TierBadge } from '../components/stripe-payment';
 
 export function LandingPage() {
   const { user, loading: authLoading } = useAuth();
@@ -128,6 +129,9 @@ export function LandingPage() {
                 <span className="hidden sm:inline text-xs md:text-sm text-slate-300 max-w-[160px] truncate">
                   {user.name || user.email}
                 </span>
+                {user.tier && user.role !== 'waitlister' && (
+                  <TierBadge tier={user.tier} />
+                )}
                 {user.role === 'waitlister' ? (
                   <Link
                     to="/waitlist"
@@ -136,12 +140,20 @@ export function LandingPage() {
                     Waitlist
                   </Link>
                 ) : (
-                  <Link
-                    to="/submit"
-                    className="px-3 py-2 md:px-4 md:py-2 text-xs md:text-sm rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 transition-all font-medium"
-                  >
-                    Submit Job
-                  </Link>
+                  <>
+                    <Link
+                      to="/account"
+                      className="px-3 py-2 md:px-4 md:py-2 text-xs md:text-sm rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 transition-all font-medium"
+                    >
+                      Account
+                    </Link>
+                    <Link
+                      to="/submit"
+                      className="px-3 py-2 md:px-4 md:py-2 text-xs md:text-sm rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 transition-all font-medium"
+                    >
+                      Submit Job
+                    </Link>
+                  </>
                 )}
                 {(user.role === 'admin' || user.role === 'ceo') && (
                   <Link

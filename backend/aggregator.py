@@ -8,6 +8,8 @@ and produces a structured comparison report.
 import asyncio
 import logging
 
+from billing import trigger_worker_payouts
+
 logger = logging.getLogger("dcn.aggregator")
 
 
@@ -80,6 +82,14 @@ async def aggregate_job(conn, job_id: str) -> bool:
         """,
         job_id,
     )
+
+    # Trigger worker payouts
+    if job_status == 'completed':
+        try:
+            await trigger_worker_payouts(job_id)
+        except Exception as e:
+            logger.error("Payout processing failed for job %s: %s", job_id, e)
+            # Don't fail aggregation — payouts can be retried
 
     return True
 

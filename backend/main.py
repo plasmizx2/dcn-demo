@@ -263,6 +263,56 @@ async def _migrate_job_tasks_retry_columns(conn) -> None:
     logger.info("Ensured job_tasks.claim_after and job_tasks.failure_count exist")
 
 
+async def _migrate_billing_tables(conn) -> None:
+    """Add Stripe billing tables and tier/stripe columns on users & workers."""
+    # User tier + Stripe customer ID
+    await conn.execute("ALTER TABLE dcn_users ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'free'")
+    await conn.execute("ALTER TABLE dcn_users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT")
+    await conn.execute("ALTER TABLE dcn_users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT")
+
+    # Worker Stripe Connect account ID
+    exists = await conn.fetchval(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='worker_nodes')"
+    )
+    if exists:
+        await conn.execute("ALTER TABLE worker_nodes ADD COLUMN IF NOT EXISTS stripe_connect_id TEXT")
+
+    # Payments table — tracks each Payment Intent per job
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS payments (
+            id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            job_id                  UUID REFERENCES jobs(id) ON DELETE CASCADE,
+            user_id                 UUID NOT NULL REFERENCES dcn_users(id) ON DELETE CASCADE,
+            stripe_payment_intent_id TEXT UNIQUE,
+            amount_cents            INTEGER NOT NULL,
+            platform_fee_cents      INTEGER NOT NULL DEFAULT 0,
+            currency                TEXT NOT NULL DEFAULT 'usd',
+            status                  TEXT NOT NULL DEFAULT 'pending',
+            created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """)
+
+    # Worker payouts table — tracks transfers to worker Connect accounts
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS worker_payouts (
+            id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            job_id            UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+            worker_node_id    UUID NOT NULL,
+            stripe_transfer_id TEXT UNIQUE,
+            amount_cents      INTEGER NOT NULL,
+            status            TEXT NOT NULL DEFAULT 'pending',
+            created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """)
+
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_payments_job_id ON payments(job_id)")
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status)")
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_worker_payouts_job_id ON worker_payouts(job_id)")
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_worker_payouts_status ON worker_payouts(status)")
+    logger.info("Billing tables and columns migrated")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start up: connect to DB, create static cache table, + start maintenance. Shut down: clean up."""

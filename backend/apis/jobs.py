@@ -7,7 +7,7 @@ from fastapi.responses import Response
 from database import get_pool
 from schemas import JobCreate
 from planner import plan_tasks
-from config import VALID_TASK_TYPES, MIN_PRIORITY, MAX_PRIORITY, MIN_REWARD
+from config import VALID_TASK_TYPES, MIN_PRIORITY, MAX_PRIORITY, MIN_REWARD, FREE_TIER_DAILY_JOB_LIMIT
 from auth import get_session, ELEVATED_ROLES
 from pricing import estimate_job_cost, calculate_actual_cost
 from rate_limit import check_rate_limit
@@ -96,13 +96,40 @@ async def create_job(job: JobCreate, request: Request) -> dict:
             detail="Waitlist accounts cannot submit jobs yet",
         )
 
-    # ── Payment gate (skipped when Stripe is not configured) ──────────────────
-    if billing.is_enabled():
-        if not job.payment_intent_id:
-            raise HTTPException(
-                status_code=402,
-                detail="Payment required — create a PaymentIntent via POST /billing/create-payment-intent first",
+    # ── Tier enforcement + payment gate ─────────────────────────
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        user_tier = await conn.fetchval(
+            "SELECT tier FROM dcn_users WHERE id = $1::uuid", user["id"],
+        )
+    user_tier = user_tier or "free"
+
+    if user_tier == "free":
+        # Enforce daily job limit
+        async with pool.acquire() as conn:
+            today_count = await conn.fetchval(
+                """
+                SELECT COUNT(*) FROM jobs
+                WHERE user_id = $1::uuid
+                  AND created_at >= CURRENT_DATE
+                """,
+                user["id"],
             )
+        if today_count >= FREE_TIER_DAILY_JOB_LIMIT:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Free tier limit: {FREE_TIER_DAILY_JOB_LIMIT} jobs per day. Upgrade to pay-as-you-go or Pro for unlimited jobs.",
+            )
+
+    # Pay-as-you-go requires payment when Stripe is active
+    if user_tier == "paygo" and billing.is_enabled() and not job.payment_intent_id:
+        raise HTTPException(
+            status_code=402,
+            detail="Pay-as-you-go tier requires payment. Create a payment intent first via /billing/create-payment-intent.",
+        )
+
+    # Verify the payment intent if provided
+    if job.payment_intent_id and billing.is_enabled():
         try:
             pi = billing.retrieve_payment_intent(job.payment_intent_id)
         except Exception:
@@ -112,6 +139,7 @@ async def create_job(job: JobCreate, request: Request) -> dict:
                 status_code=402,
                 detail=f"Payment not confirmed (status: {pi['status']}) — complete payment before submitting",
             )
+
 
     if not job.title or not job.title.strip():
         raise HTTPException(status_code=400, detail="Job title is required")
@@ -127,7 +155,6 @@ async def create_job(job: JobCreate, request: Request) -> dict:
             status_code=400,
             detail=f"Priority must be between {MIN_PRIORITY} and {MAX_PRIORITY}",
         )
-    pool = await get_pool()
     async with pool.acquire() as conn:
         async with conn.transaction():
             # Plan subtasks first so we can price the job
@@ -208,6 +235,10 @@ async def create_job(job: JobCreate, request: Request) -> dict:
                 row["id"],
                 f"Job split into {len(subtasks)} tasks",
             )
+
+            # Link payment intent to the newly created job
+            if job.payment_intent_id:
+                await link_payment_to_job(job.payment_intent_id, str(row["id"]))
 
     result = dict(row)
     result["task_count"] = len(subtasks)

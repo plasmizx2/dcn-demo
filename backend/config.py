@@ -63,3 +63,6 @@ STRIPE_MINIMUM_CHARGE_CENTS: int = 50
 
 # ── Aggregation ─────────────────────────────────────────────
 CONCAT_TASK_TYPES: set[str] = set()
+
+# ── User Tiers ──────────────────────────────────────────────
+FREE_TIER_DAILY_JOB_LIMIT: int = 3

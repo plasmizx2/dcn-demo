@@ -5,6 +5,7 @@ export interface AuthUser {
   name: string;
   avatar_url: string | null;
   role: string;
+  tier?: string;
 }
 
 /** Loads current user from cookie-backed GET /auth/me (same-origin). */

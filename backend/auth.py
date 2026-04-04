@@ -88,7 +88,7 @@ async def get_session(request: Request) -> dict | None:
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            """SELECT u.id, u.email, u.name, u.avatar_url, u.role
+            """SELECT u.id, u.email, u.name, u.avatar_url, u.role, u.tier
                FROM sessions s
                JOIN dcn_users u ON s.user_id = u.id
                WHERE s.token_id = $1""",
@@ -101,6 +101,7 @@ async def get_session(request: Request) -> dict | None:
                 "name": row["name"],
                 "avatar_url": row["avatar_url"],
                 "role": row["role"],
+                "tier": row.get("tier", "free"),
             }
     return None
 
@@ -221,7 +222,7 @@ ADMIN_PAGES = {"/ops", "/jobs", "/results", "/worker-logs", "/admin/users"}
 # API routes that require admin (or ceo) role
 ADMIN_API_PREFIXES = ["/monitor/"]
 # Pages that require any authenticated user (non-admin)
-AUTH_REQUIRED_PAGES = {"/submit", "/my-jobs", "/report-bug"}
+AUTH_REQUIRED_PAGES = {"/submit", "/account", "/my-jobs", "/report-bug"}
 # Prefixes that don't need auth
 # OAuth callbacks must be reachable without a session; do not use blanket "/auth/" or /auth/users would be public.
 PUBLIC_PREFIXES = [
@@ -237,4 +238,6 @@ PUBLIC_PREFIXES = [
     "/datasets",
     "/contact",
     "/waitlist",
+    "/billing/webhooks",
+    "/billing/config",
 ]
