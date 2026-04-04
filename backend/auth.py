@@ -222,7 +222,7 @@ ADMIN_PAGES = {"/ops", "/jobs", "/results", "/worker-logs", "/admin/users"}
 # API routes that require admin (or ceo) role
 ADMIN_API_PREFIXES = ["/monitor/"]
 # Pages that require any authenticated user (non-admin)
-AUTH_REQUIRED_PAGES = {"/submit", "/my-jobs", "/report-bug"}
+AUTH_REQUIRED_PAGES = {"/submit", "/account", "/my-jobs", "/report-bug"}
 # Prefixes that don't need auth
 # OAuth callbacks must be reachable without a session; do not use blanket "/auth/" or /auth/users would be public.
 PUBLIC_PREFIXES = [

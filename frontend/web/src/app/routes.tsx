@@ -6,6 +6,7 @@ import { MyJobsPage } from "./pages/my-jobs";
 import { DashboardPage } from "./pages/dashboard";
 import { Navigate, useLocation } from "react-router";
 import { AllJobsPage } from "./pages/all-jobs";
+import { AccountPage } from "./pages/account";
 
 function RedirectResultsToJobs() {
   const { hash } = useLocation();
@@ -30,6 +31,10 @@ export const router = createBrowserRouter([
   {
     path: "/submit",
     Component: SubmitJobPage,
+  },
+  {
+    path: "/account",
+    Component: AccountPage,
   },
   {
     path: "/my-jobs",
