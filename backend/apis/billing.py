@@ -421,8 +421,13 @@ async def stripe_webhook(request: Request):
 
     try:
         event = billing.construct_webhook_event(payload, sig)
-    except Exception:
+    except Exception as e:
+        logger.error("Webhook signature verification failed: %s", e, exc_info=True)
         raise HTTPException(status_code=400, detail="Invalid signature")
 
-    await billing.handle_webhook_event(event)
+    try:
+        await billing.handle_webhook_event(event)
+    except Exception as e:
+        logger.error("Webhook event processing failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Event processing failed") from e
     return {"received": True}
