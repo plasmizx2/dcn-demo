@@ -4,7 +4,7 @@ import {
   buildJobInputPayload,
   type DatasetMode,
 } from '../components/dataset-source-section';
-import { StripePaymentModal, TierBadge } from '../components/stripe-payment';
+import { TierBadge } from '../components/stripe-payment';
 import { motion } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
 import { Sparkles, Loader2, CheckCircle2, AlertCircle, Wallet, CreditCard, Zap, Crown } from 'lucide-react';
@@ -48,9 +48,7 @@ export function SubmitJobPage() {
 
   // Billing state
   const [tierInfo, setTierInfo] = useState<TierInfo | null>(null);
-  const [showPayment, setShowPayment] = useState(false);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [balance, setBalance] = useState<number>(0);
 
   const inputPayload = useMemo(
     () =>
@@ -58,13 +56,19 @@ export function SubmitJobPage() {
     [datasetMode, builtInName, openmlId, csvUrl, uploadToken, targetOverride],
   );
 
-  // Fetch user tier on mount
+  // Fetch user tier and balance on mount
   useEffect(() => {
     if (!ready) return;
     fetch('/billing/tier', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: TierInfo | null) => {
         if (data) setTierInfo(data);
+      })
+      .catch(() => {});
+    fetch("/billing/balance", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) setBalance(data.balance_cents ?? 0);
       })
       .catch(() => {});
   }, [ready]);
@@ -137,7 +141,7 @@ export function SubmitJobPage() {
     return true;
   };
 
-  const submitJob = async (piId?: string) => {
+  const submitJob = async () => {
     setLoading(true);
     try {
       const response = await fetch('/jobs', {
@@ -149,9 +153,13 @@ export function SubmitJobPage() {
           description,
           task_type: taskType,
           input_payload: inputPayload,
-          ...(piId ? { payment_intent_id: piId } : {}),
         }),
       });
+
+      if (response.status === 402) {
+        toast.error("Insufficient balance. Please top up your account.");
+        return;
+      }
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
@@ -164,9 +172,6 @@ export function SubmitJobPage() {
       toast.success('Job submitted successfully!');
       setTitle('');
       setDescription('');
-      setShowPayment(false);
-      setClientSecret(null);
-      setPaymentIntentId(null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to submit job');
     } finally {
@@ -174,44 +179,14 @@ export function SubmitJobPage() {
     }
   };
 
+  const insufficientBalance = tierInfo?.tier === "paygo" && estimate != null && balance < Math.round(estimate.estimated_total * 100);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    const tier = tierInfo?.tier || 'free';
-
-    if (tier === 'paygo') {
-      // Create payment intent first, then show Stripe Elements
-      setLoading(true);
-      try {
-        const res = await fetch('/billing/create-payment-intent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ task_type: taskType, input_payload: inputPayload }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error((err as { detail?: string }).detail || 'Failed to create payment');
-        }
-        const data = await res.json();
-        setClientSecret(data.client_secret);
-        setPaymentIntentId(data.payment_intent_id);
-        setShowPayment(true);
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Payment setup failed');
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
-    // Free tier or Pro tier — submit directly
+    // All tiers submit directly now — backend handles balance deduction for paygo
     await submitJob();
-  };
-
-  const handlePaymentSuccess = async (piId: string) => {
-    await submitJob(piId);
   };
 
   const handleUpgrade = async (tier: string) => {
@@ -269,31 +244,6 @@ export function SubmitJobPage() {
           <div className="grid md:grid-cols-3 gap-6">
             {/* Form */}
             <div className="md:col-span-2">
-              {/* Payment modal overlay */}
-              {showPayment && clientSecret && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mb-6 bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-purple-500/30 p-6"
-                >
-                  <div className="flex items-center gap-2 mb-4">
-                    <CreditCard className="w-5 h-5 text-purple-400" />
-                    <h3 className="font-semibold text-white">Payment required</h3>
-                    <span className="ml-auto text-sm text-slate-400">
-                      {estimate ? money(estimate.estimated_total) : ''}
-                    </span>
-                  </div>
-                  <StripePaymentModal
-                    clientSecret={clientSecret}
-                    onSuccess={handlePaymentSuccess}
-                    onCancel={() => {
-                      setShowPayment(false);
-                      setClientSecret(null);
-                    }}
-                  />
-                </motion.div>
-              )}
-
               <form onSubmit={handleSubmit} className="bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-white/10 p-8">
                 {jobId && (
                   <motion.div
@@ -323,7 +273,7 @@ export function SubmitJobPage() {
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="e.g., Compare ML models on dataset X"
                       className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-white/10 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 outline-none transition-all text-white placeholder:text-slate-500"
-                      disabled={loading || showPayment}
+                      disabled={loading}
                     />
                   </div>
 
@@ -336,7 +286,7 @@ export function SubmitJobPage() {
                       value={taskType}
                       onChange={(e) => setTaskType(e.target.value)}
                       className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-white/10 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 outline-none transition-all text-white"
-                      disabled={loading || showPayment}
+                      disabled={loading}
                     >
                       <option value="ml_experiment">ML Experiment</option>
                     </select>
@@ -346,7 +296,7 @@ export function SubmitJobPage() {
                   </div>
 
                   <DatasetSourceSection
-                    disabled={loading || showPayment}
+                    disabled={loading}
                     mode={datasetMode}
                     onModeChange={(m) => {
                       setDatasetMode(m);
@@ -375,37 +325,44 @@ export function SubmitJobPage() {
                       placeholder="Describe your task in detail. What do you want to accomplish? The AI will plan and distribute the workload automatically."
                       rows={8}
                       className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-white/10 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 outline-none transition-all text-white placeholder:text-slate-500 resize-none"
-                      disabled={loading || showPayment}
+                      disabled={loading}
                     />
                     <p className="mt-2 text-xs text-slate-500">
                       The more detail you provide, the better DCN can plan your job
                     </p>
                   </div>
 
-                  {/* Submit Button */}
-                  {!showPayment && (
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full px-6 py-4 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 disabled:from-purple-500/50 disabled:to-blue-500/50 text-white font-semibold shadow-lg shadow-purple-500/50 transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed"
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          {tierInfo?.tier === 'paygo' ? 'Setting up payment...' : 'Submitting...'}
-                        </>
-                      ) : (
-                        <>
-                          {tierInfo?.tier === 'paygo' ? (
-                            <CreditCard className="w-5 h-5" />
-                          ) : (
-                            <Sparkles className="w-5 h-5" />
-                          )}
-                          {tierInfo?.tier === 'paygo' ? 'Pay & Submit' : 'Submit Job'}
-                        </>
-                      )}
-                    </button>
+                  {/* Insufficient balance warning */}
+                  {insufficientBalance && (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                      <p className="text-sm text-amber-300">
+                        Insufficient balance.{" "}
+                        <a href="/account" className="underline hover:text-amber-200 transition-colors">
+                          Top up your account
+                        </a>
+                      </p>
+                    </div>
                   )}
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={loading || !!insufficientBalance}
+                    className="w-full px-6 py-4 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 disabled:from-purple-500/50 disabled:to-blue-500/50 text-white font-semibold shadow-lg shadow-purple-500/50 transition-all flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-5 h-5" />
+                        Submit Job
+                      </>
+                    )}
+                  </button>
                 </div>
               </form>
             </div>
@@ -444,6 +401,11 @@ export function SubmitJobPage() {
                     {tierInfo?.tier === 'pro' && (
                       <p className="text-xs text-purple-400">
                         Pro: unlimited jobs, no per-job fees
+                      </p>
+                    )}
+                    {tierInfo?.tier === "paygo" && (
+                      <p className={`text-xs ${insufficientBalance ? "text-amber-400" : "text-emerald-400"}`}>
+                        Balance: {money(balance / 100)}
                       </p>
                     )}
                   </div>
