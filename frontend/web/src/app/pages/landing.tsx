@@ -19,21 +19,24 @@ export function LandingPage() {
   const { user, loading: authLoading } = useAuth();
   const [stats, setStats] = useState({
     jobs: 0,
-    tasks: 0,
+    tasksComplete: 0,
     completed: 0,
-    workers: 0
+    workers: 0,
   });
 
   useEffect(() => {
-    // Fetch stats with animation
-    fetch('/stats').then(r => r.json()).then(data => {
-      setStats({
-        jobs: data.total_jobs || 0,
-        tasks: data.total_tasks || 0,
-        completed: data.completed_jobs || 0,
-        workers: data.total_workers ?? data.worker_count ?? 0,
-      });
-    }).catch(() => {});
+    // Fetch stats with animation (/stats is same-origin; credentials not required)
+    fetch('/stats')
+      .then((r) => r.json())
+      .then((data) => {
+        setStats({
+          jobs: data.total_jobs || 0,
+          tasksComplete: data.completed_tasks ?? data.total_tasks ?? 0,
+          completed: data.completed_jobs || 0,
+          workers: data.total_workers ?? data.worker_count ?? 0,
+        });
+      })
+      .catch(() => {});
   }, []);
 
   const features = [
@@ -200,8 +203,13 @@ export function LandingPage() {
               and executes your workload across thousands of worker nodes in real-time.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 md:gap-4">
-              {user ? (
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 md:gap-4 min-h-[52px]">
+              {authLoading ? (
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full sm:w-auto">
+                  <div className="h-12 w-full sm:min-w-[220px] rounded-xl bg-white/10 animate-pulse" aria-hidden />
+                  <div className="h-12 w-full sm:min-w-[120px] rounded-xl bg-white/5 animate-pulse" aria-hidden />
+                </div>
+              ) : user ? (
                 user.role === 'waitlister' ? (
                   <Link
                     to="/waitlist"
@@ -249,8 +257,14 @@ export function LandingPage() {
             {[
               { label: 'Jobs Processed', value: stats.jobs.toLocaleString() },
               { label: 'Active Workers', value: stats.workers.toLocaleString() },
-              { label: 'Tasks Complete', value: stats.tasks.toLocaleString() },
-              { label: 'Success Rate', value: '99.9%' }
+              { label: 'Tasks Complete', value: stats.tasksComplete.toLocaleString() },
+              {
+                label: 'Success Rate',
+                value:
+                  stats.jobs > 0
+                    ? `${Math.min(99.9, Math.round((stats.completed / stats.jobs) * 1000) / 10)}%`
+                    : '—',
+              },
             ].map((stat, i) => (
               <motion.div
                 key={i}
