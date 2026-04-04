@@ -66,14 +66,39 @@ export function AccountPage() {
     }
   };
 
-  // Check URL params for topup success
+  // Check URL params for topup success — verify and credit via backend
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("topup") === "success") {
-      toast.success("Balance topped up!");
+      const sessionId = params.get("session_id");
+      if (sessionId) {
+        fetch("/billing/verify-topup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ session_id: sessionId }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.credited) {
+              toast.success(`Balance topped up by ${money(data.amount_cents)}!`);
+            } else if (data.reason === "already_credited") {
+              toast.success("Balance already credited!");
+            } else {
+              toast.error("Could not verify payment. It may take a moment.");
+            }
+            fetchBalance();
+            fetchTransactions();
+          })
+          .catch(() => toast.error("Could not verify payment"));
+      } else {
+        toast.success("Payment completed! Balance will update shortly.");
+        fetchBalance();
+      }
       // Clean up the URL
       const url = new URL(window.location.href);
       url.searchParams.delete("topup");
+      url.searchParams.delete("session_id");
       window.history.replaceState({}, "", url.pathname + url.search);
     }
   }, []);
