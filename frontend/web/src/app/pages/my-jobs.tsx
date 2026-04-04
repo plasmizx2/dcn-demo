@@ -123,6 +123,9 @@ export function MyJobsPage() {
         a.click();
         URL.revokeObjectURL(url);
         toast.success(`Downloaded as ${format.toUpperCase()}`);
+      } else {
+        const err = await response.json().catch(() => ({}));
+        toast.error((err as { detail?: string }).detail || 'Export failed');
       }
     } catch (error) {
       toast.error('Failed to download');
