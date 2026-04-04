@@ -412,6 +412,7 @@ async def admin_list_payouts(request: Request):
 @router.post("/webhooks")
 async def stripe_webhook(request: Request):
     """Stripe webhook endpoint — verifies signature and processes events."""
+    logger.info("Webhook received")
     payload = await request.body()
     sig = request.headers.get("stripe-signature", "")
 
@@ -421,11 +422,13 @@ async def stripe_webhook(request: Request):
 
     try:
         event = billing.construct_webhook_event(payload, sig)
+        logger.info("Webhook signature verified, event type: %s", event.type)
     except Exception as e:
         logger.error("Webhook signature verification failed: %s", e, exc_info=True)
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     try:
+        logger.info("Handling webhook event: %s", event.type)
         await billing.handle_webhook_event(event)
     except Exception as e:
         logger.error("Webhook event processing failed: %s", e, exc_info=True)
