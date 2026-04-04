@@ -1,111 +1,119 @@
 """
-Billing API routes — Stripe payments, subscriptions, Connect, webhooks.
+Billing API router for DCN.
+
+Endpoints:
+  GET  /billing/config                  — publishable key + enabled flag (public)
+  POST /billing/create-payment-intent   — create PaymentIntent for a job estimate
+  GET  /billing/payment-status/{pi_id}  — check PaymentIntent status
+  GET  /billing/tier                    — current user's tier
+  POST /billing/upgrade                 — change tier (free/paygo/pro)
+  POST /billing/connect/onboard         — start Stripe Connect onboarding for worker
+  GET  /billing/connect/status          — worker's Connect account status
+  GET  /billing/payouts                 — payout history for the current user
+  POST /billing/webhooks                — Stripe webhook handler (Stripe-signed)
+  GET  /billing/admin/payments          — admin payment list
+  GET  /billing/admin/payouts           — admin payout list
 """
-
 import logging
+
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import Optional
 
-import stripe
-
-from auth import get_session, ELEVATED_ROLES
 from database import get_pool
-from billing import (
-    STRIPE_PUBLISHABLE_KEY,
-    STRIPE_WEBHOOK_SECRET,
-    create_payment_intent,
-    verify_payment_intent,
-    create_pro_subscription,
-    cancel_pro_subscription,
-    create_worker_connect_link,
-    get_worker_connect_status,
-    handle_webhook_event,
-    refund_payment,
-    _dollars_to_cents,
-)
-from config import PLATFORM_FEE_PERCENT
-from pricing import estimate_job_cost
-from planner import plan_tasks
+from auth import get_session, ELEVATED_ROLES
+import billing
 
+router = APIRouter(prefix="/billing")
 logger = logging.getLogger("dcn.billing")
-router = APIRouter()
 
 
 # ── Schemas ──────────────────────────────────────────────────
-
-class CreatePaymentIntentRequest(BaseModel):
-    task_type: str
-    input_payload: dict = {}
-
 
 class UpgradeTierRequest(BaseModel):
     tier: str  # "free", "paygo", "pro"
 
 
-class ConnectOnboardRequest(BaseModel):
-    worker_node_id: str
+# ── Public config ────────────────────────────────────────────
 
-
-# ── Public config (publishable key for frontend) ─────────────
-
-@router.get("/billing/config")
-async def billing_config():
-    """Return non-secret Stripe config for the frontend."""
+@router.get("/config")
+async def get_billing_config() -> dict:
+    """Return the Stripe publishable key and whether billing is active. Public endpoint."""
     return {
-        "publishable_key": STRIPE_PUBLISHABLE_KEY,
+        "enabled": billing.is_enabled(),
+        "publishable_key": billing.STRIPE_PUBLISHABLE_KEY if billing.is_enabled() else None,
         "pro_price_monthly": 5.00,
     }
 
 
 # ── Payment Intents ──────────────────────────────────────────
 
-@router.post("/billing/create-payment-intent")
-async def create_payment_intent_route(body: CreatePaymentIntentRequest, request: Request):
-    """Create a PaymentIntent for a pay-as-you-go job. Frontend confirms with Stripe Elements."""
+@router.post("/create-payment-intent")
+async def create_payment_intent(request: Request) -> dict:
+    """
+    Create a Stripe PaymentIntent for a job submission.
+    Body: { amount: float (dollars), job_title: str }
+    Returns: { client_secret, payment_intent_id, amount_cents }
+    """
+    if not billing.is_enabled():
+        raise HTTPException(status_code=503, detail="Billing not configured")
+
     user = await get_session(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    # Estimate cost from planner
     try:
-        subtasks = plan_tasks(body.task_type, body.input_payload)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
 
-    est = estimate_job_cost(subtasks)
-    amount_cents = _dollars_to_cents(est["estimated_total"])
-    fee_cents = _dollars_to_cents(est["platform_fee"])
+    amount_dollars = float(body.get("amount", 0))
+    if amount_dollars <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
 
-    if amount_cents < 50:
-        raise HTTPException(status_code=400, detail="Amount too small for Stripe (minimum $0.50)")
+    job_title = str(body.get("job_title", "DCN Job"))[:255]
+    amount_cents = billing.dollars_to_cents(amount_dollars)
 
-    result = await create_payment_intent(
-        user_id=user["id"],
-        email=user["email"],
-        amount_cents=amount_cents,
-        platform_fee_cents=fee_cents,
-    )
-    result["estimated_cost"] = est
-    return result
+    try:
+        result = billing.create_payment_intent(
+            amount_cents=amount_cents,
+            metadata={
+                "user_id": user["id"],
+                "user_email": user["email"],
+                "job_title": job_title,
+            },
+        )
+    except Exception as exc:
+        logger.error("Failed to create PaymentIntent: %s", exc)
+        raise HTTPException(status_code=502, detail="Payment service unavailable")
+
+    return {
+        "client_secret": result["client_secret"],
+        "payment_intent_id": result["payment_intent_id"],
+        "amount_cents": amount_cents,
+    }
 
 
-@router.get("/billing/payment-status/{payment_intent_id}")
-async def payment_status(payment_intent_id: str, request: Request):
-    """Check the status of a payment intent."""
+@router.get("/payment-status/{pi_id}")
+async def get_payment_status(pi_id: str, request: Request) -> dict:
+    """Return the current status of a PaymentIntent."""
+    if not billing.is_enabled():
+        raise HTTPException(status_code=503, detail="Billing not configured")
+
     user = await get_session(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    row = await verify_payment_intent(payment_intent_id, user["id"])
-    if not row:
-        raise HTTPException(status_code=404, detail="Payment not found")
-    return {"status": row["status"], "amount_cents": row["amount_cents"]}
+    try:
+        return billing.retrieve_payment_intent(pi_id)
+    except Exception as exc:
+        logger.error("Failed to retrieve PaymentIntent %s: %s", pi_id, exc)
+        raise HTTPException(status_code=502, detail="Payment service unavailable")
 
 
 # ── Tier management ──────────────────────────────────────────
 
-@router.get("/billing/tier")
+@router.get("/tier")
 async def get_user_tier(request: Request):
     """Return the authenticated user's current tier."""
     user = await get_session(request)
@@ -128,7 +136,7 @@ async def get_user_tier(request: Request):
     }
 
 
-@router.post("/billing/upgrade")
+@router.post("/upgrade")
 async def upgrade_tier(body: UpgradeTierRequest, request: Request):
     """Change the user's pricing tier."""
     user = await get_session(request)
@@ -142,15 +150,15 @@ async def upgrade_tier(body: UpgradeTierRequest, request: Request):
     pool = await get_pool()
 
     if tier == "pro":
-        # Create Stripe Checkout for subscription
+        if not billing.is_enabled():
+            raise HTTPException(status_code=503, detail="Billing not configured")
         try:
-            result = await create_pro_subscription(user["id"], user["email"])
+            result = await billing.create_pro_subscription(user["id"], user["email"])
             return result
         except ValueError as e:
             raise HTTPException(status_code=500, detail=str(e)) from e
 
     if tier == "paygo":
-        # Just set tier — payment method will be added when they submit a job
         async with pool.acquire() as conn:
             await conn.execute(
                 "UPDATE dcn_users SET tier = 'paygo' WHERE id = $1::uuid",
@@ -159,14 +167,13 @@ async def upgrade_tier(body: UpgradeTierRequest, request: Request):
         return {"tier": "paygo"}
 
     if tier == "free":
-        # Downgrade — cancel subscription if active
         async with pool.acquire() as conn:
             sub_id = await conn.fetchval(
                 "SELECT stripe_subscription_id FROM dcn_users WHERE id = $1::uuid",
                 user["id"],
             )
         if sub_id:
-            await cancel_pro_subscription(user["id"])
+            await billing.cancel_pro_subscription(user["id"])
         else:
             async with pool.acquire() as conn:
                 await conn.execute(
@@ -178,35 +185,126 @@ async def upgrade_tier(body: UpgradeTierRequest, request: Request):
 
 # ── Stripe Connect (worker payouts) ─────────────────────────
 
-@router.post("/billing/connect/onboard")
-async def connect_onboard(body: ConnectOnboardRequest, request: Request):
-    """Generate a Stripe Connect onboarding link for a worker node."""
+@router.post("/connect/onboard")
+async def start_connect_onboarding(request: Request) -> dict:
+    """
+    Create (or look up) a Stripe Express account for the current user
+    and return a one-time onboarding link.
+    """
+    if not billing.is_enabled():
+        raise HTTPException(status_code=503, detail="Billing not configured")
+
     user = await get_session(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
-    if user.get("role") not in ELEVATED_ROLES:
-        raise HTTPException(status_code=403, detail="Admin access required")
 
     try:
-        url = await create_worker_connect_link(body.worker_node_id)
-        return {"onboarding_url": url}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    base_url = str(body.get("base_url", billing.BASE_URL)).rstrip("/")
+
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT stripe_account_id FROM stripe_accounts WHERE user_id = $1::uuid",
+            user["id"],
+        )
+
+    if row and row["stripe_account_id"]:
+        stripe_account_id = row["stripe_account_id"]
+    else:
+        try:
+            stripe_account_id = billing.create_connect_account(user["email"])
+        except Exception as exc:
+            logger.error("Failed to create Connect account for %s: %s", user["email"], exc)
+            raise HTTPException(status_code=502, detail="Payment service unavailable")
+
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO stripe_accounts (user_id, stripe_account_id, status)
+                VALUES ($1::uuid, $2, 'pending')
+                ON CONFLICT (user_id) DO UPDATE
+                  SET stripe_account_id = EXCLUDED.stripe_account_id,
+                      status = 'pending',
+                      updated_at = NOW()
+                """,
+                user["id"],
+                stripe_account_id,
+            )
+
+    try:
+        link_url = billing.create_onboarding_link(
+            account_id=stripe_account_id,
+            return_url=f"{base_url}/worker/stripe?onboarding=complete",
+            refresh_url=f"{base_url}/worker/stripe?onboarding=refresh",
+        )
+    except Exception as exc:
+        logger.error("Failed to create onboarding link for account %s: %s", stripe_account_id, exc)
+        raise HTTPException(status_code=502, detail="Payment service unavailable")
+
+    return {"onboarding_url": link_url, "stripe_account_id": stripe_account_id}
 
 
-@router.get("/billing/connect/status/{worker_node_id}")
-async def connect_status(worker_node_id: str, request: Request):
-    """Check if a worker has completed Stripe Connect setup."""
+@router.get("/connect/status")
+async def get_connect_status(request: Request) -> dict:
+    """Return the current user's Stripe Connect status."""
+    if not billing.is_enabled():
+        return {"connected": False, "reason": "billing_not_configured"}
+
     user = await get_session(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    return await get_worker_connect_status(worker_node_id)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT stripe_account_id, status FROM stripe_accounts WHERE user_id = $1::uuid",
+            user["id"],
+        )
+
+    if not row:
+        return {"connected": False, "account_id": None, "status": "none"}
+
+    if row["status"] == "active":
+        return {"connected": True, "account_id": row["stripe_account_id"], "status": "active"}
+
+    try:
+        acct = billing.retrieve_account(row["stripe_account_id"])
+        return {"connected": acct["payouts_enabled"], "account_id": row["stripe_account_id"], **acct}
+    except Exception:
+        return {"connected": False, "account_id": row["stripe_account_id"], "status": row["status"]}
 
 
-# ── Admin: payment overview ──────────────────────────────────
+@router.get("/payouts")
+async def list_my_payouts(request: Request) -> list[dict]:
+    """Return payout history for the authenticated user."""
+    user = await get_session(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
 
-@router.get("/billing/admin/payments")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT p.id, p.job_id, p.amount_cents, p.status, p.payment_type, p.created_at,
+                   j.title AS job_title
+            FROM payments p
+            LEFT JOIN jobs j ON j.id = p.job_id
+            WHERE p.user_id = $1::uuid
+            ORDER BY p.created_at DESC
+            LIMIT 50
+            """,
+            user["id"],
+        )
+    return [dict(r) for r in rows]
+
+
+# ── Admin endpoints ──────────────────────────────────────────
+
+@router.get("/admin/payments")
 async def admin_list_payments(request: Request):
     """Admin-only: list recent payments."""
     user = await get_session(request)
@@ -228,7 +326,7 @@ async def admin_list_payments(request: Request):
     return [dict(r) for r in rows]
 
 
-@router.get("/billing/admin/payouts")
+@router.get("/admin/payouts")
 async def admin_list_payouts(request: Request):
     """Admin-only: list worker payouts."""
     user = await get_session(request)
@@ -238,32 +336,32 @@ async def admin_list_payouts(request: Request):
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT * FROM worker_payouts ORDER BY created_at DESC LIMIT 100"
+            """
+            SELECT * FROM payments
+            WHERE payment_type = 'payout'
+            ORDER BY created_at DESC
+            LIMIT 100
+            """
         )
     return [dict(r) for r in rows]
 
 
 # ── Webhooks ─────────────────────────────────────────────────
 
-@router.post("/billing/webhooks")
+@router.post("/webhooks")
 async def stripe_webhook(request: Request):
     """Stripe webhook endpoint — verifies signature and processes events."""
     payload = await request.body()
     sig = request.headers.get("stripe-signature", "")
 
-    if not STRIPE_WEBHOOK_SECRET:
-        logger.warning("STRIPE_WEBHOOK_SECRET not set — skipping signature verification")
-        event = stripe.Event.construct_from(
-            stripe.util.convert_to_stripe_object(
-                stripe.util.json.loads(payload)
-            ),
-            stripe.api_key,
-        )
-    else:
-        try:
-            event = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
-        except stripe.SignatureVerificationError:
-            raise HTTPException(status_code=400, detail="Invalid signature")
+    if not billing.STRIPE_WEBHOOK_SECRET:
+        logger.warning("STRIPE_WEBHOOK_SECRET not set — cannot verify webhook")
+        raise HTTPException(status_code=500, detail="Webhook secret not configured")
 
-    await handle_webhook_event(event)
+    try:
+        event = billing.construct_webhook_event(payload, sig)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    await billing.handle_webhook_event(event)
     return {"received": True}

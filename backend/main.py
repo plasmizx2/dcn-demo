@@ -203,6 +203,42 @@ async def _migrate_jobs_user_fk_to_dcn_users(conn) -> None:
     logger.info("Added jobs.user_id foreign key to dcn_users")
 
 
+async def _migrate_billing_tables(conn) -> None:
+    """Add stripe_accounts, payments tables and jobs.payment_intent_id column."""
+    await conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS stripe_accounts (
+            id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id             UUID UNIQUE NOT NULL REFERENCES dcn_users(id) ON DELETE CASCADE,
+            stripe_account_id   TEXT NOT NULL,
+            status              TEXT NOT NULL DEFAULT 'pending',
+            created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS payments (
+            id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            job_id          UUID REFERENCES jobs(id) ON DELETE SET NULL,
+            user_id         UUID REFERENCES dcn_users(id) ON DELETE SET NULL,
+            stripe_id       TEXT,
+            amount_cents    INTEGER NOT NULL DEFAULT 0,
+            status          TEXT NOT NULL DEFAULT 'pending',
+            payment_type    TEXT NOT NULL DEFAULT 'charge',
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        """
+    )
+    await conn.execute(
+        "ALTER TABLE jobs ADD COLUMN IF NOT EXISTS payment_intent_id TEXT"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_payments_job_id ON payments(job_id)"
+    )
+    await conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id)"
+    )
+    logger.info("Billing tables and jobs.payment_intent_id column ensured")
+
+
 async def _migrate_job_tasks_retry_columns(conn) -> None:
     """Add claim_after + failure_count for requeue-on-fail with cooldown."""
     exists = await conn.fetchval(
@@ -707,6 +743,11 @@ async def serve_report_bug():
 
 @app.get("/waitlist")
 async def serve_waitlist():
+    return _spa_index()
+
+
+@app.get("/worker/stripe")
+async def serve_worker_stripe():
     return _spa_index()
 
 

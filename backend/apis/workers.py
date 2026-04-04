@@ -1,3 +1,4 @@
+import asyncio
 import json
 from fastapi import APIRouter, HTTPException, Request
 from database import get_pool
@@ -9,6 +10,7 @@ from config import (
     TASK_FAILURE_RETRY_DELAY_SECONDS,
     TIER_FALLBACK_AFTER_MINUTES,
 )
+import billing
 
 router = APIRouter()
 
@@ -218,6 +220,10 @@ async def complete_task(task_id: str, body: TaskComplete = TaskComplete()) -> di
             if not needs_validation:
                 aggregated = await aggregate_job(conn, task["job_id"])
 
+    # Trigger worker payouts after the transaction commits (fire-and-forget)
+    if aggregated:
+        asyncio.create_task(billing.trigger_worker_payouts(str(task["job_id"])))
+
     return {
         "completed": True,
         "task": dict(updated),
@@ -395,8 +401,11 @@ async def fail_task(task_id: str, body: TaskFail = TaskFail()) -> dict:
                             """,
                             task["job_id"],
                         )
+                        asyncio.create_task(billing.refund_job_payment(str(task["job_id"])))
                     else:
-                        await aggregate_job(conn, task["job_id"])
+                        aggregated_on_fail = await aggregate_job(conn, task["job_id"])
+                        if aggregated_on_fail:
+                            asyncio.create_task(billing.trigger_worker_payouts(str(task["job_id"])))
 
     return {
         "failed": not requeue,

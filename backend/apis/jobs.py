@@ -11,7 +11,6 @@ from config import VALID_TASK_TYPES, MIN_PRIORITY, MAX_PRIORITY, MIN_REWARD, FRE
 from auth import get_session, ELEVATED_ROLES
 from pricing import estimate_job_cost, calculate_actual_cost
 from rate_limit import check_rate_limit
-from billing import verify_payment_intent, link_payment_to_job
 from aggregator import parse_ml_experiments_from_task_rows, sort_ml_experiments_by_metric
 from job_export import (
     build_json_export,
@@ -19,6 +18,7 @@ from job_export import (
     json_dumps_export,
     safe_export_filename,
 )
+import billing
 
 router = APIRouter()
 
@@ -96,7 +96,7 @@ async def create_job(job: JobCreate, request: Request) -> dict:
             detail="Waitlist accounts cannot submit jobs yet",
         )
 
-    # ── Tier enforcement ──────────────────────────────────────
+    # ── Tier enforcement + payment gate ─────────────────────────
     pool = await get_pool()
     async with pool.acquire() as conn:
         user_tier = await conn.fetchval(
@@ -121,16 +121,25 @@ async def create_job(job: JobCreate, request: Request) -> dict:
                 detail=f"Free tier limit: {FREE_TIER_DAILY_JOB_LIMIT} jobs per day. Upgrade to pay-as-you-go or Pro for unlimited jobs.",
             )
 
-    if user_tier == "paygo" and not job.payment_intent_id:
+    # Pay-as-you-go requires payment when Stripe is active
+    if user_tier == "paygo" and billing.is_enabled() and not job.payment_intent_id:
         raise HTTPException(
             status_code=402,
             detail="Pay-as-you-go tier requires payment. Create a payment intent first via /billing/create-payment-intent.",
         )
 
-    if job.payment_intent_id:
-        payment = await verify_payment_intent(job.payment_intent_id, user["id"])
-        if not payment:
-            raise HTTPException(status_code=400, detail="Invalid or unauthorized payment intent")
+    # Verify the payment intent if provided
+    if job.payment_intent_id and billing.is_enabled():
+        try:
+            pi = billing.retrieve_payment_intent(job.payment_intent_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid payment_intent_id")
+        if pi["status"] != "succeeded":
+            raise HTTPException(
+                status_code=402,
+                detail=f"Payment not confirmed (status: {pi['status']}) — complete payment before submitting",
+            )
+
 
     if not job.title or not job.title.strip():
         raise HTTPException(status_code=400, detail="Job title is required")
@@ -175,6 +184,24 @@ async def create_job(job: JobCreate, request: Request) -> dict:
                 reward_amount,
                 job.requires_validation,
             )
+
+            # Record payment in the payments ledger when Stripe is active
+            if billing.is_enabled() and job.payment_intent_id:
+                await conn.execute(
+                    """
+                    INSERT INTO payments (job_id, user_id, stripe_id, amount_cents, status, payment_type)
+                    VALUES ($1, $2, $3, $4, 'succeeded', 'charge')
+                    """,
+                    row["id"],
+                    user["id"],
+                    job.payment_intent_id,
+                    billing.dollars_to_cents(reward_amount),
+                )
+                await conn.execute(
+                    "UPDATE jobs SET payment_intent_id = $1 WHERE id = $2",
+                    job.payment_intent_id,
+                    row["id"],
+                )
 
             # Log a job_created event
             await conn.execute(
