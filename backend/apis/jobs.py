@@ -18,6 +18,7 @@ from job_export import (
     json_dumps_export,
     safe_export_filename,
 )
+import billing
 
 router = APIRouter()
 
@@ -95,6 +96,23 @@ async def create_job(job: JobCreate, request: Request) -> dict:
             detail="Waitlist accounts cannot submit jobs yet",
         )
 
+    # ── Payment gate (skipped when Stripe is not configured) ──────────────────
+    if billing.is_enabled():
+        if not job.payment_intent_id:
+            raise HTTPException(
+                status_code=402,
+                detail="Payment required — create a PaymentIntent via POST /billing/create-payment-intent first",
+            )
+        try:
+            pi = billing.retrieve_payment_intent(job.payment_intent_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid payment_intent_id")
+        if pi["status"] != "succeeded":
+            raise HTTPException(
+                status_code=402,
+                detail=f"Payment not confirmed (status: {pi['status']}) — complete payment before submitting",
+            )
+
     if not job.title or not job.title.strip():
         raise HTTPException(status_code=400, detail="Job title is required")
     if not job.task_type or not job.task_type.strip():
@@ -139,6 +157,24 @@ async def create_job(job: JobCreate, request: Request) -> dict:
                 reward_amount,
                 job.requires_validation,
             )
+
+            # Record payment in the payments ledger when Stripe is active
+            if billing.is_enabled() and job.payment_intent_id:
+                await conn.execute(
+                    """
+                    INSERT INTO payments (job_id, user_id, stripe_id, amount_cents, status, payment_type)
+                    VALUES ($1, $2, $3, $4, 'succeeded', 'charge')
+                    """,
+                    row["id"],
+                    user["id"],
+                    job.payment_intent_id,
+                    billing.dollars_to_cents(reward_amount),
+                )
+                await conn.execute(
+                    "UPDATE jobs SET payment_intent_id = $1 WHERE id = $2",
+                    job.payment_intent_id,
+                    row["id"],
+                )
 
             # Log a job_created event
             await conn.execute(
