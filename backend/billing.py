@@ -131,17 +131,19 @@ async def create_pro_subscription(user_id: str, email: str) -> dict:
 
     from database import get_pool
 
+    uid = str(user_id)
+
     pool = await get_pool()
     async with pool.acquire() as conn:
         customer_id = await conn.fetchval(
-            "SELECT stripe_customer_id FROM dcn_users WHERE id = $1::uuid", user_id,
+            "SELECT stripe_customer_id FROM dcn_users WHERE id = $1::uuid", uid,
         )
         if not customer_id:
-            customer = stripe.Customer.create(email=email, metadata={"dcn_user_id": user_id})
+            customer = stripe.Customer.create(email=email, metadata={"dcn_user_id": uid})
             customer_id = customer.id
             await conn.execute(
                 "UPDATE dcn_users SET stripe_customer_id = $1 WHERE id = $2::uuid",
-                customer_id, user_id,
+                customer_id, uid,
             )
 
     session = stripe.checkout.Session.create(
@@ -150,7 +152,7 @@ async def create_pro_subscription(user_id: str, email: str) -> dict:
         line_items=[{"price": STRIPE_PRO_PRICE_ID, "quantity": 1}],
         success_url=f"{BASE_URL}/account?upgrade=success",
         cancel_url=f"{BASE_URL}/account?upgrade=cancelled",
-        metadata={"dcn_user_id": user_id},
+        metadata={"dcn_user_id": uid},
     )
     return {"checkout_url": session.url, "session_id": session.id}
 
