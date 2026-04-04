@@ -1,7 +1,7 @@
 import { AdminLayout } from '../components/admin-layout';
 import { motion } from 'motion/react';
 import { useState, useEffect } from 'react';
-import { CheckCircle2, Clock, XCircle, Loader2, ExternalLink, Download, Trash2 } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, Loader2, ExternalLink, Download, Trash2, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRequireAuth } from '../hooks/use-require-auth';
 
@@ -264,7 +264,18 @@ export function MyJobsPage() {
 
                       {job.final_output && (
                         <div>
-                          <h4 className="font-semibold text-lg mb-4">Final Output</h4>
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-semibold text-lg">Final Output</h4>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(job.final_output!).then(() => toast.success('Copied'));
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-sm font-medium transition-colors"
+                            >
+                              <Copy className="w-4 h-4" />
+                              Copy
+                            </button>
+                          </div>
                           <div className="max-h-96 overflow-y-auto p-4 rounded-xl bg-slate-950/50 border border-white/10 text-sm text-slate-300 font-mono whitespace-pre-wrap">
                             {job.final_output.substring(0, 2000)}
                             {job.final_output.length > 2000 && '...'}
