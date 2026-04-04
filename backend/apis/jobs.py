@@ -34,8 +34,14 @@ async def list_jobs() -> list[dict]:
 
 
 @router.post("/jobs/estimate")
-async def estimate_cost(job: JobCreate) -> dict:
+async def estimate_cost(job: JobCreate, request: Request) -> dict:
     """Return a cost estimate for a job without creating it."""
+    user = await get_session(request)
+    if user and user.get("role") == "waitlister":
+        raise HTTPException(
+            status_code=403,
+            detail="Waitlist accounts cannot estimate or submit jobs yet",
+        )
     if job.task_type not in VALID_TASK_TYPES:
         raise HTTPException(
             status_code=400,
@@ -83,6 +89,11 @@ async def create_job(job: JobCreate, request: Request) -> dict:
     user = await get_session(request)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
+    if user.get("role") == "waitlister":
+        raise HTTPException(
+            status_code=403,
+            detail="Waitlist accounts cannot submit jobs yet",
+        )
 
     if not job.title or not job.title.strip():
         raise HTTPException(status_code=400, detail="Job title is required")

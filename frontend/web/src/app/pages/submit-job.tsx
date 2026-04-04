@@ -8,6 +8,7 @@ import { motion } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
 import { Sparkles, Loader2, CheckCircle2, AlertCircle, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
+import { useRequireAuth } from '../hooks/use-require-auth';
 
 type CostEstimate = {
   subtask_count: number;
@@ -21,6 +22,7 @@ const money = (n: number) =>
   new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
 
 export function SubmitJobPage() {
+  const { ready } = useRequireAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [taskType, setTaskType] = useState('ml_experiment');
@@ -44,6 +46,7 @@ export function SubmitJobPage() {
   );
 
   useEffect(() => {
+    if (!ready) return;
     let cancelled = false;
     setEstLoading(true);
     const t = setTimeout(() => {
@@ -88,7 +91,7 @@ export function SubmitJobPage() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [title, description, taskType, inputPayload]);
+  }, [ready, title, description, taskType, inputPayload]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,6 +144,16 @@ export function SubmitJobPage() {
       setLoading(false);
     }
   };
+
+  if (!ready) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>

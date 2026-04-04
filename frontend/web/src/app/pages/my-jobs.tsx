@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { useState, useEffect } from 'react';
 import { CheckCircle2, Clock, XCircle, Loader2, ExternalLink, Download, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useRequireAuth } from '../hooks/use-require-auth';
 
 interface Job {
   id: string;
@@ -20,16 +21,18 @@ interface Task {
 }
 
 export function MyJobsPage() {
+  const { ready } = useRequireAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!ready) return;
     loadJobs();
     const interval = setInterval(loadJobs, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [ready]);
 
   useEffect(() => {
     if (selectedJob) {
@@ -126,10 +129,10 @@ export function MyJobsPage() {
     }
   };
 
-  if (loading) {
+  if (!ready || loading) {
     return (
       <AdminLayout>
-        <div className="flex items-center justify-center h-screen">
+        <div className="flex items-center justify-center min-h-[50vh]">
           <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
         </div>
       </AdminLayout>
