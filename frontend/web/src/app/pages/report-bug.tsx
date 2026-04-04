@@ -2,8 +2,8 @@ import { AdminLayout } from '../components/admin-layout';
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Bug, Inbox } from 'lucide-react';
-import { useAuth } from '../hooks/use-auth';
+import { Bug, Inbox, Loader2 } from 'lucide-react';
+import { useRequireAuth } from '../hooks/use-require-auth';
 
 type BugRow = {
   id: string;
@@ -17,8 +17,8 @@ type BugRow = {
 };
 
 export function ReportBugPage() {
-  const { user, loading: authLoading } = useAuth();
-  const isElevated = user?.role === 'admin' || user?.role === 'ceo';
+  const { ready, me } = useRequireAuth();
+  const isElevated = me?.role === 'admin' || me?.role === 'ceo';
 
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
@@ -28,7 +28,7 @@ export function ReportBugPage() {
   const [listLoading, setListLoading] = useState(false);
 
   useEffect(() => {
-    if (!isElevated || authLoading) return;
+    if (!ready || !isElevated) return;
     let cancelled = false;
     setListLoading(true);
     fetch('/bugs', { credentials: 'include' })
@@ -45,7 +45,7 @@ export function ReportBugPage() {
     return () => {
       cancelled = true;
     };
-  }, [isElevated, authLoading]);
+  }, [ready, isElevated]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,6 +84,16 @@ export function ReportBugPage() {
       setLoading(false);
     }
   };
+
+  if (!ready) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
