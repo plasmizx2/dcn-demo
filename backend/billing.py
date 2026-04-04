@@ -199,8 +199,9 @@ async def verify_and_credit_topup(session_id: str, user_id: str) -> dict:
     if session.payment_status != "paid":
         return {"credited": False, "reason": "not_paid"}
 
-    topup_amount = session.metadata.get("topup_amount_cents")
-    session_user = session.metadata.get("dcn_user_id")
+    meta = dict(session.metadata) if session.metadata else {}
+    topup_amount = meta.get("topup_amount_cents")
+    session_user = meta.get("dcn_user_id")
     if not topup_amount or str(session_user) != str(user_id):
         return {"credited": False, "reason": "invalid_metadata"}
 
@@ -264,8 +265,9 @@ async def handle_webhook_event(event) -> None:
     print(f"[HANDLER] Processing event type: {etype}", flush=True)
 
     if etype == "checkout.session.completed":
-        user_id = data.metadata.get("dcn_user_id")
-        topup_amount = data.metadata.get("topup_amount_cents")
+        meta = dict(data.metadata) if data.metadata else {}
+        user_id = meta.get("dcn_user_id")
+        topup_amount = meta.get("topup_amount_cents")
         sub_id = data.subscription
 
         print(f"[HANDLER] checkout.session.completed: user_id={user_id}, topup_amount={topup_amount}, sub_id={sub_id}", flush=True)
