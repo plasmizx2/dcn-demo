@@ -184,11 +184,48 @@ async def create_topup_checkout_session(user_id: str, email: str, amount_cents: 
             },
             "quantity": 1,
         }],
-        success_url=f"{BASE_URL}/account?topup=success",
+        success_url=f"{BASE_URL}/account?topup=success&session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{BASE_URL}/account?topup=cancelled",
         metadata={"dcn_user_id": uid, "topup_amount_cents": str(amount_cents)},
     )
     return {"checkout_url": session.url, "session_id": session.id}
+
+
+async def verify_and_credit_topup(session_id: str, user_id: str) -> dict:
+    """Verify a Checkout session and credit balance if not already done."""
+    from database import get_pool
+
+    session = stripe.checkout.Session.retrieve(session_id)
+    if session.payment_status != "paid":
+        return {"credited": False, "reason": "not_paid"}
+
+    topup_amount = session.metadata.get("topup_amount_cents")
+    session_user = session.metadata.get("dcn_user_id")
+    if not topup_amount or str(session_user) != str(user_id):
+        return {"credited": False, "reason": "invalid_metadata"}
+
+    amount_cents = int(topup_amount)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        already = await conn.fetchval(
+            "SELECT 1 FROM balance_transactions WHERE reference_id = $1 AND tx_type = 'topup'",
+            session_id,
+        )
+        if already:
+            balance = await conn.fetchval("SELECT balance_cents FROM dcn_users WHERE id = $1::uuid", str(user_id))
+            return {"credited": False, "reason": "already_credited", "balance_cents": balance or 0}
+
+        async with conn.transaction():
+            new_balance = await conn.fetchval(
+                "UPDATE dcn_users SET balance_cents = balance_cents + $1 WHERE id = $2::uuid RETURNING balance_cents",
+                amount_cents, str(user_id),
+            )
+            await conn.execute(
+                """INSERT INTO balance_transactions (user_id, amount_cents, balance_after, tx_type, reference_id, description)
+                   VALUES ($1::uuid, $2, $3, 'topup', $4, $5)""",
+                str(user_id), amount_cents, new_balance, session_id, f"Top-up ${amount_cents/100:.2f}",
+            )
+    return {"credited": True, "balance_cents": new_balance, "amount_cents": amount_cents}
 
 
 async def cancel_pro_subscription(user_id: str) -> bool:
