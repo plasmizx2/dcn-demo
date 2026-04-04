@@ -124,6 +124,12 @@ export function LandingPage() {
           </Link>
           
           <div className="flex items-center gap-2 md:gap-4">
+            <Link
+              to="/pricing"
+              className="hidden md:inline px-3 py-2 text-sm rounded-lg text-slate-300 hover:text-white border border-white/10 transition-all font-medium"
+            >
+              Pricing
+            </Link>
             {!authLoading && user ? (
               <>
                 <span className="hidden sm:inline text-xs md:text-sm text-slate-300 max-w-[160px] truncate">
