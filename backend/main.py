@@ -271,6 +271,26 @@ async def _migrate_billing_tables(conn) -> None:
     logger.info("Billing tables and columns migrated")
 
 
+async def _migrate_balance_tables(conn) -> None:
+    """Add balance_cents to users and balance_transactions ledger."""
+    await conn.execute("ALTER TABLE dcn_users ADD COLUMN IF NOT EXISTS balance_cents INTEGER NOT NULL DEFAULT 0")
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS balance_transactions (
+            id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id         UUID NOT NULL REFERENCES dcn_users(id) ON DELETE CASCADE,
+            amount_cents    INTEGER NOT NULL,
+            balance_after   INTEGER NOT NULL,
+            tx_type         TEXT NOT NULL,
+            reference_id    TEXT,
+            description     TEXT,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+    """)
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_balance_tx_user_id ON balance_transactions(user_id)")
+    await conn.execute("CREATE INDEX IF NOT EXISTS idx_balance_tx_created ON balance_transactions(created_at)")
+    logger.info("Balance tables migrated")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start up: connect to DB, create static cache table, + start maintenance. Shut down: clean up."""
@@ -324,6 +344,11 @@ async def lifespan(app: FastAPI):
             await _migrate_billing_tables(conn)
         except Exception as e:
             logger.error("Billing tables migration failed: %s", e, exc_info=True)
+            raise
+        try:
+            await _migrate_balance_tables(conn)
+        except Exception as e:
+            logger.error("Balance tables migration failed: %s", e, exc_info=True)
             raise
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS bug_reports (

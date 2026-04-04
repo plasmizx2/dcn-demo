@@ -121,15 +121,41 @@ async def create_job(job: JobCreate, request: Request) -> dict:
                 detail=f"Free tier limit: {FREE_TIER_DAILY_JOB_LIMIT} jobs per day. Upgrade to pay-as-you-go or Pro for unlimited jobs.",
             )
 
-    # Pay-as-you-go requires payment when Stripe is active
-    if user_tier == "paygo" and billing.is_enabled() and not job.payment_intent_id:
-        raise HTTPException(
-            status_code=402,
-            detail="Pay-as-you-go tier requires payment. Create a payment intent first via /billing/create-payment-intent.",
-        )
+    # Pay-as-you-go: check balance (or fall back to legacy PaymentIntent)
+    paygo_deduction_cents = 0
+    if user_tier == "paygo" and billing.is_enabled():
+        if not job.payment_intent_id:
+            # Balance-based flow: estimate cost, check balance
+            try:
+                _subtasks_preview = plan_tasks(job.task_type, job.input_payload)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e)) from e
+            _estimate = estimate_job_cost(_subtasks_preview)
+            paygo_deduction_cents = billing.dollars_to_cents(_estimate["estimated_total"])
+            async with pool.acquire() as conn:
+                current_balance = await conn.fetchval(
+                    "SELECT balance_cents FROM dcn_users WHERE id = $1::uuid", user["id"],
+                )
+            current_balance = current_balance or 0
+            if current_balance < paygo_deduction_cents:
+                raise HTTPException(
+                    status_code=402,
+                    detail=f"Insufficient balance. Required: ${paygo_deduction_cents/100:.2f}, available: ${current_balance/100:.2f}. Top up at /billing/topup.",
+                )
+        else:
+            # Legacy PaymentIntent flow
+            try:
+                pi = billing.retrieve_payment_intent(job.payment_intent_id)
+            except Exception:
+                raise HTTPException(status_code=400, detail="Invalid payment_intent_id")
+            if pi["status"] != "succeeded":
+                raise HTTPException(
+                    status_code=402,
+                    detail=f"Payment not confirmed (status: {pi['status']}) — complete payment before submitting",
+                )
 
-    # Verify the payment intent if provided
-    if job.payment_intent_id and billing.is_enabled():
+    # Verify the payment intent if provided (for non-paygo tiers, e.g. pro with optional PI)
+    if job.payment_intent_id and billing.is_enabled() and user_tier != "paygo":
         try:
             pi = billing.retrieve_payment_intent(job.payment_intent_id)
         except Exception:
@@ -185,7 +211,20 @@ async def create_job(job: JobCreate, request: Request) -> dict:
                 job.requires_validation,
             )
 
-            # Record payment in the payments ledger when Stripe is active
+            # Balance deduction for paygo users (balance-based flow)
+            if paygo_deduction_cents > 0:
+                new_balance = await conn.fetchval(
+                    "UPDATE dcn_users SET balance_cents = balance_cents - $1 WHERE id = $2::uuid RETURNING balance_cents",
+                    paygo_deduction_cents, user["id"],
+                )
+                await conn.execute(
+                    """INSERT INTO balance_transactions (user_id, amount_cents, balance_after, tx_type, reference_id, description)
+                       VALUES ($1::uuid, $2, $3, 'job_deduction', $4, $5)""",
+                    user["id"], -paygo_deduction_cents, new_balance, str(row["id"]),
+                    f"Job: {job.title[:60]}",
+                )
+
+            # Record payment in the payments ledger when Stripe is active (legacy PI flow)
             if billing.is_enabled() and job.payment_intent_id:
                 await conn.execute(
                     """
@@ -236,9 +275,6 @@ async def create_job(job: JobCreate, request: Request) -> dict:
                 f"Job split into {len(subtasks)} tasks",
             )
 
-            # Link payment intent to the newly created job
-            if job.payment_intent_id:
-                await link_payment_to_job(job.payment_intent_id, str(row["id"]))
 
     result = dict(row)
     result["task_count"] = len(subtasks)

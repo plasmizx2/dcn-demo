@@ -123,7 +123,7 @@ async def get_user_tier(request: Request):
     pool = await get_pool()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT tier, stripe_customer_id, stripe_subscription_id FROM dcn_users WHERE id = $1::uuid",
+            "SELECT tier, stripe_customer_id, stripe_subscription_id, balance_cents FROM dcn_users WHERE id = $1::uuid",
             user["id"],
         )
     if not row:
@@ -133,6 +133,7 @@ async def get_user_tier(request: Request):
         "tier": row["tier"],
         "has_payment_method": bool(row["stripe_customer_id"]),
         "has_subscription": bool(row["stripe_subscription_id"]),
+        "balance_cents": row["balance_cents"] or 0,
     }
 
 
@@ -184,6 +185,63 @@ async def upgrade_tier(body: UpgradeTierRequest, request: Request):
                     user["id"],
                 )
         return {"tier": "free"}
+
+
+# ── Balance / Top-up ────────────────────────────────────────
+
+@router.post("/topup")
+async def create_topup(request: Request) -> dict:
+    """Create a Stripe Checkout session to top up balance."""
+    if not billing.is_enabled():
+        raise HTTPException(status_code=503, detail="Billing not configured")
+    user = await get_session(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
+    amount_cents = int(body.get("amount_cents", 0))
+    if amount_cents < 500:
+        raise HTTPException(status_code=400, detail="Minimum top-up is $5.00")
+    try:
+        result = await billing.create_topup_checkout_session(user["id"], user["email"], amount_cents)
+        return result
+    except Exception as e:
+        logger.error("Top-up failed for user %s: %s", user["id"], e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.get("/balance")
+async def get_balance(request: Request) -> dict:
+    """Return the authenticated user's current balance."""
+    user = await get_session(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        balance = await conn.fetchval(
+            "SELECT balance_cents FROM dcn_users WHERE id = $1::uuid", user["id"]
+        )
+    cents = balance or 0
+    return {"balance_cents": cents, "balance_dollars": round(cents / 100, 2)}
+
+
+@router.get("/balance/history")
+async def get_balance_history(request: Request) -> list[dict]:
+    """Return recent balance transactions for the authenticated user."""
+    user = await get_session(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT id, amount_cents, balance_after, tx_type, reference_id, description, created_at
+               FROM balance_transactions WHERE user_id = $1::uuid
+               ORDER BY created_at DESC LIMIT 50""",
+            user["id"],
+        )
+    return [dict(r) for r in rows]
 
 
 # ── Stripe Connect (worker payouts) ─────────────────────────

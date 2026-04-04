@@ -2,7 +2,7 @@ import { AdminLayout } from '../components/admin-layout';
 import { TierBadge } from '../components/stripe-payment';
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
-import { Loader2, CreditCard, Crown, Zap, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
+import { Loader2, CreditCard, Crown, Zap, CheckCircle2, AlertCircle, ArrowRight, Wallet, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRequireAuth } from '../hooks/use-require-auth';
 
@@ -21,6 +21,14 @@ type Payment = {
   job_title?: string;
 };
 
+type BalanceTransaction = {
+  id: string;
+  description: string;
+  amount_cents: number;
+  balance_after_cents: number;
+  created_at: string;
+};
+
 const money = (cents: number) =>
   new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(cents / 100);
 
@@ -30,6 +38,45 @@ export function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [upgrading, setUpgrading] = useState(false);
+  const [balance, setBalance] = useState<number>(0);
+  const [transactions, setTransactions] = useState<BalanceTransaction[]>([]);
+  const [toppingUp, setToppingUp] = useState(false);
+
+  const fetchBalance = async () => {
+    try {
+      const res = await fetch("/billing/balance", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setBalance(data.balance_cents ?? 0);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const fetchTransactions = async () => {
+    try {
+      const res = await fetch("/billing/balance/history", { credentials: "include" });
+      if (res.ok) {
+        const data: BalanceTransaction[] = await res.json();
+        setTransactions(data);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  // Check URL params for topup success
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("topup") === "success") {
+      toast.success("Balance topped up!");
+      // Clean up the URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete("topup");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
+  }, []);
 
   useEffect(() => {
     if (!ready) return;
@@ -48,6 +95,10 @@ export function AccountPage() {
           const data: Payment[] = await paymentsRes.json();
           setPayments(data.slice(0, 10)); // Last 10 payments
         }
+
+        // Fetch balance and transaction history
+        await fetchBalance();
+        await fetchTransactions();
       } catch (e) {
         console.error('Failed to fetch account data:', e);
       } finally {
@@ -55,6 +106,30 @@ export function AccountPage() {
       }
     })();
   }, [ready]);
+
+  const handleTopUp = async (amountCents: number) => {
+    setToppingUp(true);
+    try {
+      const res = await fetch("/billing/topup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ amount_cents: amountCents }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { detail?: string }).detail || "Top-up failed");
+      }
+      const data = await res.json();
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Top-up failed");
+    } finally {
+      setToppingUp(false);
+    }
+  };
 
   const handleUpgrade = async (tier: string) => {
     setUpgrading(true);
@@ -108,6 +183,37 @@ export function AccountPage() {
           <div className="grid md:grid-cols-3 gap-6">
             {/* Main content */}
             <div className="md:col-span-2 space-y-6">
+              {/* Balance card — shown for paygo users */}
+              {tierInfo && tierInfo.tier === "paygo" && (
+                <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-white/10 p-8">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Wallet className="w-6 h-6 text-emerald-400" />
+                    <h2 className="text-2xl font-bold text-white">Balance</h2>
+                  </div>
+                  <p className="text-4xl font-bold tracking-tight text-white tabular-nums mb-6">
+                    {money(balance)}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-slate-400 mr-1">Top up:</span>
+                    {[
+                      { label: "$5", cents: 500 },
+                      { label: "$10", cents: 1000 },
+                      { label: "$20", cents: 2000 },
+                    ].map(({ label, cents }) => (
+                      <button
+                        key={cents}
+                        onClick={() => handleTopUp(cents)}
+                        disabled={toppingUp}
+                        className="px-4 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 transition-all text-sm font-semibold flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Current plan */}
               {tierInfo && (
                 <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-white/10 p-8">
@@ -188,6 +294,46 @@ export function AccountPage() {
                   <p className="text-slate-400">No payments yet</p>
                 )}
               </div>
+
+              {/* Balance History */}
+              {tierInfo && tierInfo.tier === "paygo" && (
+                <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-white/10 p-8">
+                  <h2 className="text-2xl font-bold text-white mb-6">Balance History</h2>
+                  {transactions.length > 0 ? (
+                    <div className="space-y-3">
+                      {transactions.map((t) => (
+                        <div
+                          key={t.id}
+                          className="flex items-center justify-between p-4 rounded-lg bg-white/5 border border-white/10"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-white truncate">
+                              {t.description}
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              {new Date(t.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="text-right ml-4">
+                            <p
+                              className={`font-semibold ${
+                                t.amount_cents >= 0 ? "text-green-400" : "text-red-400"
+                              }`}
+                            >
+                              {t.amount_cents >= 0 ? "+" : ""}{money(t.amount_cents)}
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              Balance: {money(t.balance_after_cents)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-slate-400">No transactions yet</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Sidebar: upgrade options */}

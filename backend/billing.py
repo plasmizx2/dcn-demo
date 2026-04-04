@@ -157,6 +157,40 @@ async def create_pro_subscription(user_id: str, email: str) -> dict:
     return {"checkout_url": session.url, "session_id": session.id}
 
 
+async def create_topup_checkout_session(user_id: str, email: str, amount_cents: int) -> dict:
+    """Create a Stripe Checkout session to top up user balance."""
+    from database import get_pool
+    uid = str(user_id)
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        customer_id = await conn.fetchval(
+            "SELECT stripe_customer_id FROM dcn_users WHERE id = $1::uuid", uid,
+        )
+        if not customer_id:
+            customer = stripe.Customer.create(email=email, metadata={"dcn_user_id": uid})
+            customer_id = customer.id
+            await conn.execute(
+                "UPDATE dcn_users SET stripe_customer_id = $1 WHERE id = $2::uuid",
+                customer_id, uid,
+            )
+    session = stripe.checkout.Session.create(
+        customer=customer_id,
+        mode="payment",
+        line_items=[{
+            "price_data": {
+                "currency": "usd",
+                "unit_amount": amount_cents,
+                "product_data": {"name": f"DCN Balance Top-Up (${amount_cents/100:.2f})"},
+            },
+            "quantity": 1,
+        }],
+        success_url=f"{BASE_URL}/account?topup=success",
+        cancel_url=f"{BASE_URL}/account?topup=cancelled",
+        metadata={"dcn_user_id": uid, "topup_amount_cents": str(amount_cents)},
+    )
+    return {"checkout_url": session.url, "session_id": session.id}
+
+
 async def cancel_pro_subscription(user_id: str) -> bool:
     """Cancel the user's Pro subscription."""
     from database import get_pool
@@ -192,8 +226,34 @@ async def handle_webhook_event(event) -> None:
 
     if etype == "checkout.session.completed":
         user_id = data.metadata.get("dcn_user_id")
+        topup_amount = data.metadata.get("topup_amount_cents")
         sub_id = data.subscription
-        if user_id and sub_id:
+
+        if user_id and topup_amount:
+            # Top-up: credit user balance
+            amount_cents = int(topup_amount)
+            pool = await get_pool()
+            async with pool.acquire() as conn:
+                # Idempotency: check if already credited
+                already = await conn.fetchval(
+                    "SELECT 1 FROM balance_transactions WHERE reference_id = $1 AND tx_type = 'topup'",
+                    data.id,
+                )
+                if not already:
+                    async with conn.transaction():
+                        new_balance = await conn.fetchval(
+                            "UPDATE dcn_users SET balance_cents = balance_cents + $1 WHERE id = $2::uuid RETURNING balance_cents",
+                            amount_cents, user_id,
+                        )
+                        await conn.execute(
+                            """INSERT INTO balance_transactions (user_id, amount_cents, balance_after, tx_type, reference_id, description)
+                               VALUES ($1::uuid, $2, $3, 'topup', $4, $5)""",
+                            user_id, amount_cents, new_balance, data.id, f"Top-up ${amount_cents/100:.2f}",
+                        )
+                    logger.info("User %s topped up %d cents (new balance: %d)", user_id, amount_cents, new_balance)
+
+        elif user_id and sub_id:
+            # Pro subscription
             pool = await get_pool()
             async with pool.acquire() as conn:
                 await conn.execute(
@@ -344,3 +404,28 @@ async def refund_job_payment(job_id: str) -> None:
             logger.info("Refunded payment %s for job %s (refund %s)", row["stripe_id"][:16], job_id[:8], result["id"])
         except Exception as exc:
             logger.error("Failed to refund payment for job %s: %s", job_id[:8], exc)
+
+
+async def refund_job_balance(job_id: str) -> None:
+    """Refund balance for a failed paygo job."""
+    from database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        tx = await conn.fetchrow(
+            "SELECT user_id, amount_cents FROM balance_transactions WHERE reference_id = $1 AND tx_type = 'job_deduction' LIMIT 1",
+            str(job_id),
+        )
+        if not tx:
+            return
+        refund_cents = abs(tx["amount_cents"])
+        async with conn.transaction():
+            new_balance = await conn.fetchval(
+                "UPDATE dcn_users SET balance_cents = balance_cents + $1 WHERE id = $2::uuid RETURNING balance_cents",
+                refund_cents, tx["user_id"],
+            )
+            await conn.execute(
+                """INSERT INTO balance_transactions (user_id, amount_cents, balance_after, tx_type, reference_id, description)
+                   VALUES ($1::uuid, $2, $3, 'refund', $4, 'Refund for failed job')""",
+                tx["user_id"], refund_cents, new_balance, str(job_id),
+            )
+        logger.info("Refunded %d cents to user %s for job %s", refund_cents, str(tx["user_id"])[:8], str(job_id)[:8])
