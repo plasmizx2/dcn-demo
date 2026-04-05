@@ -19,6 +19,7 @@ import { ContactPage } from "./pages/contact";
 import { ReportBugPage } from "./pages/report-bug";
 import { NotFoundPage } from "./pages/not-found";
 import { WaitlistPage } from "./pages/waitlist";
+import { CustomerDashboardPage } from "./pages/customer-dashboard";
 
 export const router = createBrowserRouter([
   {
@@ -40,6 +41,10 @@ export const router = createBrowserRouter([
   {
     path: "/pricing",
     Component: PricingPage,
+  },
+  {
+    path: "/dashboard",
+    Component: CustomerDashboardPage,
   },
   {
     path: "/my-jobs",

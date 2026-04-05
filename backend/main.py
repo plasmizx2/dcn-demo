@@ -465,7 +465,7 @@ async def _finish_oauth_login(user: dict) -> RedirectResponse:
     elif user["role"] in ELEVATED_ROLES:
         redirect = "/ops"
     else:
-        redirect = "/submit"
+        redirect = "/dashboard"
     response = RedirectResponse(redirect, status_code=302)
     response.set_cookie(SESSION_COOKIE, token, **_session_cookie_args())
     return response
@@ -701,6 +701,11 @@ async def serve_jobs_page():
 
 @app.get("/my-jobs")
 async def serve_my_jobs():
+    return _spa_index()
+
+
+@app.get("/dashboard")
+async def serve_dashboard():
     return _spa_index()
 
 
