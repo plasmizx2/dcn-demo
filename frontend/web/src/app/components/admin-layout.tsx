@@ -1,10 +1,10 @@
 import { Link, useLocation } from 'react-router';
-import { 
-  LayoutDashboard, 
-  FileText, 
-  Monitor, 
-  Users, 
-  Plus, 
+import {
+  LayoutDashboard,
+  FileText,
+  Monitor,
+  Users,
+  Plus,
   Clipboard,
   LogOut,
   Cpu,
@@ -13,6 +13,7 @@ import {
   Mail,
   Bug,
   Settings,
+  BarChart3,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ReactNode, useEffect, useState } from 'react';
@@ -45,7 +46,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   const navItems = [
     { path: '/submit', label: 'Submit Job', icon: Plus },
-    { path: '/ops', label: 'Dashboard', icon: LayoutDashboard, adminOnly: true },
+    { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
+    { path: '/ops', label: 'Ops', icon: LayoutDashboard, adminOnly: true },
     { path: '/jobs', label: 'All jobs', icon: FileText, adminOnly: true },
     { path: '/worker-logs', label: 'Worker Logs', icon: Monitor, adminOnly: true },
     { path: '/admin/users', label: 'Users', icon: Users, adminOnly: true },

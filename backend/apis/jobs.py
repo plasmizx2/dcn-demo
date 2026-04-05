@@ -70,6 +70,68 @@ async def list_my_jobs(request: Request) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+@router.get("/dashboard/stats")
+async def customer_dashboard_stats(request: Request) -> dict:
+    """Return dashboard stats for the authenticated customer."""
+    user = await get_session(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not logged in")
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        counts = await conn.fetchrow(
+            """
+            SELECT
+                COUNT(*)                                        AS total,
+                COUNT(*) FILTER (WHERE status = 'completed')    AS completed,
+                COUNT(*) FILTER (WHERE status = 'running')      AS running,
+                COUNT(*) FILTER (WHERE status = 'queued')       AS queued,
+                COUNT(*) FILTER (WHERE status = 'failed')       AS failed
+            FROM jobs
+            WHERE user_id = $1::uuid
+            """,
+            user["id"],
+        )
+        try:
+            spend = await conn.fetchval(
+                """
+                SELECT COALESCE(SUM(p.amount_cents), 0)
+                FROM payments p
+                JOIN jobs j ON j.id = p.job_id
+                WHERE j.user_id = $1::uuid AND p.status = 'captured'
+                """,
+                user["id"],
+            )
+        except Exception:
+            spend = 0
+        recent = await conn.fetch(
+            """
+            SELECT id, title, task_type, status, created_at, final_output
+            FROM jobs
+            WHERE user_id = $1::uuid
+            ORDER BY created_at DESC
+            LIMIT 5
+            """,
+            user["id"],
+        )
+        try:
+            tier_row = await conn.fetchval(
+                "SELECT tier FROM dcn_users WHERE id = $1::uuid",
+                user["id"],
+            )
+        except Exception:
+            tier_row = None
+    return {
+        "total_jobs": counts["total"],
+        "completed_jobs": counts["completed"],
+        "running_jobs": counts["running"],
+        "queued_jobs": counts["queued"],
+        "failed_jobs": counts["failed"],
+        "total_spend_cents": spend or 0,
+        "tier": tier_row or "free",
+        "recent_jobs": [dict(r) for r in recent],
+    }
+
+
 @router.get("/jobs/{job_id}")
 async def get_job(job_id: str) -> dict:
     """Return a single job by ID."""
