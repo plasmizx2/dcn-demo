@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useRequireAdmin } from '../hooks/use-require-admin';
 import { Loader2 } from 'lucide-react';
+import { Skeleton } from '../components/ui/skeleton';
 import { toast } from 'sonner';
 
 interface MonitorStats {
@@ -134,8 +135,28 @@ export function DashboardPage() {
   if (!ready) {
     return (
       <AdminLayout>
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+        <div className="container mx-auto px-6 py-12">
+          <div className="mb-8">
+            <Skeleton className="h-10 w-72 mb-3" />
+            <Skeleton className="h-5 w-96" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <div key={i} className="bg-slate-900/50 rounded-2xl border border-white/10 p-6">
+                <Skeleton className="w-12 h-12 rounded-xl mb-4" />
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-8 w-16" />
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 rounded-2xl border border-white/10 bg-slate-900/40 p-6">
+            <Skeleton className="h-6 w-32 mb-4" />
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-4 w-full" />
+              ))}
+            </div>
+          </div>
         </div>
       </AdminLayout>
     );

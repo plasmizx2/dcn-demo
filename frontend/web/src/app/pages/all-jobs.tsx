@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { useCallback, useEffect, useState } from 'react';
 import { useRequireAdmin } from '../hooks/use-require-admin';
 import { Loader2, Copy, Search, Gauge, Zap, Trash2, ScrollText } from 'lucide-react';
+import { Skeleton } from '../components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -162,8 +163,32 @@ export function AllJobsPage() {
   if (!ready || loading) {
     return (
       <AdminLayout>
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+        <div className="container mx-auto px-6 py-12 max-w-[1400px]">
+          <Skeleton className="h-10 w-40 mb-2" />
+          <Skeleton className="h-5 w-96 mb-6" />
+          <div className="flex flex-col lg:flex-row gap-6 min-h-[60vh]">
+            <div className="lg:w-96 flex-shrink-0 rounded-2xl border border-white/10 bg-slate-900/40 overflow-hidden">
+              <div className="p-3 border-b border-white/10 space-y-2">
+                <Skeleton className="h-9 w-full rounded-lg" />
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Skeleton key={i} className="h-6 w-16 rounded-md" />
+                  ))}
+                </div>
+              </div>
+              <div className="p-1">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="px-4 py-3 border-b border-white/5">
+                    <Skeleton className="h-4 w-48 mb-2" />
+                    <Skeleton className="h-3 w-28" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1 rounded-2xl border border-white/10 bg-slate-900/40 min-h-[400px] flex items-center justify-center">
+              <Skeleton className="h-5 w-52" />
+            </div>
+          </div>
         </div>
       </AdminLayout>
     );
