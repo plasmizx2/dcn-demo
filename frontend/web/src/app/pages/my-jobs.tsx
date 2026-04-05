@@ -2,6 +2,7 @@ import { AdminLayout } from '../components/admin-layout';
 import { motion } from 'motion/react';
 import { useState, useEffect } from 'react';
 import { CheckCircle2, Clock, XCircle, Loader2, ExternalLink, Download, Trash2, Copy } from 'lucide-react';
+import { Skeleton } from '../components/ui/skeleton';
 import { toast } from 'sonner';
 import { useRequireAuth } from '../hooks/use-require-auth';
 
@@ -135,8 +136,28 @@ export function MyJobsPage() {
   if (!ready || loading) {
     return (
       <AdminLayout>
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+        <div className="container mx-auto px-6 py-12">
+          <Skeleton className="h-10 w-48 mb-3" />
+          <Skeleton className="h-5 w-80 mb-8" />
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-slate-900/50 rounded-2xl border border-white/10 p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Skeleton className="w-5 h-5 rounded-full" />
+                      <Skeleton className="h-6 w-56" />
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Skeleton className="h-5 w-24 rounded-full" />
+                      <Skeleton className="h-4 w-36" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-8 w-24 rounded-full" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </AdminLayout>
     );

@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { useCallback, useEffect, useState } from 'react';
 import { useRequireAdmin } from '../hooks/use-require-admin';
 import { Loader2 } from 'lucide-react';
+import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 
@@ -36,18 +37,23 @@ export function AdminUsersPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [audit, setAudit] = useState<AuditData | null>(null);
   const [loadingAudit, setLoadingAudit] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(true);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [roleChoice, setRoleChoice] = useState<'customer' | 'admin' | 'waitlister'>('customer');
   const [savingRole, setSavingRole] = useState(false);
 
   const loadUsers = useCallback(async () => {
-    const ur = await fetch('/auth/users', { credentials: 'include' });
-    if (!ur.ok) {
-      setLoadErr(await ur.text());
-      return;
+    try {
+      const ur = await fetch('/auth/users', { credentials: 'include' });
+      if (!ur.ok) {
+        setLoadErr(await ur.text());
+        return;
+      }
+      setUsers(await ur.json());
+      setLoadErr(null);
+    } finally {
+      setLoadingUsers(false);
     }
-    setUsers(await ur.json());
-    setLoadErr(null);
   }, []);
 
   useEffect(() => {
@@ -114,11 +120,33 @@ export function AdminUsersPage() {
     }
   };
 
-  if (!ready) {
+  if (!ready || loadingUsers) {
     return (
       <AdminLayout>
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+        <div className="container mx-auto px-6 py-12 max-w-6xl">
+          <Skeleton className="h-10 w-52 mb-3" />
+          <Skeleton className="h-5 w-96 mb-6" />
+          <div className="grid lg:grid-cols-2 gap-6">
+            <div className="rounded-2xl border border-white/10 bg-slate-900/50 overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/10">
+                <Skeleton className="h-4 w-20" />
+              </div>
+              <div className="p-3 space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-5 w-40" />
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-5 w-16 rounded-md" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-slate-900/50 min-h-[200px] p-5">
+              <Skeleton className="h-4 w-28 mb-3" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+          </div>
         </div>
       </AdminLayout>
     );

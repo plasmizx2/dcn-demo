@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { useCallback, useEffect, useState } from 'react';
 import { useRequireAdmin } from '../hooks/use-require-admin';
 import { Loader2, Cpu, Trash2 } from 'lucide-react';
+import { Skeleton } from '../components/ui/skeleton';
 import { toast } from 'sonner';
 
 interface WorkerNode {
@@ -122,8 +123,30 @@ export function WorkerLogsPage() {
   if (!ready || loadingWorkers) {
     return (
       <AdminLayout>
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+        <div className="container mx-auto px-6 py-12 max-w-6xl">
+          <Skeleton className="h-10 w-56 mb-2" />
+          <Skeleton className="h-5 w-80 mb-6" />
+          <div className="grid lg:grid-cols-2 gap-6">
+            <div>
+              <Skeleton className="h-4 w-20 mb-3" />
+              <div className="grid gap-3 sm:grid-cols-2">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="rounded-xl border border-white/10 bg-slate-900/50 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Skeleton className="w-4 h-4 rounded" />
+                      <Skeleton className="h-5 w-28" />
+                    </div>
+                    <Skeleton className="h-3 w-24 mb-1" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5 min-h-[320px]">
+              <Skeleton className="h-4 w-28 mb-3" />
+              <Skeleton className="h-4 w-52" />
+            </div>
+          </div>
         </div>
       </AdminLayout>
     );
