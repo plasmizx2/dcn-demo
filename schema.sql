@@ -118,3 +118,17 @@ CREATE TABLE IF NOT EXISTS sessions (
     user_id             UUID NOT NULL REFERENCES dcn_users(id) ON DELETE CASCADE,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- ─── Subscriptions ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID NOT NULL REFERENCES dcn_users(id) UNIQUE,
+    plan            TEXT NOT NULL DEFAULT 'free',
+    stripe_sub_id   TEXT,
+    jobs_remaining  INT NOT NULL DEFAULT 5,
+    billing_cycle   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);
