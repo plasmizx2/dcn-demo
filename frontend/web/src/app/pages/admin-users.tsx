@@ -99,7 +99,10 @@ export function AdminUsersPage() {
     me?.role === 'ceo' && selected && selected.role !== 'ceo' && selected.id !== me.id;
 
   const saveRole = async () => {
-    if (!selectedId || !canEditRole) return;
+    if (!selectedId || !canEditRole || !selected) return;
+    if (roleChoice === selected.role) return;
+    const ok = confirm(`Change ${selected.email} from "${selected.role}" to "${roleChoice}"?`);
+    if (!ok) return;
     setSavingRole(true);
     try {
       const pr = await fetch('/auth/role', {
