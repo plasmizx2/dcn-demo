@@ -82,7 +82,6 @@ except Exception:
     sys.exit(1)
 PY
 }
-
 issue_comment_already_implemented() {
   # $1: issue number
   # $2: optional short reason
@@ -558,7 +557,6 @@ if [ "${HEARTBEAT_INTERVAL_SECONDS:-0}" -gt 0 ] 2>/dev/null; then
   HEARTBEAT_PID="$!"
   log "HEARTBEAT: enabled (every ${HEARTBEAT_INTERVAL_SECONDS}s, pid ${HEARTBEAT_PID})"
 fi
-
 # Always stash local changes so branch checkouts/pulls can't fail (including edits to this script).
 DID_STASH=0
 if [ -n "$(git status --porcelain 2>/dev/null || true)" ]; then
