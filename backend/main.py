@@ -583,10 +583,16 @@ async def github_callback(request: Request):
         if not email:
             emails_resp = await client.get("https://api.github.com/user/emails", headers=headers)
             if emails_resp.status_code == 200:
-                for e in emails_resp.json():
+                emails_data = emails_resp.json()
+                for e in emails_data:
                     if e.get("primary"):
                         email = e["email"]
                         break
+                if not email:
+                    for e in emails_data:
+                        if e.get("verified"):
+                            email = e["email"]
+                            break
         if not email:
             logger.error("GitHub: could not get user email")
             return RedirectResponse("/login")
