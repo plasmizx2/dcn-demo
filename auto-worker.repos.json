@@ -1,0 +1,12 @@
+{
+  "repos": [
+    { "name": "dcn-demo", "path": "/Users/seandumont/Desktop/dcn-demo", "skip_issue_numbers": "88", "roadmap_issue_number": "88" },
+    { "name": "dcn-worker", "path": "/Users/seandumont/Desktop/dcn-worker" },
+    { "name": "dcn-monitor", "path": "/Users/seandumont/Desktop/dcn-monitor" },
+    { "name": "HackFund", "path": "/Users/seandumont/Desktop/HackFund" },
+    { "name": "PeaPod", "path": "/Users/seandumont/Desktop/PeaPod", "skip_issue_numbers": "1", "roadmap_issue_number": "1" },
+    { "name": "DumontDemos", "path": "/Users/seandumont/Desktop/DumontDemos" },
+    { "name": "yourtopshop", "path": "/Users/seandumont/Desktop/yourtopshop" },
+    { "name": "Harlins-Detailing", "path": "/Users/seandumont/Desktop/Harlins Detailing" }
+  ]
+}

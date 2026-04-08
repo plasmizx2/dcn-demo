@@ -179,3 +179,65 @@ docker run --rm -p 8000:8000 \
 ```
 
 Open `http://localhost:8000` — you should see the React UI served from `frontend/web/dist` (built by Docker or `npm run build`).
+
+---
+
+## Auto-worker (multi-repo)
+
+This repo includes a **multi-repo** auto-worker that can process GitHub issues across **multiple local repos**, enforcing **one open auto-worker PR per repo**.
+
+### Files
+
+- `auto-worker-core.sh`: repo-scoped worker (does one repo run)
+- `auto-worker-multi.sh`: loops all repos from config
+- `auto-worker.repos.json`: list of local repos to manage
+- `auto-worker.sh`: backward-compatible wrapper for running the core in this repo
+
+### Prerequisites
+
+- `gh` (GitHub CLI) authenticated (or `GH_TOKEN` set)
+- `jq`
+- `git`
+- whichever agent CLIs you use (`claude`, `gemini`) on PATH
+
+### Configuration
+
+Edit `auto-worker.repos.json`:
+
+```json
+{
+  "repos": [
+    { "name": "my-repo", "path": "/absolute/path/to/my-repo" }
+  ]
+}
+```
+
+### Run locally
+
+Dry-run (no push/PR create):
+
+```bash
+DRY_RUN=1 ./auto-worker-multi.sh
+```
+
+Real run:
+
+```bash
+export GH_TOKEN="..."   # required for non-interactive push + PR create
+./auto-worker-multi.sh
+```
+
+Per-repo logs/state/locks are stored under:
+
+```text
+~/.auto-worker/<repoName>/
+  auto-worker.log
+  state.json
+  lock
+```
+
+### Cron (example)
+
+```bash
+0 * * * * /bin/bash -lc 'export GH_TOKEN="..."; cd "/Users/seandumont/Desktop/dcn-demo" && ./auto-worker-multi.sh >> "$HOME/.auto-worker/cron.log" 2>&1'
+```

@@ -1,3 +1,10 @@
+.DS_Store
+
+# Auto-worker local state/logs
+.auto-worker-state.json
+.gemini-attempts.json
+.auto-worker/
+
 .env
 .claude/
 __pycache__/
