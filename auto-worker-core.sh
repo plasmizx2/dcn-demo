@@ -47,7 +47,7 @@ require_cmd() {
 }
 
 pick_ollama_model() {
-  # Prefer explicit OLLAMA_MODEL; otherwise choose the largest installed model.
+  # Prefer explicit OLLAMA_MODEL; otherwise choose a deterministic installed model.
   if [ -n "$OLLAMA_MODEL" ]; then
     echo "$OLLAMA_MODEL"
     return 0
@@ -57,28 +57,26 @@ pick_ollama_model() {
     return 0
   fi
   # `ollama list` columns: NAME ID SIZE MODIFIED
-  # Choose max SIZE (GB/MB).
-  ollama list 2>/dev/null | awk 'NR>1 {print $1 "\t" $3}' | python3 - <<'PY'
-import re,sys
-best=None
-bestv=-1.0
-for line in sys.stdin:
-  line=line.strip()
-  if not line: continue
-  name,size=line.split("\t",1)
-  m=re.match(r"^\s*([0-9.]+)\s*([GMK]B)\s*$", size)
-  if not m: 
-    continue
-  v=float(m.group(1))
-  unit=m.group(2)
-  if unit=="KB": v=v/1024/1024
-  elif unit=="MB": v=v/1024
-  # GB stays GB
-  if v>bestv:
-    bestv=v
-    best=name
-print(best or "")
-PY
+  # NOTE: if the Ollama server isn't reachable, `ollama list` prints an error to stderr.
+  # We capture stderr so the caller can decide what to do.
+  local out
+  out="$(ollama list 2>&1 || true)"
+  if echo "$out" | grep -qiE "could not connect|connection refused|dial tcp|failed to connect"; then
+    echo ""
+    return 0
+  fi
+  local names
+  names="$(printf "%s\n" "$out" | awk 'NR>1 {print $1}' || true)"
+  # Prefer known-good models on your machine.
+  if echo "$names" | grep -qx "qwen2.5:7b"; then
+    echo "qwen2.5:7b"
+    return 0
+  fi
+  if echo "$names" | grep -qx "qwen2.5:3b"; then
+    echo "qwen2.5:3b"
+    return 0
+  fi
+  echo "$names" | head -n 1
 }
 
 run_ollama_agent() {
@@ -92,10 +90,23 @@ run_ollama_agent() {
     log "OLLAMA: not installed/on PATH"
     return 1
   fi
+
+  # If Ollama server isn't running (common under cron/non-GUI), start it.
+  if ! ollama list >/dev/null 2>&1; then
+    if [ "${DRY_RUN:-0}" = "1" ]; then
+      log "OLLAMA: server not reachable; DRY_RUN so not starting server."
+    else
+      log "OLLAMA: server not reachable; starting 'ollama serve' in background..."
+      (nohup ollama serve >/dev/null 2>&1 &)
+      # Give it a moment, then continue (model picking will retry).
+      sleep 1
+    fi
+  fi
+
   local model
   model="$(pick_ollama_model)"
   if [ -z "$model" ]; then
-    log "OLLAMA: no installed models found (set OLLAMA_MODEL or install a model)"
+    log "OLLAMA: no installed models found OR server unreachable. To prove models exist, run: ollama list"
     return 1
   fi
   log "OLLAMA: running model=${model}"
