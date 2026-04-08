@@ -23,3 +23,9 @@ services:
         sync: false
       - key: CEO_EMAIL
         sync: false
+
+previews:
+  generation: PR # Generate preview environments for pull requests
+  expiration: 7d # Keep preview environments for 7 days
+  # Optional: Add specific PR branches to include/exclude
+  # pullRequestPattern: "fix/*" # Only create previews for PRs with branches matching this pattern
