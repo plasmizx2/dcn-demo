@@ -19,6 +19,7 @@ from job_export import (
     safe_export_filename,
 )
 import billing
+import subscriptions
 
 router = APIRouter()
 
@@ -158,30 +159,27 @@ async def create_job(job: JobCreate, request: Request) -> dict:
             detail="Waitlist accounts cannot submit jobs yet",
         )
 
-    # ── Tier enforcement + payment gate ─────────────────────────
-    pool = await get_pool()
-    async with pool.acquire() as conn:
-        user_tier = await conn.fetchval(
-            "SELECT tier FROM dcn_users WHERE id = $1::uuid", user["id"],
+    # ── Subscription & Quota enforcement ─────────────────────────
+    sub = await subscriptions.get_subscription(user["id"])
+    if not sub:
+        raise HTTPException(status_code=500, detail="Failed to retrieve subscription")
+    
+    plan_id = sub["plan"]
+    plan = subscriptions.PLANS.get(plan_id, subscriptions.PLANS["free"])
+    
+    # Check quota
+    if not await subscriptions.check_quota(user["id"]):
+        raise HTTPException(
+            status_code=402,
+            detail=f"Subscription quota exhausted ({plan['name']} tier). Upgrade to submit more jobs."
         )
-    user_tier = user_tier or "free"
 
-    if user_tier == "free":
-        # Enforce daily job limit
-        async with pool.acquire() as conn:
-            today_count = await conn.fetchval(
-                """
-                SELECT COUNT(*) FROM jobs
-                WHERE user_id = $1::uuid
-                  AND created_at >= CURRENT_DATE
-                """,
-                user["id"],
-            )
-        if today_count >= FREE_TIER_DAILY_JOB_LIMIT:
-            raise HTTPException(
-                status_code=429,
-                detail=f"Free tier limit: {FREE_TIER_DAILY_JOB_LIMIT} jobs per day. Upgrade to pay-as-you-go or Pro for unlimited jobs.",
-            )
+    # Apply priority from plan if not explicitly set higher
+    job_priority = max(job.priority, plan["priority"])
+
+    # ── Payment gate (for Pay-as-you-go / Overage) ────────────────
+    pool = await get_pool()
+    user_tier = plan_id # Use plan_id as user_tier
 
     # Pay-as-you-go: check balance (or fall back to legacy PaymentIntent)
     paygo_deduction_cents = 0
