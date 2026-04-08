@@ -23,3 +23,7 @@ services:
         sync: false
       - key: CEO_EMAIL
         sync: false
+
+previews:
+  generation: PR
+  expiration: 7d
