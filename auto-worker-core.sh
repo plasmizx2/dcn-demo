@@ -914,17 +914,17 @@ PUSH_COMMIT_MSG="$(git log -1 --pretty=%s 2>/dev/null || echo "")"
 PUSH_FILES_CHANGED="$(git diff --name-only HEAD~1..HEAD 2>/dev/null | head -20 || echo "(unknown)")"
 PUSH_PR_NUM="$(gh pr list --state open --head "$BRANCH" --json number --jq '.[0].number // empty' 2>/dev/null || true)"
 
-if [ -n "${PUSH_PR_NUM:-}" ]; then
-  _pr_body="## 🤖 Auto-worker update
+if [ -n "${PUSH_PR_NUM:-}" ] && [ "$SHA_AFTER_COMMIT" != "$SHA_BEFORE_COMMIT" ]; then
+  _pr_body="## Auto-worker update
 
-**Commit:** ${PUSH_COMMIT_SHA} — ${PUSH_COMMIT_MSG}
-**Provider:** ${USED_PROVIDER}
+Commit: ${PUSH_COMMIT_SHA} -- ${PUSH_COMMIT_MSG}
+Provider: ${USED_PROVIDER}
 
-**Files changed:**
+Files changed:
 ${PUSH_FILES_CHANGED}
 
 ---
-*Pushed by auto-worker. Leave a comment if you want changes — I'll pick it up on the next run.*"
+Pushed by auto-worker. Leave a comment to request changes."
   post_pr_reply "$PUSH_PR_NUM" "$_pr_body"
   log "PR COMMENT: posted update on PR #${PUSH_PR_NUM} (commit ${PUSH_COMMIT_SHA})"
 fi
