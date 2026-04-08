@@ -408,17 +408,16 @@ if [ -z "$USED_PROVIDER" ]; then
     npm install -g @google/gemini-cli 2>&1 | tee -a "$LOG_FILE" || true
   fi
   _tmp="$(mktemp)"
-  # Capture output to detect rate-limit messages.
   set +e
   gemini --yolo -p "$AGENT_PROMPT" --output-format json 2>&1 | tee -a "$LOG_FILE" | tee "$_tmp" >/dev/null
   gem_rc="${PIPESTATUS[0]}"
   set -e
-  if [ "$gem_rc" -ne 0 ] && grep -qiE "rate limit|429|too many requests|quota" "$_tmp"; then
-    log "GEMINI: rate limited. Falling back to Ollama."
+  if [ "$gem_rc" -ne 0 ] && grep -qiE "Please set an Auth method|GEMINI_API_KEY|GOOGLE_GENAI_USE_VERTEXAI|GOOGLE_GENAI_USE_GCA|RESOURCE_EXHAUSTED|credits are depleted|prepayment credits are depleted|rate limit|429|too many requests|quota" "$_tmp"; then
+    log "GEMINI: auth/billing/rate-limit detected. Falling back to Ollama."
     run_ollama_agent "$AGENT_PROMPT" || log "OLLAMA: fallback failed."
     USED_PROVIDER="ollama"
   elif [ "$gem_rc" -ne 0 ]; then
-    log "WARN: Gemini exited non-zero (rc=${gem_rc}). Not treating as rate-limit; check logs."
+    log "WARN: Gemini exited non-zero (rc=${gem_rc}). Not treating as fallback; check logs."
   fi
   rm -f "$_tmp" 2>/dev/null || true
 fi
