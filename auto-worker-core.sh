@@ -37,8 +37,31 @@ PREFER_CLAUDE="${PREFER_CLAUDE:-0}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-}"
 OLLAMA_FALLBACK_ENABLED="${OLLAMA_FALLBACK_ENABLED:-1}"
 OLLAMA_P3_ONLY="${OLLAMA_P3_ONLY:-1}"
+SECRETS_FILE="${SECRETS_FILE:-$HOME/.auto-worker/secrets.json}"
+SECRETS_PROJECT="${SECRETS_PROJECT:-dcn-demo}"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"; }
+
+issue_comment_already_implemented() {
+  # $1: issue number
+  # $2: optional short reason
+  local n="$1"
+  local reason="${2:-}"
+  [ -z "$n" ] && return 0
+  gh issue comment "$n" --body "$(cat <<EOF
+## Auto-worker note
+
+I attempted to work this issue but it appears the requested behavior may already be implemented (or there wasn’t a clear code change to make).
+
+${reason:+**Reason observed:** ${reason}}
+
+### What you can do next
+- If this issue is truly done: **close it**.
+- If it still isn’t done: please **expand the issue** with concrete acceptance criteria (what screen/API, exact expected behavior, and how to verify), and mention what’s currently broken/missing.
+
+EOF
+)" 2>>"$LOG_FILE" || true
+}
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -220,6 +243,12 @@ ensure_log_dir
 cd "$REPO_DIR" || { echo "REPO_DIR not found: $REPO_DIR" >&2; exit 1; }
 for c in jq gh git; do require_cmd "$c"; done
 
+# Cron/monitor-safe Gemini auth: load GEMINI_API_KEY from ~/.auto-worker/secrets.json if missing.
+if [ -z "${GEMINI_API_KEY:-}" ] && [ -f "$SECRETS_FILE" ] && command -v jq >/dev/null 2>&1; then
+  GEMINI_API_KEY="$(jq -r --arg p "$SECRETS_PROJECT" '.gemini_api_keys[$p] // empty' "$SECRETS_FILE" 2>/dev/null || true)"
+  export GEMINI_API_KEY
+fi
+
 # Prevent overlapping runs (per-repo lock)
 if [ -f "$LOCK_FILE" ]; then
   LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null || true)
@@ -230,9 +259,63 @@ if [ -f "$LOCK_FILE" ]; then
   rm -f "$LOCK_FILE"
 fi
 echo $$ > "$LOCK_FILE"
-trap 'rm -f "$LOCK_FILE"' EXIT
+STOP_REQUESTED=0
+
+cleanup() {
+  rm -f "$LOCK_FILE" 2>/dev/null || true
+  if [ "${DID_STASH:-0}" = "1" ]; then
+    # Only restore if the working tree is clean; otherwise leave stash for manual resolution.
+    if [ -z "$(git status --porcelain 2>/dev/null || true)" ]; then
+      git stash pop -q 2>>"$LOG_FILE" || true
+      log "GIT: restored pre-run stash."
+    else
+      log "GIT: leaving pre-run stash (working tree not clean)."
+    fi
+  fi
+}
+
+save_progress_and_exit() {
+  # Called on SIGTERM/SIGINT to preserve partial work.
+  STOP_REQUESTED=1
+  log "STOP: received stop signal; saving progress..."
+
+  # Best-effort: if we have a state file, keep it as in_progress so we resume later.
+  local n=""
+  local branch=""
+  if [ -f "$STATE_FILE" ]; then
+    n="$(jq -r '.number // empty' "$STATE_FILE" 2>/dev/null || true)"
+    branch="$(jq -r '.branch // empty' "$STATE_FILE" 2>/dev/null || true)"
+  fi
+
+  # Commit any current changes as a WIP commit so nothing is lost.
+  if [ -n "$(git status --porcelain 2>/dev/null || true)" ]; then
+    git add -A 2>>"$LOG_FILE" || true
+    git commit -m "$(cat <<EOF
+wip: partial progress on issue #${n:-unknown} (stopped)
+
+Work in progress — stopped from monitor. Resume later.
+EOF
+)" 2>>"$LOG_FILE" || true
+    log "STOP: saved WIP commit (issue #${n:-unknown}, branch ${branch:-unknown})."
+  else
+    log "STOP: no uncommitted changes to save."
+  fi
+
+  exit 0
+}
+
+trap cleanup EXIT
+trap save_progress_and_exit TERM INT
 
 log "START: repo=${REPO_DIR}, dry_run=${DRY_RUN}, state_file=${STATE_FILE}"
+
+# Always stash local changes so branch checkouts/pulls can't fail (including edits to this script).
+DID_STASH=0
+if [ -n "$(git status --porcelain 2>/dev/null || true)" ]; then
+  log "GIT: working tree dirty; creating temporary stash for auto-worker."
+  git stash push -u -m "auto-worker temp stash $(date '+%Y-%m-%d %H:%M:%S')" 2>>"$LOG_FILE" || true
+  DID_STASH=1
+fi
 
 # DRY_RUN=1 means: do not mutate the repo at all (no branch creation, no agent run, no commits).
 # We still compute what would be done and log it.
@@ -361,7 +444,8 @@ if [ "$RESUMING" = false ]; then
 
   log "Working on issue #${NUMBER}: ${TITLE} (base=${DEFAULT_BRANCH})"
 
-  EXISTING_PR=$(gh pr list --search "issue-${NUMBER}" --json number --jq '.[0].number // empty' 2>/dev/null || true)
+  # Only block if there's an OPEN PR for this issue. Closed PRs should not prevent rework.
+  EXISTING_PR=$(gh pr list --state open --search "issue-${NUMBER}" --json number --jq '.[0].number // empty' 2>/dev/null || true)
   if [ -n "$EXISTING_PR" ]; then
     log "SKIP: PR #${EXISTING_PR} already exists for issue #${NUMBER}"
     exit 0
