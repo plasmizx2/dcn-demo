@@ -36,7 +36,6 @@ SKIP_LABELS="${SKIP_LABELS:-no-ai,needs-owner-input,needs-payment}"
 PREFER_CLAUDE="${PREFER_CLAUDE:-0}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-}"
 OLLAMA_FALLBACK_ENABLED="${OLLAMA_FALLBACK_ENABLED:-1}"
-OLLAMA_P3_ONLY="${OLLAMA_P3_ONLY:-1}"
 SECRETS_FILE="${SECRETS_FILE:-$HOME/.auto-worker/secrets.json}"
 SECRETS_PROJECT="${SECRETS_PROJECT:-dcn-demo}"
 
@@ -70,37 +69,137 @@ require_cmd() {
   }
 }
 
-is_p3_issue_number() {
-  # $1: issue number
+run_gemini_model_ladder() {
+  # $1: prompt text
+  # Falls back to next model if we get 503 "high demand"/UNAVAILABLE.
+  local prompt="$1"
+  local models=("gemini-2.5-pro" "gemini-2.5-flash" "gemini-2.5-flash-lite")
+  local m tmp rc
+
+  tmp="$(mktemp)"
+  for m in "${models[@]}"; do
+    log "GEMINI: trying model=${m}"
+    : >"$tmp"
+    set +e
+    gemini -m "$m" -p "$prompt" --output-format text 2>&1 | tee -a "$LOG_FILE" | tee "$tmp" >/dev/null
+    rc="${PIPESTATUS[0]}"
+    set -e
+
+    if [ "$rc" -eq 0 ]; then
+      rm -f "$tmp" 2>/dev/null || true
+      return 0
+    fi
+
+    # Try next model on 503/high demand.
+    if grep -qiE "\"code\"\\s*:\\s*503|\\b503\\b|high demand|UNAVAILABLE" "$tmp"; then
+      log "GEMINI: model ${m} overloaded/unavailable (503). Falling back..."
+      continue
+    fi
+
+    # Non-503 error: stop and let caller handle.
+    rm -f "$tmp" 2>/dev/null || true
+    return "$rc"
+  done
+
+  rm -f "$tmp" 2>/dev/null || true
+  return 503
+}
+
+extract_first_unified_diff() {
+  # Reads stdin, outputs first unified diff to stdout (best-effort).
+  python3 - <<'PY'
+import re, sys
+s = sys.stdin.read()
+m = re.search(r"```diff\\s*(.*?)\\s*```", s, re.S|re.I)
+if m:
+  sys.stdout.write(m.group(1).strip() + "\n")
+  raise SystemExit(0)
+m = re.search(r"(?ms)^(diff --git .+)$", s)
+if m:
+  sys.stdout.write(m.group(1))
+  if not m.group(1).endswith("\n"):
+    sys.stdout.write("\n")
+  raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
+run_gemini_patch_ladder_and_apply() {
+  # $1: issue number, $2: title, $3: body
   local n="$1"
-  gh issue view "$n" --json labels --jq '[.labels[]?.name // empty] | any(startswith("P3"))' 2>/dev/null | grep -qx "true"
-}
+  local title="$2"
+  local body="$3"
 
-pick_first_p3_issue_number() {
-  gh issue list --state open --json number,labels --jq '
-    [.[] | select((.labels // []) | any(.name | startswith("P3")))] | sort_by(.number) | .[0].number // empty
-  ' 2>/dev/null || true
-}
-
-create_p3_issue_from_repo_scan() {
-  log "OLLAMA: no P3 issues found; creating a new P3 suggestion issue from quick scan."
-  local findings
-  findings="$( (command -v rg >/dev/null 2>&1 && rg -n --hidden --glob '!.git/**' 'TODO|FIXME|HACK' . || grep -R -n 'TODO\\|FIXME\\|HACK' . 2>/dev/null) | head -n 60 )"
-  if [ -z "${findings:-}" ]; then
-    findings="No obvious TODO/FIXME/HACK markers found in a quick scan."
+  if ! command -v gemini >/dev/null 2>&1; then
+    log "Installing Gemini CLI via npm..."
+    npm install -g @google/gemini-cli 2>&1 | tee -a "$LOG_FILE" || true
   fi
-  gh issue create \
-    --title "P3: repo cleanup suggestions (auto)" \
-    --body "$(cat <<EOF
-Auto-worker reached Ollama fallback mode and did not find any open P3 issues to work on.
+  require_cmd gemini
 
-## Quick scan findings (first 60 matches)
-\`\`\`
-${findings}
-\`\`\`
+  if [ -z "${GEMINI_API_KEY:-}" ]; then
+    log "ERROR: GEMINI_API_KEY is not set."
+    return 41
+  fi
+
+  local prompt
+  prompt="$(cat <<EOF
+You are a coding agent. Output MUST be ONLY a single unified diff that can be applied with 'git apply'.
+Do not include any explanation text.
+Begin your output with: diff --git
+
+Repo context: ${REPO_DIR}
+
+Fix GitHub issue #${n}: ${title}
+
+Issue body:
+${body}
 EOF
-)" \
-    --label "P3" 2>>"$LOG_FILE" || true
+)"
+
+  local models=("gemini-2.5-pro" "gemini-2.5-flash" "gemini-2.5-flash-lite")
+  local m tmp_out tmp_diff rc
+  tmp_out="$(mktemp)"
+  tmp_diff="$(mktemp)"
+
+  for m in "${models[@]}"; do
+    log "GEMINI: patch mode model=${m}"
+    : >"$tmp_out"
+    set +e
+    gemini -m "$m" -p "$prompt" --output-format text >"$tmp_out" 2>&1
+    rc=$?
+    set -e
+
+    if [ "$rc" -ne 0 ] && grep -qiE "\\b503\\b|high demand|UNAVAILABLE" "$tmp_out"; then
+      log "GEMINI: patch mode ${m} overloaded/unavailable (503). Falling back..."
+      continue
+    fi
+    if [ "$rc" -ne 0 ]; then
+      cat "$tmp_out" >>"$LOG_FILE"
+      rm -f "$tmp_out" "$tmp_diff" 2>/dev/null || true
+      return "$rc"
+    fi
+
+    if ! extract_first_unified_diff <"$tmp_out" >"$tmp_diff"; then
+      log "GEMINI: patch mode did not output an applyable diff."
+      cat "$tmp_out" >>"$LOG_FILE"
+      rm -f "$tmp_out" "$tmp_diff" 2>/dev/null || true
+      return 1
+    fi
+
+    if git apply --3way "$tmp_diff" 2>>"$LOG_FILE"; then
+      log "GEMINI: patch applied successfully."
+      rm -f "$tmp_out" "$tmp_diff" 2>/dev/null || true
+      return 0
+    fi
+
+    log "GEMINI: patch failed to apply."
+    cat "$tmp_out" >>"$LOG_FILE"
+    rm -f "$tmp_out" "$tmp_diff" 2>/dev/null || true
+    return 1
+  done
+
+  rm -f "$tmp_out" "$tmp_diff" 2>/dev/null || true
+  return 503
 }
 
 pick_ollama_model() {
@@ -538,63 +637,18 @@ if [ -z "$USED_PROVIDER" ]; then
   fi
   _tmp="$(mktemp)"
   set +e
-  gemini --yolo -p "$AGENT_PROMPT" --output-format json 2>&1 | tee -a "$LOG_FILE" | tee "$_tmp" >/dev/null
+  # Prefer patch mode so we don't depend on Gemini's filesystem tools (which can fail).
+  run_gemini_patch_ladder_and_apply "$NUMBER" "$TITLE" "$BODY" 2>&1 | tee -a "$LOG_FILE" | tee "$_tmp" >/dev/null
   gem_rc="${PIPESTATUS[0]}"
   set -e
   if [ "$gem_rc" -ne 0 ] && grep -qiE "Please set an Auth method|GEMINI_API_KEY|GOOGLE_GENAI_USE_VERTEXAI|GOOGLE_GENAI_USE_GCA|RESOURCE_EXHAUSTED|credits are depleted|prepayment credits are depleted|rate limit|429|too many requests|quota" "$_tmp"; then
     log "GEMINI: auth/billing/rate-limit detected. Falling back to Ollama."
-    if [ "$OLLAMA_P3_ONLY" = "1" ] && ! is_p3_issue_number "$NUMBER"; then
-      P3_NUM="$(pick_first_p3_issue_number)"
-      if [ -z "${P3_NUM:-}" ]; then
-        create_p3_issue_from_repo_scan
-        log "OLLAMA: no P3 issue available; exiting."
-        exit 0
-      fi
-      log "OLLAMA: switching from #${NUMBER} to P3 issue #${P3_NUM}."
-      NUMBER="$P3_NUM"
-      TITLE="$(gh issue view "$NUMBER" --json title --jq '.title' 2>/dev/null || echo "P3 issue #${NUMBER}")"
-      BODY="$(gh issue view "$NUMBER" --json body --jq '.body' 2>/dev/null || echo "")"
-      BRANCH="${BRANCH_PREFIX}${NUMBER}"
-      git checkout "$DEFAULT_BRANCH" 2>>"$LOG_FILE" || true
-      git pull origin "$DEFAULT_BRANCH" 2>>"$LOG_FILE" || true
-      if git rev-parse --verify "$BRANCH" >/dev/null 2>&1; then
-        git checkout "$BRANCH"
-      else
-        git checkout -b "$BRANCH"
-      fi
-      jq -n \
-        --arg number "$NUMBER" \
-        --arg title "$TITLE" \
-        --arg body "$BODY" \
-        --arg branch "$BRANCH" \
-        --arg status "in_progress" \
-        '{number: $number, title: $title, body: $body, branch: $branch, status: $status}' \
-        > "$STATE_FILE"
-      # Rebuild prompt for new issue.
-      AGENT_PROMPT="
-You are an autonomous coding agent working in the repo at: ${REPO_DIR}
-
-REFERENCE (optional):
-${ROADMAP}
-
-Your task is to implement a solution for this GitHub issue:
-
-Issue #${NUMBER}: ${TITLE}
-
-${BODY}
-
-Process:
-1. PLAN/ANALYZE
-2. IMPLEMENT
-3. TEST (if applicable)
-4. COMMIT with:
-   fix: <short description>
-
-   Closes #${NUMBER}
-"
-    fi
     run_ollama_agent "$AGENT_PROMPT" || log "OLLAMA: fallback failed."
     USED_PROVIDER="ollama"
+  elif [ "$gem_rc" -eq 503 ] || grep -qiE "\"code\"\\s*:\\s*503|\\b503\\b|high demand|UNAVAILABLE" "$_tmp"; then
+    log "ERROR: Gemini models are overloaded/unavailable (503). Exiting."
+    rm -f "$_tmp" 2>/dev/null || true
+    exit 1
   elif [ "$gem_rc" -ne 0 ]; then
     log "WARN: Gemini exited non-zero (rc=${gem_rc}). Not treating as fallback; check logs."
   fi
@@ -608,6 +662,12 @@ if [ -n "$ACTUAL_CHANGES" ]; then HAS_CHANGES=true; fi
 if [ -n "$(git log "${DEFAULT_BRANCH}"..HEAD --oneline 2>/dev/null)" ]; then HAS_CHANGES=true; fi
 
 if [ "$HAS_CHANGES" = false ]; then
+  # If the agent is claiming it's already implemented / nothing to do, tell the user in the issue.
+  reason=""
+  if tail -200 "$LOG_FILE" 2>/dev/null | grep -qiE "already implemented|task complete|consider this task complete|feature is implemented|nothing to do"; then
+    reason="Agent output indicates it may already be implemented."
+    issue_comment_already_implemented "$NUMBER" "$reason"
+  fi
   log "ERROR: Agent made no changes. Cleaning up."
   git checkout "$DEFAULT_BRANCH"
   git branch -D "$BRANCH" 2>/dev/null || true
