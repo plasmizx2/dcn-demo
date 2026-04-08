@@ -25,12 +25,15 @@ logger = logging.getLogger("dcn.worker")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from handlers import ml_experiment
+from handlers import local_llm_chat
 from config import RETRY_BACKOFF_SECONDS, RATE_LIMIT_BACKOFF_MULTIPLIER, WORKER_POLL_INTERVAL_SECONDS
 
 BASE_URL = "https://dcn-demo.onrender.com"
 
 # Tell Gemini client where to find the cache server
 os.environ["DCN_CACHE_URL"] = BASE_URL
+# Tell chat handler where to find the coordinator
+os.environ["DCN_BASE_URL"] = BASE_URL
 
 
 def detect_worker_tier():
@@ -105,6 +108,7 @@ WORKER_TIER = detect_worker_tier()
 # Map task_type -> handler
 HANDLERS = {
     "ml_experiment": ml_experiment.handle,
+    "local_llm_chat": local_llm_chat.handle,
 }
 
 
@@ -122,6 +126,7 @@ def heartbeat(worker_node_id):
 
 AI_TASK_TYPES = [
     "ml_experiment",
+    "local_llm_chat",
 ]
 
 

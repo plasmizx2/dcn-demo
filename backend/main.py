@@ -14,6 +14,7 @@ from database import get_pool, close_pool
 from apis.jobs import router as jobs_router
 from apis.monitor import router as monitor_router
 from apis.workers import router as workers_router
+from apis.chat import router as chat_router
 from apis.feedback import router as feedback_router
 from apis.billing import router as billing_router
 from auth import (
@@ -370,6 +371,18 @@ async def lifespan(app: FastAPI):
                 created_at  TIMESTAMPTZ DEFAULT now()
             );
         """)
+        # ── Local LLM chat (issue #89) ────────────────────────────
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                job_id          UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+                seq             INTEGER NOT NULL,
+                role            TEXT NOT NULL CHECK (role IN ('system','user','assistant')),
+                content         TEXT NOT NULL DEFAULT '',
+                created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX IF NOT EXISTS idx_chat_messages_job_seq ON chat_messages(job_id, seq);
+        """)
         # Performance indexes (safe to re-run)
         await conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON jobs(user_id);
@@ -395,6 +408,7 @@ app.add_middleware(
 app.include_router(jobs_router)
 app.include_router(monitor_router)
 app.include_router(workers_router)
+app.include_router(chat_router)
 app.include_router(feedback_router)
 app.include_router(billing_router)
 

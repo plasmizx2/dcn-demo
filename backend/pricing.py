@@ -23,10 +23,10 @@ def estimate_job_cost(subtasks: list[dict]) -> dict:
 
     for task in subtasks:
         payload = task.get("task_payload", {})
-        task_type = payload.get("experiment_type", "ml_experiment")
+        task_type = payload.get("task_type") or payload.get("experiment_type") or "ml_experiment"
         min_tier = payload.get("min_tier", 2)
 
-        base_rate = BASE_RATES.get("ml_experiment", 0.01)
+        base_rate = BASE_RATES.get(task_type, BASE_RATES.get("ml_experiment", 0.01))
         tier_mult = TIER_MULTIPLIER.get(min_tier, 1.0)
         est_seconds = ESTIMATED_SECONDS_PER_TIER.get(min_tier, 10)
 
@@ -72,7 +72,8 @@ def calculate_actual_cost(task_rows: list[dict]) -> dict:
                 payload = {}
 
         min_tier = payload.get("min_tier", 2)
-        base_rate = BASE_RATES.get("ml_experiment", 0.01)
+        task_type = payload.get("task_type") or payload.get("experiment_type") or "ml_experiment"
+        base_rate = BASE_RATES.get(task_type, BASE_RATES.get("ml_experiment", 0.01))
         tier_mult = TIER_MULTIPLIER.get(min_tier, 1.0)
 
         task_cost = round(base_rate * tier_mult * exec_time, 4)

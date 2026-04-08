@@ -30,6 +30,7 @@ SESSION_MAX_AGE_SECONDS: int = 86400  # 24 hours
 # ── Task Types ───────────────────────────────────────────────
 VALID_TASK_TYPES: set[str] = {
     "ml_experiment",
+    "local_llm_chat",
 }
 
 # ── Job Constraints ──────────────────────────────────────────
@@ -42,6 +43,8 @@ MIN_REWARD: float = 0.0
 # Kept low so DCN undercuts self-hosted cloud compute for convenience
 BASE_RATES: dict[str, float] = {
     "ml_experiment": 0.0001,
+    # Chat sessions are priced low for the demo (cost is mostly worker time).
+    "local_llm_chat": 0.00005,
 }
 # Multiplier applied based on minimum worker tier required
 TIER_MULTIPLIER: dict[int, float] = {1: 1.0, 2: 1.2, 3: 1.5, 4: 2.0}

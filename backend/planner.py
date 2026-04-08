@@ -16,6 +16,9 @@ def plan_tasks(task_type: str, input_payload: dict) -> list[dict]:
     if task_type == "ml_experiment":
         return _plan_ml_experiment(input_payload)
 
+    if task_type == "local_llm_chat":
+        return _plan_local_llm_chat(input_payload)
+
     else:
         return [
             {"task_name": f"step_{i}", "task_description": f"Subtask {i} for {task_type}", "task_payload": {}}
@@ -298,3 +301,31 @@ def _plan_ml_experiment(input_payload: dict) -> list[dict]:
                 "task_payload": {**base, "experiment_type": "extra_trees_classifier", "features": all_features, "cv_folds": 5, "params": {"n_estimators": 500, "max_depth": 20}, "min_tier": 4},
             },
         ]
+
+
+def _plan_local_llm_chat(input_payload: dict) -> list[dict]:
+    """
+    Plan a single long-running chat session task.
+
+    The worker is expected to run local inference (e.g. Ollama) and stream
+    assistant tokens back to the coordinator via chat APIs.
+    """
+    model = input_payload.get("model", "llama3.1")
+    idle_timeout_seconds = int(input_payload.get("idle_timeout_seconds", 5 * 60))
+    max_duration_seconds = int(input_payload.get("max_duration_seconds", 30 * 60))
+    system_prompt = input_payload.get("system_prompt", "").strip()
+
+    return [
+        {
+            "task_name": "chat_session",
+            "task_description": f"Run a streaming chat session with local model '{model}'",
+            "task_payload": {
+                "task_type": "local_llm_chat",
+                "model": model,
+                "idle_timeout_seconds": idle_timeout_seconds,
+                "max_duration_seconds": max_duration_seconds,
+                "system_prompt": system_prompt,
+                "min_tier": 1,
+            },
+        }
+    ]
