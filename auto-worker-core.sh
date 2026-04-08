@@ -36,6 +36,7 @@ SKIP_LABELS="${SKIP_LABELS:-no-ai,needs-owner-input,needs-payment}"
 PREFER_CLAUDE="${PREFER_CLAUDE:-0}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-}"
 OLLAMA_FALLBACK_ENABLED="${OLLAMA_FALLBACK_ENABLED:-1}"
+OLLAMA_P3_ONLY="${OLLAMA_P3_ONLY:-1}"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"; }
 
@@ -44,6 +45,39 @@ require_cmd() {
     echo "auto-worker-core requires '$1' on PATH" >&2
     exit 1
   }
+}
+
+is_p3_issue_number() {
+  # $1: issue number
+  local n="$1"
+  gh issue view "$n" --json labels --jq '[.labels[]?.name // empty] | any(startswith("P3"))' 2>/dev/null | grep -qx "true"
+}
+
+pick_first_p3_issue_number() {
+  gh issue list --state open --json number,labels --jq '
+    [.[] | select((.labels // []) | any(.name | startswith("P3")))] | sort_by(.number) | .[0].number // empty
+  ' 2>/dev/null || true
+}
+
+create_p3_issue_from_repo_scan() {
+  log "OLLAMA: no P3 issues found; creating a new P3 suggestion issue from quick scan."
+  local findings
+  findings="$( (command -v rg >/dev/null 2>&1 && rg -n --hidden --glob '!.git/**' 'TODO|FIXME|HACK' . || grep -R -n 'TODO\\|FIXME\\|HACK' . 2>/dev/null) | head -n 60 )"
+  if [ -z "${findings:-}" ]; then
+    findings="No obvious TODO/FIXME/HACK markers found in a quick scan."
+  fi
+  gh issue create \
+    --title "P3: repo cleanup suggestions (auto)" \
+    --body "$(cat <<EOF
+Auto-worker reached Ollama fallback mode and did not find any open P3 issues to work on.
+
+## Quick scan findings (first 60 matches)
+\`\`\`
+${findings}
+\`\`\`
+EOF
+)" \
+    --label "P3" 2>>"$LOG_FILE" || true
 }
 
 pick_ollama_model() {
@@ -425,6 +459,56 @@ if [ -z "$USED_PROVIDER" ]; then
   set -e
   if [ "$gem_rc" -ne 0 ] && grep -qiE "Please set an Auth method|GEMINI_API_KEY|GOOGLE_GENAI_USE_VERTEXAI|GOOGLE_GENAI_USE_GCA|RESOURCE_EXHAUSTED|credits are depleted|prepayment credits are depleted|rate limit|429|too many requests|quota" "$_tmp"; then
     log "GEMINI: auth/billing/rate-limit detected. Falling back to Ollama."
+    if [ "$OLLAMA_P3_ONLY" = "1" ] && ! is_p3_issue_number "$NUMBER"; then
+      P3_NUM="$(pick_first_p3_issue_number)"
+      if [ -z "${P3_NUM:-}" ]; then
+        create_p3_issue_from_repo_scan
+        log "OLLAMA: no P3 issue available; exiting."
+        exit 0
+      fi
+      log "OLLAMA: switching from #${NUMBER} to P3 issue #${P3_NUM}."
+      NUMBER="$P3_NUM"
+      TITLE="$(gh issue view "$NUMBER" --json title --jq '.title' 2>/dev/null || echo "P3 issue #${NUMBER}")"
+      BODY="$(gh issue view "$NUMBER" --json body --jq '.body' 2>/dev/null || echo "")"
+      BRANCH="${BRANCH_PREFIX}${NUMBER}"
+      git checkout "$DEFAULT_BRANCH" 2>>"$LOG_FILE" || true
+      git pull origin "$DEFAULT_BRANCH" 2>>"$LOG_FILE" || true
+      if git rev-parse --verify "$BRANCH" >/dev/null 2>&1; then
+        git checkout "$BRANCH"
+      else
+        git checkout -b "$BRANCH"
+      fi
+      jq -n \
+        --arg number "$NUMBER" \
+        --arg title "$TITLE" \
+        --arg body "$BODY" \
+        --arg branch "$BRANCH" \
+        --arg status "in_progress" \
+        '{number: $number, title: $title, body: $body, branch: $branch, status: $status}' \
+        > "$STATE_FILE"
+      # Rebuild prompt for new issue.
+      AGENT_PROMPT="
+You are an autonomous coding agent working in the repo at: ${REPO_DIR}
+
+REFERENCE (optional):
+${ROADMAP}
+
+Your task is to implement a solution for this GitHub issue:
+
+Issue #${NUMBER}: ${TITLE}
+
+${BODY}
+
+Process:
+1. PLAN/ANALYZE
+2. IMPLEMENT
+3. TEST (if applicable)
+4. COMMIT with:
+   fix: <short description>
+
+   Closes #${NUMBER}
+"
+    fi
     run_ollama_agent "$AGENT_PROMPT" || log "OLLAMA: fallback failed."
     USED_PROVIDER="ollama"
   elif [ "$gem_rc" -ne 0 ]; then
