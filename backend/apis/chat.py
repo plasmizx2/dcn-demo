@@ -27,11 +27,9 @@ async def _require_job_access(conn, request: Request, job_id: str) -> dict:
 
 
 @router.get("/chat/{job_id}/messages")
-async def get_chat_messages(job_id: str, after_seq: int = 0, request: Request | None = None) -> list[dict]:
+async def get_chat_messages(request: Request, job_id: str, after_seq: int = 0) -> list[dict]:
     pool = await get_pool()
     async with pool.acquire() as conn:
-        if request is None:
-            raise HTTPException(status_code=400, detail="Missing request")
         await _require_job_access(conn, request, job_id)
 
         rows = await conn.fetch(
