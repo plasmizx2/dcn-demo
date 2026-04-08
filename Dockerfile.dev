@@ -1,0 +1,19 @@
+# Development Dockerfile
+FROM python:3.12-slim-bookworm
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    nodejs \
+    npm \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY backend/requirements.txt /app/backend/requirements.txt
+RUN pip install --no-cache-dir -r /app/backend/requirements.txt
+
+COPY backend/ /app/backend/
+COPY frontend/web/ /app/frontend/web/
+
+WORKDIR /app/backend
+ENV PYTHONUNBUFFERED=1
