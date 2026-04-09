@@ -27,6 +27,9 @@ interface HistoryRow {
 function timeAgo(iso?: string) {
   if (!iso) return 'never';
   const d = new Date(iso);
+  if (isNaN(d.getTime())) {
+    return 'never';
+  }
   const seconds = Math.floor((Date.now() - d.getTime()) / 1000);
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);
