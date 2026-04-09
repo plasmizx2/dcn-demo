@@ -280,7 +280,7 @@ export function WorkerLogsPage() {
                                   <span className="text-xs capitalize text-slate-400">{h.status || '—'}</span>
                                 </td>
                                 <td className="p-2 text-slate-500 text-xs">
-                                  {h.execution_time_seconds != null
+                                  {h.execution_time_seconds != null && isFinite(h.execution_time_seconds)
                                     ? `${Number(h.execution_time_seconds).toFixed(1)}s`
                                     : '—'}
                                 </td>
