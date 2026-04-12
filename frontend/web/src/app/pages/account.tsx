@@ -370,7 +370,7 @@ export function AccountPage() {
                               {t.amount_cents >= 0 ? "+" : ""}{money(t.amount_cents)}
                             </p>
                             <p className="text-xs text-slate-400">
-                              Balance: {t.balance_after != null ? money(t.balance_after) : "—"}
+                              Balance: {Number.isFinite(t.balance_after as number) ? money(t.balance_after as number) : "—"}
                             </p>
                           </div>
                         </div>
