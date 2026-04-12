@@ -25,7 +25,7 @@ type BalanceTransaction = {
   id: string;
   description: string;
   amount_cents: number;
-  balance_after_cents: number | null;
+  balance_after: number | null;
   created_at: string;
 };
 
@@ -370,7 +370,7 @@ export function AccountPage() {
                               {t.amount_cents >= 0 ? "+" : ""}{money(t.amount_cents)}
                             </p>
                             <p className="text-xs text-slate-400">
-                              Balance: {t.balance_after_cents != null ? money(t.balance_after_cents) : "—"}
+                              Balance: {t.balance_after != null ? money(t.balance_after) : "—"}
                             </p>
                           </div>
                         </div>
