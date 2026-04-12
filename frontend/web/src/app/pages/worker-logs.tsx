@@ -267,11 +267,15 @@ export function WorkerLogsPage() {
                           <tbody>
                             {history.map((h, i) => (
                               <tr key={`${h.task_id}-${i}`} className="border-b border-white/5">
-                                <td className="p-2 text-slate-300">
-                                  {h.task_name || (h.task_id ? String(h.task_id).slice(0, 8) : '—')}
+                                <td className="p-2 text-slate-300 max-w-[160px]">
+                                  <div className="truncate" title={h.task_name || undefined}>
+                                    {h.task_name || (h.task_id ? String(h.task_id).slice(0, 8) : '—')}
+                                  </div>
                                 </td>
-                                <td className="p-2 text-slate-400 truncate max-w-[120px]">
-                                  {h.job_title || '—'}
+                                <td className="p-2 text-slate-400 max-w-[120px]">
+                                  <div className="truncate" title={h.job_title || undefined}>
+                                    {h.job_title || '—'}
+                                  </div>
                                 </td>
                                 <td className="p-2">
                                   <span className="text-xs capitalize text-slate-400">{h.status || '—'}</span>

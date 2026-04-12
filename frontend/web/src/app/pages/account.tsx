@@ -187,7 +187,10 @@ export function AccountPage() {
         credentials: 'include',
         body: JSON.stringify({ tier }),
       });
-      if (!res.ok) throw new Error('Upgrade failed');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { detail?: string }).detail || 'Upgrade failed');
+      }
       const data = await res.json();
 
       if (data.checkout_url) {
@@ -198,7 +201,7 @@ export function AccountPage() {
       setTierInfo((prev) => (prev ? { ...prev, tier: data.tier || tier } : null));
       toast.success(`Switched to ${tier} tier`);
     } catch (e) {
-      toast.error('Failed to change tier');
+      toast.error(e instanceof Error ? e.message : 'Failed to change tier');
     } finally {
       setUpgrading(false);
     }

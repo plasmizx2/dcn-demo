@@ -282,7 +282,7 @@ async def get_balance_history(request: Request) -> list[dict]:
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            """SELECT id, amount_cents, balance_after, tx_type, reference_id, description, created_at
+            """SELECT id, amount_cents, balance_after AS balance_after_cents, tx_type, reference_id, description, created_at
                FROM balance_transactions WHERE user_id = $1::uuid
                ORDER BY created_at DESC LIMIT 50""",
             user["id"],

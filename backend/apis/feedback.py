@@ -1,11 +1,14 @@
 """API routes for bug reports and contact messages."""
 
+import re
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
 from database import get_pool
 from auth import get_session, ELEVATED_ROLES
 from rate_limit import check_rate_limit
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 router = APIRouter()
 
@@ -76,6 +79,8 @@ async def create_contact_message(body: ContactMessage, request: Request) -> dict
     check_rate_limit(request, max_requests=3, window_seconds=60)  # 3 messages/min
     if not body.name.strip() or not body.email.strip() or not body.message.strip():
         raise HTTPException(status_code=400, detail="Name, email, and message are required")
+    if not _EMAIL_RE.match(body.email.strip()):
+        raise HTTPException(status_code=400, detail="Invalid email address")
 
     user = await get_session(request)
     user_id = user["id"] if user else None

@@ -49,8 +49,13 @@ export function ContactPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRe.test(email.trim())) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
     setLoading(true);
-    
+
     try {
       const response = await fetch('/contact', {
         method: 'POST',
