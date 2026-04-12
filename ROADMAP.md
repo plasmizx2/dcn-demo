@@ -18,18 +18,9 @@ The distributed worker architecture already exists. The gap is focus and polish.
 
 ---
 
-## Phase 0: Strip to ML Experiment Only
+## Phase 0: Strip to ML Experiment Only ✅ COMPLETE
 
-Remove everything that isn't `ml_experiment`. This reduces scope, sharpens the product, and makes every subsequent step simpler.
-
-### What to remove
-- [ ] Task types from `backend/config.py`: `document_analysis`, `codebase_review`, `website_builder`, `research_pipeline`, `data_processing`, `image_processing`, `web_scraping`, `audio_transcription`, `sentiment_classification`
-- [ ] Handler files: `backend/handlers/document.py`, `codebase.py`, `website.py`, `research.py`, `data_processing.py`
-- [ ] Desktop worker handlers (in [dcn-worker](https://github.com/plasmizx2/dcn-worker)): `audio_transcription.py`, `image_processing.py`, etc.
-- [ ] Planner branches for removed task types (`backend/planner.py`)
-- [ ] Aggregator branches for removed task types (`backend/aggregator.py`)
-- [ ] Frontend task type selectors (document, codebase, website, research, data options)
-- [ ] Gemini client (used only for non-ML task synthesis — ML handler uses sklearn directly)
+Non-ML task types and handlers have been removed. Only `ml_experiment` remains.
 
 ### What stays
 - `ml_experiment` handler (backend + [dcn-worker](https://github.com/plasmizx2/dcn-worker))
@@ -64,22 +55,17 @@ dcn-worker --host http://your-server.com --name "mikes-pc"
 
 ---
 
-## Phase 2: Coordinator Easy Deploy
+## Phase 2: Coordinator Easy Deploy ✅ COMPLETE
 
-Your coordinator (the server) needs to be easy to run on any machine, not just your laptop.
+### Done
+- [x] `Dockerfile` for production build (Vite/React + FastAPI)
+- [x] `render.yaml` for one-click Render deployment
+- [x] Environment variable config: `DATABASE_URL`, `PORT`, `SECRET_KEY`
+- [x] Health check endpoint (`/health`)
 
-### Goal
-One command to start the full coordinator stack:
-```bash
-docker compose up
-```
-
-### Tasks
-- [ ] Write `Dockerfile` for the backend
-- [ ] Write `docker-compose.yml` with backend + Postgres
-- [ ] Environment variable config: `DATABASE_URL`, `PORT`, `SECRET_KEY`
-- [ ] Health check endpoint (`/health`) so workers can verify connectivity
-- [ ] `COORDINATOR_SETUP.md` — how to run the coordinator on a VPS or spare machine
+### Remaining
+- [ ] `docker-compose.yml` with backend + Postgres (for local self-hosting)
+- [ ] `COORDINATOR_SETUP.md` — how to run on a VPS or spare machine
 
 ---
 
@@ -99,33 +85,32 @@ Workers authenticate with a secret token. Unknown workers are rejected.
 
 ---
 
-## Phase 4: Real ML Support
+## Phase 4: Real ML Support ✅ MOSTLY COMPLETE
 
-The current handler uses sklearn on hardcoded datasets. Real ML engineers need to bring their own data and models.
+### Done
+- [x] Job submission accepts CSV file upload, OpenML ID, or built-in datasets
+- [x] Planner generates experiment configs from user-specified model list + param grid
+- [x] Worker handler loads CSV, runs train/test split, returns metrics
+- [x] Support: LinearRegression, Ridge, DecisionTree, RandomForest, GradientBoosting
+- [x] Results page shows ranked experiment table with downloadable winning config
 
-### Goal
-Users can upload a CSV and pick from supported model families. Workers train on real data.
-
-### Tasks
-- [ ] Job submission accepts CSV file upload or URL
-- [ ] Planner generates experiment configs from user-specified model list + param grid
-- [ ] Worker handler loads CSV, runs train/test split, returns metrics
-- [ ] Support: LinearRegression, Ridge, RandomForest, GradientBoosting, XGBoost
-- [ ] Results page shows ranked experiment table with downloadable winning config
-- [ ] (Later) PyTorch support — simple MLP trainer for classification tasks
+### Remaining
+- [ ] Target column dropdown from preview columns (#78)
+- [ ] XGBoost support
+- [ ] PyTorch support (future)
 
 ---
 
-## Phase 5: Operator Polish
+## Phase 5: Operator Polish ✅ MOSTLY COMPLETE
 
-The `/ops` dashboard is your demo centerpiece. It needs to show the distributed story clearly.
+### Done
+- [x] Live worker list: name, machine, tier, tasks completed, last seen
+- [x] Per-worker task activity feed
+- [x] Job timeline: submitted → planned → tasks distributed → aggregated
+- [x] Speedup stat: timing comparison tab on completed jobs
 
-### Tasks
-- [ ] Live worker list: name, machine, tier, tasks completed, last seen
-- [ ] Per-worker task activity feed
-- [ ] Job timeline: submitted → planned → tasks distributed → aggregated
-- [ ] Speedup stat: "This job ran in 12s distributed vs ~50s sequential"
-- [ ] Worker geographic map (optional, use IP geolocation — shows "compute from multiple machines")
+### Remaining
+- [ ] Worker geographic map (optional, future)
 
 ---
 
@@ -155,9 +140,8 @@ Anyone can submit an ML experiment job. Anyone can run a worker and contribute c
 
 ## Immediate Next Steps
 
-1. Complete Phase 0 — strip to `ml_experiment` only
-2. Test the pipeline end-to-end with just ML experiments
-3. Get `dcn-worker` running on a second machine (your other laptop)
-4. Run a real job across two machines and screenshot the `/ops` dashboard
+1. Fix P1 bugs: contact form email validation (#59), long task names in worker-logs (#60), billing regressions (#98, #116)
+2. Complete P1 enhancements: target column dropdown (#78), pricing credibility (#74), task requeue on worker disconnect (#82)
+3. Work through P2 items: pagination (#56), security hardening (#86), README refresh (#84)
 
-That's the MVP of a distributed compute network.
+See [GitHub issue #88](https://github.com/plasmizx2/dcn-demo/issues/88) for the full prioritized production readiness checklist.
