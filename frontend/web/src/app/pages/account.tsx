@@ -30,8 +30,8 @@ type BalanceTransaction = {
 };
 
 const money = (cents: number | null | undefined): string => {
-  if (!Number.isFinite(cents as number)) return '—';
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format((cents as number) / 100);
+  if (typeof cents !== 'number' || !isFinite(cents)) return '—';
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(cents / 100);
 };
 
 export function AccountPage() {
