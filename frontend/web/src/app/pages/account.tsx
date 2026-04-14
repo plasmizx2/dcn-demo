@@ -29,8 +29,10 @@ type BalanceTransaction = {
   created_at: string;
 };
 
-const money = (cents: number) =>
-  new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(cents / 100);
+const money = (cents: number | null | undefined): string => {
+  if (!Number.isFinite(cents as number)) return '—';
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format((cents as number) / 100);
+};
 
 export function AccountPage() {
   const { ready } = useRequireAuth();
@@ -364,13 +366,13 @@ export function AccountPage() {
                           <div className="text-right ml-4">
                             <p
                               className={`font-semibold ${
-                                t.amount_cents >= 0 ? "text-green-400" : "text-red-400"
+                                (t.amount_cents ?? 0) >= 0 ? "text-green-400" : "text-red-400"
                               }`}
                             >
-                              {t.amount_cents >= 0 ? "+" : ""}{money(t.amount_cents)}
+                              {(t.amount_cents ?? 0) >= 0 ? "+" : ""}{money(t.amount_cents)}
                             </p>
                             <p className="text-xs text-slate-400">
-                              Balance: {Number.isFinite(t.balance_after as number) ? money(t.balance_after as number) : "—"}
+                              Balance: {money(t.balance_after)}
                             </p>
                           </div>
                         </div>
