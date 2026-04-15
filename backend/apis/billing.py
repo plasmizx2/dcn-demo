@@ -28,6 +28,13 @@ router = APIRouter(prefix="/billing")
 logger = logging.getLogger("dcn.billing")
 
 
+def _get_base_url(request: Request) -> str:
+    """Derive the base URL from the incoming request so PR previews work."""
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("host", request.url.netloc)
+    return f"{scheme}://{host}"
+
+
 # ── Schemas ──────────────────────────────────────────────────
 
 class UpgradeTierRequest(BaseModel):
@@ -154,7 +161,7 @@ async def upgrade_tier(body: UpgradeTierRequest, request: Request):
         if not billing.is_enabled():
             raise HTTPException(status_code=503, detail="Billing not configured")
         try:
-            result = await billing.create_pro_subscription(user["id"], user["email"])
+            result = await billing.create_pro_subscription(user["id"], user["email"], base_url=_get_base_url(request))
             return result
         except ValueError as e:
             raise HTTPException(status_code=500, detail=str(e)) from e
@@ -205,7 +212,7 @@ async def create_topup(request: Request) -> dict:
     if amount_cents < 500:
         raise HTTPException(status_code=400, detail="Minimum top-up is $5.00")
     try:
-        result = await billing.create_topup_checkout_session(user["id"], user["email"], amount_cents)
+        result = await billing.create_topup_checkout_session(user["id"], user["email"], amount_cents, base_url=_get_base_url(request))
         return result
     except Exception as e:
         logger.error("Top-up failed for user %s: %s", user["id"], e, exc_info=True)

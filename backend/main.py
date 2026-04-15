@@ -36,6 +36,13 @@ BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 
 logger = logging.getLogger("dcn")
 
+
+def _get_base_url(request: Request) -> str:
+    """Derive the base URL from the incoming request so PR previews work automatically."""
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("host", request.url.netloc)
+    return f"{scheme}://{host}"
+
 ERROR_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "error")
 WEB_DIST = os.path.join(os.path.dirname(__file__), "..", "frontend", "web", "dist")
 
@@ -445,9 +452,12 @@ async def auth_middleware(request: Request, call_next):
 
 # ── Auth routes ─────────────────────────────────────────────────
 
-def _session_cookie_args() -> dict:
+def _session_cookie_args(request: Request | None = None) -> dict:
     """Session cookie flags — Secure on HTTPS so browsers keep the cookie on production."""
-    secure = BASE_URL.startswith("https://")
+    if request:
+        secure = _get_base_url(request).startswith("https://")
+    else:
+        secure = BASE_URL.startswith("https://")
     return {
         "httponly": True,
         "samesite": "lax",
@@ -457,7 +467,7 @@ def _session_cookie_args() -> dict:
     }
 
 
-async def _finish_oauth_login(user: dict) -> RedirectResponse:
+async def _finish_oauth_login(user: dict, request: Request | None = None) -> RedirectResponse:
     """Shared helper: create session, set cookie, redirect."""
     token = await create_session(user)
     if user["role"] == "waitlister":
@@ -467,7 +477,7 @@ async def _finish_oauth_login(user: dict) -> RedirectResponse:
     else:
         redirect = "/dashboard"
     response = RedirectResponse(redirect, status_code=302)
-    response.set_cookie(SESSION_COOKIE, token, **_session_cookie_args())
+    response.set_cookie(SESSION_COOKIE, token, **_session_cookie_args(request))
     return response
 
 
@@ -483,10 +493,11 @@ async def serve_login(request: Request):
 
 # ── Google OAuth ─────────────────────────────────────────────
 @app.get("/auth/google")
-async def google_login():
+async def google_login(request: Request):
+    base = _get_base_url(request)
     params = urlencode({
         "client_id": GOOGLE_CLIENT_ID,
-        "redirect_uri": f"{BASE_URL}/auth/google/callback",
+        "redirect_uri": f"{base}/auth/google/callback",
         "response_type": "code",
         "scope": "openid email profile",
         "access_type": "offline",
@@ -501,12 +512,13 @@ async def google_callback(request: Request):
     if not code:
         return RedirectResponse("/login")
 
+    base = _get_base_url(request)
     async with httpx.AsyncClient() as client:
         token_resp = await client.post("https://oauth2.googleapis.com/token", data={
             "code": code,
             "client_id": GOOGLE_CLIENT_ID,
             "client_secret": GOOGLE_CLIENT_SECRET,
-            "redirect_uri": f"{BASE_URL}/auth/google/callback",
+            "redirect_uri": f"{base}/auth/google/callback",
             "grant_type": "authorization_code",
         })
         if token_resp.status_code != 200:
@@ -531,15 +543,16 @@ async def google_callback(request: Request):
         provider="google",
         provider_id=str(info["id"]),
     )
-    return await _finish_oauth_login(user)
+    return await _finish_oauth_login(user, request)
 
 
 # ── GitHub OAuth ─────────────────────────────────────────────
 @app.get("/auth/github")
-async def github_login():
+async def github_login(request: Request):
+    base = _get_base_url(request)
     params = urlencode({
         "client_id": GITHUB_CLIENT_ID,
-        "redirect_uri": f"{BASE_URL}/auth/github/callback",
+        "redirect_uri": f"{base}/auth/github/callback",
         "scope": "read:user user:email",
     })
     return RedirectResponse(f"https://github.com/login/oauth/authorize?{params}")
@@ -551,6 +564,7 @@ async def github_callback(request: Request):
     if not code:
         return RedirectResponse("/login")
 
+    base = _get_base_url(request)
     async with httpx.AsyncClient() as client:
         token_resp = await client.post(
             "https://github.com/login/oauth/access_token",
@@ -558,7 +572,7 @@ async def github_callback(request: Request):
                 "client_id": GITHUB_CLIENT_ID,
                 "client_secret": GITHUB_CLIENT_SECRET,
                 "code": code,
-                "redirect_uri": f"{BASE_URL}/auth/github/callback",
+                "redirect_uri": f"{base}/auth/github/callback",
             },
             headers={"Accept": "application/json"},
         )
@@ -598,7 +612,7 @@ async def github_callback(request: Request):
         provider="github",
         provider_id=str(gh_user["id"]),
     )
-    return await _finish_oauth_login(user)
+    return await _finish_oauth_login(user, request)
 
 
 # ── Session endpoints ────────────────────────────────────────
@@ -621,7 +635,7 @@ async def do_logout(request: Request):
     if token:
         await destroy_session(token)
     response = RedirectResponse("/login", status_code=302)
-    secure = BASE_URL.startswith("https://")
+    secure = _get_base_url(request).startswith("https://")
     response.delete_cookie(SESSION_COOKIE, path="/", samesite="lax", secure=secure)
     return response
 
