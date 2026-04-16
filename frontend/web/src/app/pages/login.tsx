@@ -71,7 +71,42 @@ export function LoginPage() {
           </div>
 
           {/* OAuth Buttons */}
-          <div className="space-y-3">
+          <div className="space-y-4">
+            {/* GitHub Primary Button */}
+            <div className="space-y-2">
+              <a
+                href="/auth/github"
+                className="group w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 transition-all border border-purple-500/50 hover:border-purple-400/50 text-white shadow-lg shadow-purple-500/20"
+              >
+                <Github className="w-5 h-5" />
+                <span className="font-semibold">Continue with GitHub</span>
+              </a>
+
+              {/* GitHub Benefits */}
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="bg-white/5 rounded-lg p-2 border border-white/10">
+                  <div className="font-semibold text-purple-300 mb-1">🔐 Secure</div>
+                  <div className="text-slate-400">Industry-standard OAuth</div>
+                </div>
+                <div className="bg-white/5 rounded-lg p-2 border border-white/10">
+                  <div className="font-semibold text-blue-300 mb-1">✅ Works Everywhere</div>
+                  <div className="text-slate-400">PR previews & all domains</div>
+                </div>
+                <div className="bg-white/5 rounded-lg p-2 border border-white/10">
+                  <div className="font-semibold text-cyan-300 mb-1">⚡ Seamless</div>
+                  <div className="text-slate-400">Already have a GitHub account</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-white/10" />
+              <span className="text-xs text-slate-500 uppercase tracking-wider">or</span>
+              <div className="flex-1 h-px bg-white/10" />
+            </div>
+
+            {/* Google Alternative */}
             <a
               href="/auth/google"
               className="group w-full flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl bg-white hover:bg-gray-50 transition-all border border-gray-200 hover:shadow-lg"
@@ -84,21 +119,6 @@ export function LoginPage() {
               </svg>
               <span className="font-semibold text-gray-700">Continue with Google</span>
             </a>
-
-            <a
-              href="/auth/github"
-              className="group w-full flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 transition-all border border-white/10 hover:border-white/20 text-white"
-            >
-              <Github className="w-5 h-5" />
-              <span className="font-semibold">Continue with GitHub</span>
-            </a>
-          </div>
-
-          {/* Divider */}
-          <div className="my-8 flex items-center gap-4">
-            <div className="flex-1 h-px bg-white/10" />
-            <span className="text-xs text-slate-500 uppercase tracking-wider">Secure Authentication</span>
-            <div className="flex-1 h-px bg-white/10" />
           </div>
 
           {/* Back link */}

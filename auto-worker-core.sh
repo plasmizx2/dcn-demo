@@ -82,6 +82,7 @@ except Exception:
     sys.exit(1)
 PY
 }
+
 issue_comment_already_implemented() {
   # $1: issue number
   # $2: optional short reason
@@ -91,13 +92,13 @@ issue_comment_already_implemented() {
   gh issue comment "$n" --body "$(cat <<EOF
 ## Auto-worker note
 
-I attempted to work this issue but it appears the requested behavior may already be implemented (or there wasn’t a clear code change to make).
+I attempted to work this issue but it appears the requested behavior may already be implemented (or there wasn't a clear code change to make).
 
 ${reason:+**Reason observed:** ${reason}}
 
 ### What you can do next
 - If this issue is truly done: **close it**.
-- If it still isn’t done: please **expand the issue** with concrete acceptance criteria (what screen/API, exact expected behavior, and how to verify), and mention what’s currently broken/missing.
+- If it still isn't done: please **expand the issue** with concrete acceptance criteria (what screen/API, exact expected behavior, and how to verify), and mention what's currently broken/missing.
 
 EOF
 )" 2>>"$LOG_FILE" || true
@@ -175,7 +176,7 @@ run_gemini_model_ladder() {
     fi
 
     # Try next model on 503/high demand.
-    if grep -qiE "\"code\"\\s*:\\s*503|\\b503\\b|high demand|UNAVAILABLE" "$tmp"; then
+    if grep -qiE "\"code\"\s*:\s*503|\b503\b|high demand|UNAVAILABLE" "$tmp"; then
       log "GEMINI: model ${m} overloaded/unavailable (503). Falling back..."
       continue
     fi
@@ -267,7 +268,7 @@ EOF
     rc=$?
     set -e
 
-    if [ "$rc" -ne 0 ] && grep -qiE "\\b503\\b|high demand|UNAVAILABLE" "$tmp_out"; then
+    if [ "$rc" -ne 0 ] && grep -qiE "\b503\b|high demand|UNAVAILABLE" "$tmp_out"; then
       log "GEMINI: patch mode ${m} overloaded/unavailable (503). Falling back..."
       continue
     fi
@@ -302,7 +303,6 @@ EOF
 }
 
 pick_ollama_model() {
-  # Prefer explicit OLLAMA_MODEL; otherwise choose a deterministic installed model.
   if [ -n "$OLLAMA_MODEL" ]; then
     echo "$OLLAMA_MODEL"
     return 0
@@ -311,9 +311,6 @@ pick_ollama_model() {
     echo ""
     return 0
   fi
-  # `ollama list` columns: NAME ID SIZE MODIFIED
-  # NOTE: if the Ollama server isn't reachable, `ollama list` prints an error to stderr.
-  # We capture stderr so the caller can decide what to do.
   local out
   out="$(ollama list 2>&1 || true)"
   if echo "$out" | grep -qiE "could not connect|connection refused|dial tcp|failed to connect"; then
@@ -322,20 +319,12 @@ pick_ollama_model() {
   fi
   local names
   names="$(printf "%s\n" "$out" | awk 'NR>1 {print $1}' || true)"
-  # Prefer known-good models on your machine.
-  if echo "$names" | grep -qx "qwen2.5:7b"; then
-    echo "qwen2.5:7b"
-    return 0
-  fi
-  if echo "$names" | grep -qx "qwen2.5:3b"; then
-    echo "qwen2.5:3b"
-    return 0
-  fi
+  if echo "$names" | grep -qx "qwen2.5:7b"; then echo "qwen2.5:7b"; return 0; fi
+  if echo "$names" | grep -qx "qwen2.5:3b"; then echo "qwen2.5:3b"; return 0; fi
   echo "$names" | head -n 1
 }
 
 run_ollama_agent() {
-  # $1: prompt text
   local prompt="$1"
   if [ "$OLLAMA_FALLBACK_ENABLED" != "1" ]; then
     log "OLLAMA: fallback disabled (OLLAMA_FALLBACK_ENABLED=${OLLAMA_FALLBACK_ENABLED})"
@@ -345,27 +334,22 @@ run_ollama_agent() {
     log "OLLAMA: not installed/on PATH"
     return 1
   fi
-
-  # If Ollama server isn't running (common under cron/non-GUI), start it.
   if ! ollama list >/dev/null 2>&1; then
     if [ "${DRY_RUN:-0}" = "1" ]; then
       log "OLLAMA: server not reachable; DRY_RUN so not starting server."
     else
       log "OLLAMA: server not reachable; starting 'ollama serve' in background..."
       (nohup ollama serve >/dev/null 2>&1 &)
-      # Give it a moment, then continue (model picking will retry).
       sleep 1
     fi
   fi
-
   local model
   model="$(pick_ollama_model)"
   if [ -z "$model" ]; then
-    log "OLLAMA: no installed models found OR server unreachable. To prove models exist, run: ollama list"
+    log "OLLAMA: no installed models found OR server unreachable."
     return 1
   fi
   log "OLLAMA: running model=${model}"
-  # Feed prompt on stdin to avoid shell escaping issues.
   printf "%s" "$prompt" | ollama run "$model" 2>&1 | tee -a "$LOG_FILE" || true
   return 0
 }
@@ -392,7 +376,6 @@ skip_issue_number() {
 }
 
 issue_has_skip_label() {
-  # $1: issue json
   [ -z "$SKIP_LABELS" ] && return 1
   local labels
   labels="$(echo "$1" | jq -r '[.labels[]?.name // empty] | map(ascii_downcase) | .[]' 2>/dev/null || true)"
@@ -409,7 +392,6 @@ issue_has_skip_label() {
 }
 
 pick_first_eligible_issue() {
-  # Returns a single issue object (json) or empty string.
   local issues_json="$1"
   [ -z "$issues_json" ] && return 0
   echo "$issues_json" | jq -r '.[] | @base64' | while read -r b64; do
@@ -432,7 +414,7 @@ pick_first_eligible_issue() {
 
 has_open_autoworker_pr() {
   # One PR at a time per repo, based on branch prefix.
-  # NOTE: `gh ... --jq` does not support passing jq args; interpolate safely.
+  # NOTE: `gh ... --jq` does not support passing jq args; interpolate safely via Python.
   local pfx_escaped
   pfx_escaped="$(printf "%s" "$BRANCH_PREFIX" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')"
   gh pr list --state open --author "@me" --json headRefName,number,title --jq \
@@ -440,24 +422,20 @@ has_open_autoworker_pr() {
 }
 
 infer_issue_number_from_branch() {
-  # $1: branch name (e.g. fix/issue-89, fix/issue-89-chat)
-  # Prints number or empty.
   local b="${1:-}"
-  python3 - "$b" <<'PY'
+  python3 -c '
 import re, sys
 b = sys.argv[1] if len(sys.argv) > 1 else ""
 m = re.search(r"issue-([0-9]+)", b)
 print(m.group(1) if m else "")
-PY
+' "$b"
 }
 
 infer_issue_number_from_pr() {
-  # $1: PR number
-  # Best-effort: find "Closes #N" or first "#N" in PR body.
   local prn="${1:-}"
   [ -z "$prn" ] && return 0
   local body
-  body="$(gh pr view "$prn" --json body --jq '.body // \"\"' 2>/dev/null || true)"
+  body="$(gh pr view "$prn" --json body --jq '.body // ""' 2>/dev/null || true)"
   python3 -c '
 import re, sys
 s = sys.argv[1] if len(sys.argv) > 1 else ""
@@ -468,6 +446,7 @@ print(m.group(1) if m else "")
 ' "$body"
 }
 
+# ── Startup ─────────────────────────────────────────────────────
 ensure_log_dir
 cd "$REPO_DIR" || { echo "REPO_DIR not found: $REPO_DIR" >&2; exit 1; }
 for c in jq gh git; do require_cmd "$c"; done
@@ -496,7 +475,6 @@ cleanup() {
     kill "$HEARTBEAT_PID" 2>/dev/null || true
   fi
   if [ "${DID_STASH:-0}" = "1" ]; then
-    # Only restore if the working tree is clean; otherwise leave stash for manual resolution.
     if [ -z "$(git status --porcelain 2>/dev/null || true)" ]; then
       git stash pop -q 2>>"$LOG_FILE" || true
       log "GIT: restored pre-run stash."
@@ -507,32 +485,23 @@ cleanup() {
 }
 
 save_progress_and_exit() {
-  # Called on SIGTERM/SIGINT to preserve partial work.
   STOP_REQUESTED=1
   log "STOP: received stop signal; saving progress..."
-
-  # Best-effort: if we have a state file, keep it as in_progress so we resume later.
   local n=""
   local branch=""
   if [ -f "$STATE_FILE" ]; then
     n="$(jq -r '.number // empty' "$STATE_FILE" 2>/dev/null || true)"
     branch="$(jq -r '.branch // empty' "$STATE_FILE" 2>/dev/null || true)"
   fi
-
-  # Commit any current changes as a WIP commit so nothing is lost.
   if [ -n "$(git status --porcelain 2>/dev/null || true)" ]; then
     git add -A 2>>"$LOG_FILE" || true
-    git commit -m "$(cat <<EOF
-wip: partial progress on issue #${n:-unknown} (stopped)
+    git commit -m "wip: partial progress on issue #${n:-unknown} (stopped)
 
-Work in progress — stopped from monitor. Resume later.
-EOF
-)" 2>>"$LOG_FILE" || true
+Work in progress — stopped from monitor. Resume later." 2>>"$LOG_FILE" || true
     log "STOP: saved WIP commit (issue #${n:-unknown}, branch ${branch:-unknown})."
   else
     log "STOP: no uncommitted changes to save."
   fi
-
   exit 0
 }
 
@@ -541,11 +510,9 @@ trap save_progress_and_exit TERM INT
 
 log "START: repo=${REPO_DIR}, dry_run=${DRY_RUN}, state_file=${STATE_FILE}"
 
-# Best-effort: make GH_TOKEN available if user has `gh auth login` set up.
 ensure_gh_token
 
-# Periodic heartbeat so logs show we're alive (useful when waiting on LLM/network).
-# Disable by setting HEARTBEAT_INTERVAL_SECONDS=0.
+# Periodic heartbeat so logs show we're alive.
 HEARTBEAT_PID=""
 if [ "${HEARTBEAT_INTERVAL_SECONDS:-0}" -gt 0 ] 2>/dev/null; then
   (
@@ -557,7 +524,8 @@ if [ "${HEARTBEAT_INTERVAL_SECONDS:-0}" -gt 0 ] 2>/dev/null; then
   HEARTBEAT_PID="$!"
   log "HEARTBEAT: enabled (every ${HEARTBEAT_INTERVAL_SECONDS}s, pid ${HEARTBEAT_PID})"
 fi
-# Always stash local changes so branch checkouts/pulls can't fail (including edits to this script).
+
+# Always stash local changes so branch checkouts/pulls can't fail.
 DID_STASH=0
 if [ -n "$(git status --porcelain 2>/dev/null || true)" ]; then
   log "GIT: working tree dirty; creating temporary stash for auto-worker."
@@ -565,8 +533,7 @@ if [ -n "$(git status --porcelain 2>/dev/null || true)" ]; then
   DID_STASH=1
 fi
 
-# DRY_RUN=1 means: do not mutate the repo at all (no branch creation, no agent run, no commits).
-# We still compute what would be done and log it.
+# DRY_RUN=1: compute what would be done and log it, without any mutations.
 if [ "$DRY_RUN" = "1" ]; then
   DEFAULT_BRANCH=$(git_default_branch "$REPO_DIR")
   git checkout "$DEFAULT_BRANCH" 2>>"$LOG_FILE" || true
@@ -612,7 +579,7 @@ if [ -f "$LOG_FILE" ] && tail -50 "$LOG_FILE" | grep -qi "You've hit your limit\
   log "Claude is rate limited. Will use Gemini for P3-low issues only."
 fi
 
-# Also probe current status so we don't waste time attempting Claude.
+# Also probe live so we don't waste time attempting Claude.
 if [ "$CLAUDE_RATE_LIMITED" = false ] && detect_claude_rate_limit_now; then
   CLAUDE_RATE_LIMITED=true
   log "Claude is rate limited (live probe). Skipping Claude and going straight to Gemini."
@@ -646,7 +613,6 @@ if [ "$RESUMING" = false ]; then
     OPEN_PR_TITLE=$(echo "$OPEN_AUTO_PR" | jq -r '.title')
     OPEN_PR_BRANCH=$(echo "$OPEN_AUTO_PR" | jq -r '.headRefName')
 
-    # Best-effort: infer issue number from branch name like fix/issue-89 or fix/issue-89-chat.
     INFERRED_NUM="$(infer_issue_number_from_branch "$OPEN_PR_BRANCH")"
     if [ -z "$INFERRED_NUM" ]; then
       INFERRED_NUM="$(infer_issue_number_from_pr "$OPEN_PR_NUM")"
@@ -680,29 +646,20 @@ if [ "$RESUMING" = false ]; then
   else
     log "Checking for open issues..."
 
-    if [ "$CLAUDE_RATE_LIMITED" = true ]; then
-      # When Claude is rate limited, only consider P3 issues (best effort).
-      ISSUES=$(gh issue list --state open --json number,title,labels --jq '
-        [.[]] |
-        map(select(.number != 0)) |
-        map(select(.labels | any(.name | startswith("P3")))) |
-        sort_by(.number)
-      ' 2>>"$LOG_FILE" || true)
-    else
-      # Normal: P0 > P1 > P2 > P3 > other; then oldest (lowest number).
-      ISSUES=$(gh issue list --state open --json number,title,labels --jq '
-        [.[]] |
-        map(select(.number != 0)) |
-        def priority:
-          [.labels[]?.name // empty]
-          | if any(startswith("P0")) then 0
-            elif any(startswith("P1")) then 1
-            elif any(startswith("P2")) then 2
-            elif any(startswith("P3")) then 3
-            else 4 end;
-        sort_by([priority, .number])
-      ' 2>>"$LOG_FILE" || true)
-    fi
+    # Normal priority sort: P0 > P1 > P2 > P3 > other; then oldest (lowest number).
+    # Claude rate-limit only affects which AI model is used, not which issues we pick.
+    ISSUES=$(gh issue list --state open --json number,title,labels --jq '
+      [.[]] |
+      map(select(.number != 0)) |
+      def priority:
+        [.labels[]?.name // empty]
+        | if any(startswith("P0")) then 0
+          elif any(startswith("P1")) then 1
+          elif any(startswith("P2")) then 2
+          elif any(startswith("P3")) then 3
+          else 4 end;
+      sort_by([priority, .number])
+    ' 2>>"$LOG_FILE" || true)
 
     ISSUE="$(pick_first_eligible_issue "$ISSUES")"
     if [ -z "$ISSUE" ]; then
@@ -767,29 +724,15 @@ ${CHANGES:-None}
 "
 fi
 
-# ── Run the agent CLI (Claude/Gemini, with Ollama fallback) ─────
+# ── Fetch PR feedback and inject into prompt ─────────────────────
 PR_FEEDBACK=""
 OPEN_HEAD_PR_NUM="$(gh pr list --state open --head "$BRANCH" --json number --jq '.[0].number // empty' 2>/dev/null || true)"
 if [ -n "${OPEN_HEAD_PR_NUM:-}" ]; then
   PR_FEEDBACK="$(fetch_pr_feedback "$OPEN_HEAD_PR_NUM" || true)"
   log "PR CONTEXT: loaded feedback from PR #${OPEN_HEAD_PR_NUM} ($(printf "%s" "$PR_FEEDBACK" | wc -c | tr -d ' ') bytes)"
   if [ "${STOP_AFTER_PR_FEEDBACK:-0}" = "1" ]; then
-    log "WARNING: STOP_AFTER_PR_FEEDBACK=1 is set — this is a debug flag that prevents the worker from doing actual work. Remove it from your environment to allow full runs."
+    log "WARNING: STOP_AFTER_PR_FEEDBACK=1 is set — this debug flag prevents actual work. Unset it to allow full runs."
     log "STOP_AFTER_PR_FEEDBACK=1 set; exiting after loading PR context."
-    exit 0
-  fi
-  if [ "${REPLY_TO_PR_FEEDBACK_ONLY:-0}" = "1" ]; then
-    post_pr_reply "$OPEN_HEAD_PR_NUM" "$(cat <<EOF
-Saw your PR comment. I’m going to iterate directly on this PR.
-
-- I’ll treat the PR thread as the “source of truth” for feedback.
-- Next run will pull the latest PR comments + inline review notes and use them as requirements.
-- If changes are needed, I’ll push additional commits to this same branch so PR #${OPEN_HEAD_PR_NUM} updates in place.
-
-If you want me to prioritize a specific fix, drop acceptance criteria in the PR comment as a checklist (what to click + expected result).
-EOF
-)"
-    log "REPLY_TO_PR_FEEDBACK_ONLY=1 set; replied on PR and exiting."
     exit 0
   fi
 fi
@@ -837,7 +780,6 @@ if [ "$PREFER_CLAUDE" = "1" ] && [ "$CLAUDE_RATE_LIMITED" = false ]; then
   log "Running Claude Code on issue #${NUMBER}..."
   USED_PROVIDER="claude"
   if ! claude -p --verbose --model opus "$AGENT_PROMPT" --allowedTools Bash,Read,Write,Edit,MultiEdit 2>&1 | tee -a "$LOG_FILE"; then
-    # If Claude fails, fall back to Gemini.
     log "WARN: Claude failed; falling back to Gemini."
     USED_PROVIDER=""
   fi
@@ -852,16 +794,15 @@ if [ -z "$USED_PROVIDER" ]; then
   fi
   _tmp="$(mktemp)"
   set +e
-  # Prefer patch mode so we don't depend on Gemini's filesystem tools (which can fail).
   run_gemini_patch_ladder_and_apply "$NUMBER" "$TITLE" "$BODY" 2>&1 | tee -a "$LOG_FILE" | tee "$_tmp" >/dev/null
   gem_rc="${PIPESTATUS[0]}"
   set -e
-  if [ "$gem_rc" -ne 0 ] && grep -qiE "Please set an Auth method|GEMINI_API_KEY|GOOGLE_GENAI_USE_VERTEXAI|GOOGLE_GENAI_USE_GCA|RESOURCE_EXHAUSTED|credits are depleted|prepayment credits are depleted|rate limit|429|too many requests|quota" "$_tmp"; then
+  if [ "$gem_rc" -ne 0 ] && grep -qiE "Please set an Auth method|GEMINI_API_KEY|GOOGLE_GENAI_USE_VERTEXAI|RESOURCE_EXHAUSTED|credits are depleted|rate limit|429|too many requests|quota" "$_tmp"; then
     log "GEMINI: auth/billing/rate-limit detected. Falling back to Ollama."
     run_ollama_agent "$AGENT_PROMPT" || log "OLLAMA: fallback failed."
     USED_PROVIDER="ollama"
-  elif [ "$gem_rc" -eq 503 ] || grep -qiE "\"code\"\\s*:\\s*503|\\b503\\b|high demand|UNAVAILABLE" "$_tmp"; then
-    log "ERROR: Gemini models are overloaded/unavailable (503). Continuing to post-agent step (may still have commits to push)."
+  elif [ "$gem_rc" -eq 503 ] || grep -qiE "\"code\"\s*:\s*503|\b503\b|high demand|UNAVAILABLE" "$_tmp"; then
+    log "ERROR: Gemini models are overloaded/unavailable (503). Continuing to post-agent step."
   elif [ "$gem_rc" -ne 0 ]; then
     log "WARN: Gemini exited non-zero (rc=${gem_rc}). Not treating as fallback; check logs."
   fi
@@ -875,7 +816,6 @@ if [ -n "$ACTUAL_CHANGES" ]; then HAS_CHANGES=true; fi
 if [ -n "$(git log "${DEFAULT_BRANCH}"..HEAD --oneline 2>/dev/null)" ]; then HAS_CHANGES=true; fi
 
 if [ "$HAS_CHANGES" = false ]; then
-  # If the agent is claiming it's already implemented / nothing to do, tell the user in the issue.
   reason=""
   if tail -200 "$LOG_FILE" 2>/dev/null | grep -qiE "already implemented|task complete|consider this task complete|feature is implemented|nothing to do"; then
     reason="Agent output indicates it may already be implemented."
@@ -888,16 +828,25 @@ if [ "$HAS_CHANGES" = false ]; then
   exit 1
 fi
 
+# Record the SHA before we commit/push so we can detect truly new commits.
+SHA_BEFORE_COMMIT="$(git rev-parse HEAD 2>/dev/null || echo "")"
+
 if [ -n "$(git status --porcelain)" ]; then
+  # Selectively stage changes — explicitly exclude auto-worker tooling files
+  # that may appear modified in the working tree (they are local-only and must
+  # not be committed to feature branches).
   git add -A
-  git commit -m "$(cat <<EOF
-fix: implement solution for issue #${NUMBER}
+  git reset HEAD -- auto-worker-core.sh auto-worker.sh auto-worker-uninstall.sh auto-worker-monitor/ .gitignore 2>/dev/null || true
+  # Only commit if there are staged changes after excluding tooling files.
+  if [ -n "$(git diff --cached --name-only)" ]; then
+    git commit -m "fix: implement solution for issue #${NUMBER}
 
 Closes #${NUMBER}
 
-Automated implementation by auto-worker.
-EOF
-)" 2>/dev/null || true
+Automated implementation by auto-worker." 2>/dev/null || true
+  else
+    log "INFO: Only tooling files changed (no real code changes to commit)."
+  fi
 fi
 
 ensure_gh_token
@@ -908,13 +857,14 @@ if ! git -c "http.https://github.com/.extraheader=Authorization: basic $(echo -n
   exit 1
 fi
 
-# ── Post a PR comment summarizing what this run did ──────────────
-PUSH_COMMIT_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")"
-PUSH_COMMIT_MSG="$(git log -1 --pretty=%s 2>/dev/null || echo "")"
-PUSH_FILES_CHANGED="$(git diff --name-only HEAD~1..HEAD 2>/dev/null | head -20 || echo "(unknown)")"
+# ── Post a PR comment ONLY when a genuinely new commit was pushed ──
+SHA_AFTER_COMMIT="$(git rev-parse HEAD 2>/dev/null || echo "")"
 PUSH_PR_NUM="$(gh pr list --state open --head "$BRANCH" --json number --jq '.[0].number // empty' 2>/dev/null || true)"
 
 if [ -n "${PUSH_PR_NUM:-}" ] && [ "$SHA_AFTER_COMMIT" != "$SHA_BEFORE_COMMIT" ]; then
+  PUSH_COMMIT_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")"
+  PUSH_COMMIT_MSG="$(git log -1 --pretty=%s 2>/dev/null || echo "")"
+  PUSH_FILES_CHANGED="$(git diff --name-only HEAD~1..HEAD 2>/dev/null | head -20 || echo "(unknown)")"
   _pr_body="## Auto-worker update
 
 Commit: ${PUSH_COMMIT_SHA} -- ${PUSH_COMMIT_MSG}
@@ -927,8 +877,11 @@ ${PUSH_FILES_CHANGED}
 Pushed by auto-worker. Leave a comment to request changes."
   post_pr_reply "$PUSH_PR_NUM" "$_pr_body"
   log "PR COMMENT: posted update on PR #${PUSH_PR_NUM} (commit ${PUSH_COMMIT_SHA})"
+elif [ -n "${PUSH_PR_NUM:-}" ]; then
+  log "PR COMMENT: skipped -- no new commit was made (nothing to report on PR #${PUSH_PR_NUM})"
 fi
 
+# ── Create or skip PR ─────────────────────────────────────────────
 EXISTING_HEAD_PR="$(gh pr list --state open --head "$BRANCH" --json number --jq '.[0].number // empty' 2>/dev/null || true)"
 if [ -n "${EXISTING_HEAD_PR:-}" ]; then
   log "INFO: PR #${EXISTING_HEAD_PR} already exists for branch ${BRANCH}; skipping gh pr create."
@@ -944,8 +897,7 @@ fi
 
 if ! gh pr create \
   --title "fix: ${TITLE}" \
-  --body "$(cat <<EOF
-## Summary
+  --body "## Summary
 
 Automated implementation for #${NUMBER}.
 
@@ -961,10 +913,7 @@ Closes #${NUMBER}
 - [ ] Code follows existing project patterns
 
 ---
-*This PR was generated automatically by the auto-worker.*
-EOF
-)" 2>&1 | tee -a "$LOG_FILE"; then
-  # If the PR already exists, don't treat that as an error.
+This PR was generated automatically by the auto-worker." 2>&1 | tee -a "$LOG_FILE"; then
   if tail -200 "$LOG_FILE" | grep -qiE "pull request.*already exists|a pull request for branch .* already exists"; then
     log "INFO: PR already exists for branch ${BRANCH}; continuing."
   else
@@ -976,4 +925,3 @@ fi
 rm -f "$STATE_FILE"
 git checkout "$DEFAULT_BRANCH"
 log "Done with issue #${NUMBER}. PR created."
-

@@ -12,6 +12,7 @@ dcn-worker/config.json
 
 # Local-only: GitHub issue auto-worker (keep copies on your machine; not in repo)
 auto-worker.sh
+auto-worker-core.sh
 auto-worker-uninstall.sh
 auto-worker-monitor/
 .auto-worker-state.json

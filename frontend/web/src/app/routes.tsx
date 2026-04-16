@@ -8,7 +8,6 @@ import { Navigate, useLocation } from "react-router";
 import { AllJobsPage } from "./pages/all-jobs";
 import { AccountPage } from "./pages/account";
 import { PricingPage } from "./pages/pricing";
-import { ChatPage } from "./pages/chat";
 
 function RedirectResultsToJobs() {
   const { hash } = useLocation();
@@ -34,10 +33,6 @@ export const router = createBrowserRouter([
   {
     path: "/submit",
     Component: SubmitJobPage,
-  },
-  {
-    path: "/chat",
-    Component: ChatPage,
   },
   {
     path: "/account",
