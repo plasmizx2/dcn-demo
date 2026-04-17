@@ -1,11 +1,11 @@
 import { useNavigate } from 'react-router';
-import { Check } from 'lucide-react';
+import { Check, Lock } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useRequireAuth } from '../hooks/use-require-auth';
+import { useAuth } from '../hooks/use-auth';
 
 export function PricingPage() {
   const navigate = useNavigate();
-  const { user } = useRequireAuth();
+  const { user, loading } = useAuth();
 
   const tiers = [
     {
@@ -82,12 +82,20 @@ export function PricingPage() {
                 </button>
               </>
             ) : (
-              <button
-                onClick={() => navigate('/')}
-                className="text-sm hover:text-purple-400 transition"
-              >
-                Back
-              </button>
+              <>
+                <button
+                  onClick={() => navigate('/')}
+                  className="text-sm hover:text-purple-400 transition"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={() => navigate('/login?next=/pricing')}
+                  className="text-sm px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold transition"
+                >
+                  Sign In
+                </button>
+              </>
             )}
           </div>
         </nav>
@@ -151,22 +159,21 @@ export function PricingPage() {
               <button
                 onClick={() => {
                   if (!user) {
-                    navigate('/');
-                  } else if (tier.name === 'Free') {
-                    navigate('/account');
-                  } else if (tier.name === 'Pro') {
-                    navigate('/account');
+                    // Redirect to login, then back to pricing so they can complete the purchase
+                    navigate('/login?next=/pricing');
                   } else {
                     navigate('/account');
                   }
                 }}
-                className={`w-full py-3 rounded-lg font-semibold mb-8 transition ${
+                disabled={loading}
+                className={`w-full py-3 rounded-lg font-semibold mb-8 transition flex items-center justify-center gap-2 ${
                   tier.featured
                     ? 'bg-purple-600 hover:bg-purple-700 text-white'
                     : 'bg-slate-700 hover:bg-slate-600 text-white'
-                }`}
+                } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                {user ? tier.cta : 'Sign Up'}
+                {!user && !loading && <Lock className="w-4 h-4" />}
+                {loading ? 'Loading...' : user ? tier.cta : `Sign in to ${tier.name === 'Free' ? 'start' : 'buy'}`}
               </button>
 
               <div className="space-y-3">

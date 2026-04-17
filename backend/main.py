@@ -467,11 +467,25 @@ def _session_cookie_args(request: Request | None = None) -> dict:
     }
 
 
-async def _finish_oauth_login(user: dict, request: Request | None = None) -> RedirectResponse:
+def _safe_next_path(next_path: str | None) -> str | None:
+    """Validate a ?next= value: must be a relative path (prevents open redirects)."""
+    if not next_path:
+        return None
+    # Only allow relative paths starting with "/" but not "//" (protocol-relative)
+    if not next_path.startswith("/") or next_path.startswith("//"):
+        return None
+    return next_path
+
+
+async def _finish_oauth_login(user: dict, request: Request | None = None, next_path: str | None = None) -> RedirectResponse:
     """Shared helper: create session, set cookie, redirect."""
     token = await create_session(user)
+    safe_next = _safe_next_path(next_path)
     if user["role"] == "waitlister":
         redirect = "/waitlist"
+    elif safe_next:
+        # Honor user-requested post-login destination (e.g. /pricing)
+        redirect = safe_next
     elif user["role"] in ELEVATED_ROLES:
         redirect = "/ops"
     else:
@@ -495,14 +509,19 @@ async def serve_login(request: Request):
 @app.get("/auth/google")
 async def google_login(request: Request):
     base = _get_base_url(request)
-    params = urlencode({
+    next_path = _safe_next_path(request.query_params.get("next"))
+    oauth_params: dict = {
         "client_id": GOOGLE_CLIENT_ID,
         "redirect_uri": f"{base}/auth/google/callback",
         "response_type": "code",
         "scope": "openid email profile",
         "access_type": "offline",
         "prompt": "select_account",
-    })
+    }
+    if next_path:
+        # Pass next path through OAuth state so the callback can honor it
+        oauth_params["state"] = next_path
+    params = urlencode(oauth_params)
     return RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{params}")
 
 
@@ -543,18 +562,24 @@ async def google_callback(request: Request):
         provider="google",
         provider_id=str(info["id"]),
     )
-    return await _finish_oauth_login(user, request)
+    next_path = request.query_params.get("state")
+    return await _finish_oauth_login(user, request, next_path=next_path)
 
 
 # ── GitHub OAuth ─────────────────────────────────────────────
 @app.get("/auth/github")
 async def github_login(request: Request):
     base = _get_base_url(request)
-    params = urlencode({
+    next_path = _safe_next_path(request.query_params.get("next"))
+    oauth_params: dict = {
         "client_id": GITHUB_CLIENT_ID,
         "redirect_uri": f"{base}/auth/github/callback",
         "scope": "read:user user:email",
-    })
+    }
+    if next_path:
+        # Pass next path through OAuth state so the callback can honor it
+        oauth_params["state"] = next_path
+    params = urlencode(oauth_params)
     return RedirectResponse(f"https://github.com/login/oauth/authorize?{params}")
 
 
@@ -612,7 +637,8 @@ async def github_callback(request: Request):
         provider="github",
         provider_id=str(gh_user["id"]),
     )
-    return await _finish_oauth_login(user, request)
+    next_path = request.query_params.get("state")
+    return await _finish_oauth_login(user, request, next_path=next_path)
 
 
 # ── Session endpoints ────────────────────────────────────────

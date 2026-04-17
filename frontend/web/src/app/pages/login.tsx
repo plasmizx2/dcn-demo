@@ -1,18 +1,38 @@
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { motion } from 'motion/react';
 import { Cpu, Github } from 'lucide-react';
 import { useEffect } from 'react';
 import { useAuth } from '../hooks/use-auth';
 
+// Only allow relative paths as a safety measure (prevents open-redirect).
+function safeNext(raw: string | null): string | null {
+  if (!raw) return null;
+  if (!raw.startsWith('/') || raw.startsWith('//')) return null;
+  return raw;
+}
+
 export function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, loading } = useAuth();
+
+  const nextPath = safeNext(searchParams.get('next'));
+  const nextQS = nextPath ? `?next=${encodeURIComponent(nextPath)}` : '';
 
   useEffect(() => {
     if (loading || !user) return;
-    const dest = user.role === 'waitlister' ? '/waitlist' : (user.role === 'admin' || user.role === 'ceo') ? '/ops' : '/submit';
+    if (user.role === 'waitlister') {
+      navigate('/waitlist', { replace: true });
+      return;
+    }
+    // If an already-signed-in user lands here with ?next=/foo, send them straight there
+    if (nextPath) {
+      navigate(nextPath, { replace: true });
+      return;
+    }
+    const dest = (user.role === 'admin' || user.role === 'ceo') ? '/ops' : '/submit';
     navigate(dest, { replace: true });
-  }, [loading, user, navigate]);
+  }, [loading, user, navigate, nextPath]);
 
   if (loading) {
     return (
@@ -75,7 +95,7 @@ export function LoginPage() {
             {/* GitHub Primary Button */}
             <div className="space-y-2">
               <a
-                href="/auth/github"
+                href={`/auth/github${nextQS}`}
                 className="group w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 transition-all border border-purple-500/50 hover:border-purple-400/50 text-white shadow-lg shadow-purple-500/20"
               >
                 <Github className="w-5 h-5" />
@@ -108,7 +128,7 @@ export function LoginPage() {
 
             {/* Google Alternative */}
             <a
-              href="/auth/google"
+              href={`/auth/google${nextQS}`}
               className="group w-full flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl bg-white hover:bg-gray-50 transition-all border border-gray-200 hover:shadow-lg"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
