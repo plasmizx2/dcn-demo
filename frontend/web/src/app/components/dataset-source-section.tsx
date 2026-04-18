@@ -35,6 +35,8 @@ type Props = {
   onUploadTokenChange: (t: string | null) => void;
   targetOverride: string;
   onTargetOverrideChange: (v: string) => void;
+  /** Called whenever preview data changes (or is cleared). Parent uses stats for cost estimate. */
+  onPreviewChange?: (preview: DatasetPreview | null) => void;
 };
 
 const tabs: { id: DatasetMode; label: string; icon: typeof Database }[] = [
@@ -58,10 +60,16 @@ export function DatasetSourceSection({
   onUploadTokenChange,
   targetOverride,
   onTargetOverrideChange,
+  onPreviewChange,
 }: Props) {
   const [builtIns, setBuiltIns] = useState<BuiltinDatasetMeta[]>([]);
   const [preview, setPreview] = useState<DatasetPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+
+  const setPreviewAndNotify = (p: DatasetPreview | null) => {
+    setPreview(p);
+    onPreviewChange?.(p);
+  };
   const [uploadBusy, setUploadBusy] = useState(false);
 
   useEffect(() => {
@@ -105,10 +113,10 @@ export function DatasetSourceSection({
         throw new Error(typeof d === 'string' ? d : 'Preview failed');
       }
       const data = await res.json();
-      setPreview(data as DatasetPreview);
+      setPreviewAndNotify(data as DatasetPreview);
       toast.success('Dataset loaded');
     } catch (e) {
-      setPreview(null);
+      setPreviewAndNotify(null);
       toast.error(e instanceof Error ? e.message : 'Preview failed');
     } finally {
       setPreviewLoading(false);
@@ -121,7 +129,7 @@ export function DatasetSourceSection({
     if (!file) return;
     setUploadBusy(true);
     onUploadTokenChange(null);
-    setPreview(null);
+    setPreviewAndNotify(null);
     try {
       const fd = new FormData();
       fd.append('file', file);
@@ -148,7 +156,7 @@ export function DatasetSourceSection({
         const err = await pr.json().catch(() => ({}));
         throw new Error((err as { detail?: string }).detail || 'Preview failed');
       }
-      setPreview(await pr.json());
+      setPreviewAndNotify(await pr.json());
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Upload failed');
     } finally {

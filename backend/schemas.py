@@ -12,6 +12,9 @@ class JobCreate(BaseModel):
     reward_amount: float = 0.00
     requires_validation: bool = False
     payment_intent_id: Optional[str] = None
+    # Optional dataset stats from client preview (n_rows, n_cols).
+    # Used only by /jobs/estimate to scale the cost estimate; ignored on job creation.
+    dataset_stats: Optional[dict] = None
 
 
 class TaskClaim(BaseModel):

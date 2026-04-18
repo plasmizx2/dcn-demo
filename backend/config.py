@@ -50,6 +50,14 @@ ESTIMATED_SECONDS_PER_TIER: dict[int, int] = {1: 3, 2: 5, 3: 8, 4: 14}
 # Platform fee as a percentage of compute cost
 PLATFORM_FEE_PERCENT: float = 15.0
 
+# ── Dataset scale factors (for pre-submission cost estimates) ─
+# Estimates apply a sub-linear multiplier based on dataset dimensions.
+# At the baseline (ROWS_BASELINE rows, COLS_BASELINE cols) the multiplier is 1.0.
+# Uses log2 scaling so cost grows meaningfully but not explosively with size.
+DATASET_ROWS_BASELINE: int = 1_000   # 1K rows → data_multiplier 1.0
+DATASET_COLS_BASELINE: int = 10      # 10 cols → data_multiplier 1.0
+DATASET_SCALE_CAP: float = 10.0     # multiplier is capped at 10× baseline
+
 # ── Task Timeouts ──────────────────────────────────────────
 # Max seconds a single ML training call (cross_validate + fit) may run
 TASK_TRAINING_TIMEOUT_SECONDS: int = 300  # 5 minutes
