@@ -270,7 +270,7 @@ export function WorkerLogsPage() {
                           <tbody>
                             {history.map((h, i) => (
                               <tr key={`${h.task_id}-${i}`} className="border-b border-white/5">
-                                <td className="p-2 text-slate-300">
+                                <td className="p-2 text-slate-300 max-w-[300px] overflow-hidden text-ellipsis whitespace-nowrap">
                                   {h.task_name || (h.task_id ? String(h.task_id).slice(0, 8) : '—')}
                                 </td>
                                 <td className="p-2 text-slate-400 truncate max-w-[120px]">
