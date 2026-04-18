@@ -1,7 +1,8 @@
 """API routes for bug reports and contact messages."""
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+import re
 from typing import Optional
 from database import get_pool
 from auth import get_session, ELEVATED_ROLES
@@ -21,6 +22,14 @@ class ContactMessage(BaseModel):
     email: str
     subject: str = "general"
     message: str
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        pattern = r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
+        if not re.match(pattern, v.strip()):
+            raise ValueError("Invalid email address")
+        return v.strip()
 
 
 @router.post("/bugs")
