@@ -124,13 +124,14 @@ def construct_webhook_event(payload: bytes, sig_header: str):
 
 # ── Pro subscription ─────────────────────────────────────────────────────────
 
-async def create_pro_subscription(user_id: str, email: str) -> dict:
+async def create_pro_subscription(user_id: str, email: str, base_url: str | None = None) -> dict:
     """Create a Stripe Checkout session for Pro tier ($5/mo)."""
     if not STRIPE_PRO_PRICE_ID:
         raise ValueError("STRIPE_PRO_PRICE_ID not configured")
 
     from database import get_pool
 
+    base = base_url or BASE_URL
     uid = str(user_id)
 
     pool = await get_pool()
@@ -150,16 +151,17 @@ async def create_pro_subscription(user_id: str, email: str) -> dict:
         customer=customer_id,
         mode="subscription",
         line_items=[{"price": STRIPE_PRO_PRICE_ID, "quantity": 1}],
-        success_url=f"{BASE_URL}/account?upgrade=success&session_id={{CHECKOUT_SESSION_ID}}",
-        cancel_url=f"{BASE_URL}/account?upgrade=cancelled",
+        success_url=f"{base}/account?upgrade=success&session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{base}/account?upgrade=cancelled",
         metadata={"dcn_user_id": uid},
     )
     return {"checkout_url": session.url, "session_id": session.id}
 
 
-async def create_topup_checkout_session(user_id: str, email: str, amount_cents: int) -> dict:
+async def create_topup_checkout_session(user_id: str, email: str, amount_cents: int, base_url: str | None = None) -> dict:
     """Create a Stripe Checkout session to top up user balance."""
     from database import get_pool
+    base = base_url or BASE_URL
     uid = str(user_id)
     pool = await get_pool()
     async with pool.acquire() as conn:
@@ -184,8 +186,8 @@ async def create_topup_checkout_session(user_id: str, email: str, amount_cents: 
             },
             "quantity": 1,
         }],
-        success_url=f"{BASE_URL}/account?topup=success&session_id={{CHECKOUT_SESSION_ID}}",
-        cancel_url=f"{BASE_URL}/account?topup=cancelled",
+        success_url=f"{base}/account?topup=success&session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{base}/account?topup=cancelled",
         metadata={"dcn_user_id": uid, "topup_amount_cents": str(amount_cents)},
     )
     return {"checkout_url": session.url, "session_id": session.id}

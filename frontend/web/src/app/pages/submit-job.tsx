@@ -293,6 +293,9 @@ export function SubmitJobPage() {
                     <p className="mt-2 text-xs text-slate-500">
                       More task types ship when planners are enabled server-side.
                     </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Looking for local LLM chat? <a href="/chat" className="text-purple-400 hover:underline">Start a private chat session.</a>
+                    </p>
                   </div>
 
                   <DatasetSourceSection
