@@ -3,6 +3,7 @@ import {
   DatasetSourceSection,
   buildJobInputPayload,
   type DatasetMode,
+  type DatasetPreview,
 } from '../components/dataset-source-section';
 import { TierBadge } from '../components/stripe-payment';
 import { motion } from 'motion/react';
@@ -17,6 +18,8 @@ type CostEstimate = {
   platform_fee: number;
   platform_fee_percent: number;
   estimated_total: number;
+  data_multiplier?: number;
+  dataset_stats?: { n_rows: number | null; n_cols: number | null };
 };
 
 type TierInfo = {
@@ -27,6 +30,12 @@ type TierInfo = {
 
 const money = (n: number) =>
   new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
+
+/** Display a fee amount. Shows "< $0.01" when the fee is positive but below one cent. */
+const feeDisplay = (fee: number) => {
+  if (fee > 0 && fee < 0.01) return '< $0.01';
+  return money(fee);
+};
 
 export function SubmitJobPage() {
   const { ready } = useRequireAuth();
@@ -45,6 +54,7 @@ export function SubmitJobPage() {
   const [csvUrl, setCsvUrl] = useState('');
   const [uploadToken, setUploadToken] = useState<string | null>(null);
   const [targetOverride, setTargetOverride] = useState('');
+  const [previewStats, setPreviewStats] = useState<{ n_rows: number; n_cols: number } | null>(null);
 
   // Billing state
   const [tierInfo, setTierInfo] = useState<TierInfo | null>(null);
@@ -90,6 +100,7 @@ export function SubmitJobPage() {
               description: description || '',
               task_type: taskType,
               input_payload: inputPayload,
+              ...(previewStats ? { dataset_stats: previewStats } : {}),
             }),
           });
           if (!res.ok) {
@@ -119,7 +130,7 @@ export function SubmitJobPage() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [ready, title, description, taskType, inputPayload]);
+  }, [ready, title, description, taskType, inputPayload, previewStats]);
 
   const validateForm = (): boolean => {
     if (!title.trim() || !description.trim()) {
@@ -315,6 +326,11 @@ export function SubmitJobPage() {
                     onUploadTokenChange={setUploadToken}
                     targetOverride={targetOverride}
                     onTargetOverrideChange={setTargetOverride}
+                    onPreviewChange={(p) =>
+                      setPreviewStats(
+                        p ? { n_rows: p.row_count, n_cols: p.columns.length } : null,
+                      )
+                    }
                   />
 
                   {/* Description */}
@@ -394,7 +410,10 @@ export function SubmitJobPage() {
                     </p>
                     <p className="text-xs text-slate-400 leading-relaxed">
                       {estimate.subtask_count} planned tasks · {money(estimate.compute_cost)} compute +{' '}
-                      {estimate.platform_fee_percent}% fee ({money(estimate.platform_fee)})
+                      {estimate.platform_fee_percent}% fee ({feeDisplay(estimate.platform_fee)})
+                      {estimate.data_multiplier != null && estimate.data_multiplier !== 1 && (
+                        <> · {estimate.data_multiplier}× dataset scale</>
+                      )}
                     </p>
                     {tierInfo?.tier === 'free' && (
                       <p className="text-xs text-emerald-400">

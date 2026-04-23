@@ -53,7 +53,24 @@ async def estimate_cost(job: JobCreate, request: Request) -> dict:
         subtasks = plan_tasks(job.task_type, job.input_payload)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    return estimate_job_cost(subtasks)
+
+    # Resolve dataset dimensions for the data-scale multiplier.
+    # 1. Prefer explicit stats from the client (post-preview).
+    # 2. Fall back to known built-in dataset sizes for built_in sources.
+    n_rows: int | None = None
+    n_cols: int | None = None
+    if job.dataset_stats:
+        n_rows = job.dataset_stats.get("n_rows")
+        n_cols = job.dataset_stats.get("n_cols")
+    elif job.input_payload.get("source", "built_in") == "built_in":
+        from datasets import DATASETS
+        ds_name = job.input_payload.get("dataset_name", "weather_ri")
+        if ds_name in DATASETS:
+            ds_info = DATASETS[ds_name]
+            n_rows = 75_000  # all built-in datasets are generated at 75K rows
+            n_cols = len(ds_info.get("all_features", [])) + 1  # features + target col
+
+    return estimate_job_cost(subtasks, n_rows=n_rows, n_cols=n_cols)
 
 
 @router.get("/jobs/mine")
