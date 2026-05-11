@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Database, Globe, Link2, Upload, Loader2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -65,10 +65,22 @@ export function DatasetSourceSection({
   const [builtIns, setBuiltIns] = useState<BuiltinDatasetMeta[]>([]);
   const [preview, setPreview] = useState<DatasetPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  // Tracks whether the user has explicitly chosen "Custom…" in the target select
+  const [targetCustomMode, setTargetCustomMode] = useState(false);
+  const prevPreviewRef = useRef<DatasetPreview | null>(null);
 
   const setPreviewAndNotify = (p: DatasetPreview | null) => {
     setPreview(p);
     onPreviewChange?.(p);
+    // When a new preview loads, reset custom-mode and clear any stale override
+    if (p && p !== prevPreviewRef.current) {
+      setTargetCustomMode(false);
+      // Only clear if the current override isn't a column from the new dataset
+      if (!p.columns.includes(targetOverride)) {
+        onTargetOverrideChange('');
+      }
+    }
+    prevPreviewRef.current = p;
   };
   const [uploadBusy, setUploadBusy] = useState(false);
 
@@ -274,14 +286,62 @@ export function DatasetSourceSection({
           <label className="block text-sm font-medium text-slate-300 mb-2">
             Target column <span className="text-slate-500 font-normal">(optional)</span>
           </label>
-          <input
-            type="text"
-            value={targetOverride}
-            onChange={(e) => onTargetOverrideChange(e.target.value)}
-            placeholder="Override auto-detected target column"
-            disabled={disabled}
-            className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-white/10 focus:border-purple-500/50 outline-none text-white placeholder:text-slate-500"
-          />
+          {preview && preview.columns.length > 0 ? (() => {
+            const CUSTOM = '__custom__';
+            // A value not in the column list means we're already in custom mode
+            const isCustomValue = targetOverride !== '' && !preview.columns.includes(targetOverride);
+            const inCustomMode = targetCustomMode || isCustomValue;
+            const selectValue = inCustomMode ? CUSTOM : targetOverride;
+            return (
+              <div className="space-y-2">
+                <select
+                  value={selectValue}
+                  onChange={(e) => {
+                    if (e.target.value === CUSTOM) {
+                      setTargetCustomMode(true);
+                      // keep existing override so user can edit it; if empty, clear
+                      if (preview.columns.includes(targetOverride)) {
+                        onTargetOverrideChange('');
+                      }
+                    } else {
+                      setTargetCustomMode(false);
+                      onTargetOverrideChange(e.target.value);
+                    }
+                  }}
+                  disabled={disabled}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-white/10 focus:border-purple-500/50 outline-none text-white"
+                >
+                  <option value="">Auto-detect · {preview.suggested_target}</option>
+                  {preview.columns.map((col) => (
+                    <option key={col} value={col}>
+                      {col}{col === preview.suggested_target ? ' (suggested)' : ''}
+                    </option>
+                  ))}
+                  <option value={CUSTOM}>Custom…</option>
+                </select>
+                {inCustomMode && (
+                  <input
+                    type="text"
+                    value={targetOverride}
+                    onChange={(e) => onTargetOverrideChange(e.target.value)}
+                    placeholder="Type exact column name"
+                    disabled={disabled}
+                    autoFocus
+                    className="w-full px-4 py-2 text-sm rounded-xl bg-slate-800/50 border border-white/10 focus:border-purple-500/50 outline-none text-white placeholder:text-slate-500"
+                  />
+                )}
+              </div>
+            );
+          })() : (
+            <input
+              type="text"
+              value={targetOverride}
+              onChange={(e) => onTargetOverrideChange(e.target.value)}
+              placeholder="Override auto-detected target column"
+              disabled={disabled}
+              className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-white/10 focus:border-purple-500/50 outline-none text-white placeholder:text-slate-500"
+            />
+          )}
         </div>
       )}
 
