@@ -1,3 +1,4 @@
 flask>=3.0
 gunicorn>=22.0
-psycopg2-binary>=2.9
+requests>=2.31
+pynacl>=1.5

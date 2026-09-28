@@ -1,5 +1,5 @@
-# Render Blueprint: creates the web service + a free Postgres database.
-# If deploying from the dcn-demo repo, rootDir points Render at this folder.
+# Render Blueprint (free plan). Render only reads blueprints from the repo
+# root, so move this file there if you deploy with "New → Blueprint".
 services:
   - type: web
     name: strike-tracker
@@ -7,15 +7,14 @@ services:
     plan: free
     rootDir: strike-tracker
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    # Exactly one worker: the Discord backup runs in a background thread.
+    startCommand: gunicorn app:app --workers 1 --threads 8 --timeout 60
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: strike-tracker-db
-          property: connectionString
-      - key: ADMIN_KEY
-        sync: false  # optional: set in the dashboard to lock adding/removing names
-
-databases:
-  - name: strike-tracker-db
-    plan: free
+      - key: DISCORD_WEBHOOK_URL   # storage/backup + announcements
+        sync: false
+      - key: DISCORD_PUBLIC_KEY    # optional: /strikes buttons in Discord
+        sync: false
+      - key: DISCORD_BOT_TOKEN     # optional: registers the /strikes command
+        sync: false
+      - key: ADMIN_KEY             # optional: lock adding/removing names
+        sync: false
